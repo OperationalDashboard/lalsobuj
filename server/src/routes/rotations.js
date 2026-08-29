@@ -1,0 +1,88 @@
+const express = require("express");
+const db = require("../db");
+const { requireAuth, requireModulePermission, requireRole } = require("../middleware/auth");
+const { FULL_ACCESS } = require("../roles");
+
+const router = express.Router();
+router.use(requireAuth);
+const guardWrite = requireModulePermission("rotations", "write");
+
+const WRITABLE = ["bus_id", "driver_id", "helper_id", "supervisor_id", "route", "duty_date", "shift_start", "shift_end", "status", "trip_id"];
+
+// Duty roster, with the linked Trip's live status/times folded in when
+// present — that's what keeps this page from getting stuck on "scheduled"
+// after the bus has actually completed its run. A row with a trip_id was
+// created automatically the moment that trip's bus left the counter (see
+// POST /api/trips) — Rotation no longer needs a duplicate manual entry for
+// a rotation that's already on the road; Accounts does its accounting
+// against that same rotation. Rows whose linked trip has been moved to
+// Trash (see /api/trips/trash) are excluded — removing a rotation removes
+// it everywhere, not just here.
+router.get("/", (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT r.*, b.reg_number,
+              t.rotation_no as trip_rotation_no, t.status as trip_status,
+              t.departure_time as trip_departure_time, t.arrival_time as trip_arrival_time
+       FROM rotations r
+       LEFT JOIN trips t ON t.id = r.trip_id
+       LEFT JOIN buses b ON b.id = r.bus_id
+       WHERE r.trip_id IS NULL OR t.deleted_at IS NULL
+       ORDER BY r.duty_date DESC, r.id DESC`
+    )
+    .all();
+  res.json(
+    rows.map((r) => ({
+      ...r,
+      // Effective status: if linked to a trip, mirror the trip; otherwise
+      // fall back to whatever was set manually.
+      status: r.trip_id ? (r.trip_status === "completed" ? "completed" : "running") : r.status,
+      shift_end: r.trip_id && r.trip_arrival_time ? r.trip_arrival_time : r.shift_end,
+      rotation_no: r.trip_id ? r.trip_rotation_no : null,
+    }))
+  );
+});
+
+router.post("/", guardWrite, (req, res) => {
+  const present = WRITABLE.filter((c) => req.body[c] !== undefined);
+  if (!present.length) return res.status(400).json({ error: "No valid fields provided" });
+  const placeholders = present.map(() => "?").join(",");
+  const values = present.map((c) => req.body[c]);
+  const info = db.prepare(`INSERT INTO rotations (${present.join(",")}) VALUES (${placeholders})`).run(...values);
+  res.status(201).json(db.prepare("SELECT * FROM rotations WHERE id = ?").get(info.lastInsertRowid));
+});
+
+router.put("/:id", guardWrite, (req, res) => {
+  const present = WRITABLE.filter((c) => req.body[c] !== undefined);
+  if (!present.length) return res.status(400).json({ error: "No valid fields provided" });
+  const setClause = present.map((c) => `${c} = ?`).join(", ");
+  const values = present.map((c) => req.body[c]);
+  const info = db.prepare(`UPDATE rotations SET ${setClause} WHERE id = ?`).run(...values, req.params.id);
+  if (info.changes === 0) return res.status(404).json({ error: "Not found" });
+  res.json(db.prepare("SELECT * FROM rotations WHERE id = ?").get(req.params.id));
+});
+
+// Removing a rotation that's linked to a real trip is Admin/Super Admin
+// only, because it takes the whole rotation — both legs, and everything
+// Accounts recorded against it — out of Accounts AND Reports at once,
+// moving it to Trash instead of just unlisting it here. A plain scheduled
+// entry with no linked trip can still be removed by anyone with rotation
+// write access, same as before.
+router.delete("/:id", guardWrite, (req, res) => {
+  const row = db.prepare("SELECT * FROM rotations WHERE id = ?").get(req.params.id);
+  if (!row) return res.status(404).json({ error: "Not found" });
+
+  if (row.trip_id) {
+    if (!FULL_ACCESS.includes(req.user.role)) {
+      return res.status(403).json({ error: "Only Admin/Super Admin can remove a rotation that has a live trip — it moves to Trash." });
+    }
+    db.prepare(
+      "UPDATE trips SET deleted_at = datetime('now'), deleted_by = ? WHERE group_id = (SELECT group_id FROM trips WHERE id = ?)"
+    ).run(req.user.id, row.trip_id);
+  }
+
+  db.prepare("DELETE FROM rotations WHERE id = ?").run(req.params.id);
+  res.status(204).end();
+});
+
+module.exports = router;
