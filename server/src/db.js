@@ -7,8 +7,8 @@ const fs = require("fs");
 const Database = require("libsql");
 require("dotenv").config();
 
-const tursoUrl = process.env.TURSO_DATABASE_URL;
-const tursoAuthToken = process.env.TURSO_AUTH_TOKEN;
+const tursoUrl = process.env.TURSO_DATABASE_URL?.trim();
+const tursoAuthToken = process.env.TURSO_AUTH_TOKEN?.trim();
 
 if (tursoUrl && !tursoAuthToken) {
   throw new Error("TURSO_AUTH_TOKEN is required when TURSO_DATABASE_URL is set");
