@@ -12,7 +12,7 @@ export default function Maintenance() {
   const [locations, setLocations] = useState([]);
   const [ticketForm, setTicketForm] = useState(ticketEmpty);
   const [error, setError] = useState("");
-  const [summary, setSummary] = useState({ total: 0, resolved: 0, perBus: [] });
+  const [summary, setSummary] = useState({ total: 0, resolved: 0, open: 0, inProgress: 0, longMaintenance: 0, perBus: [] });
 
   const [openTicketId, setOpenTicketId] = useState(null);
   const [partForm, setPartForm] = useState(partEmpty);
@@ -117,10 +117,11 @@ export default function Maintenance() {
         </div>
       </div>
 
-      <div className="grid grid-3" style={{ marginBottom: 20 }}>
+      <div className="grid grid-4" style={{ marginBottom: 20 }}>
         <div className="card stat-card"><div className="stat-label">{t("total_tickets")}</div><div className="stat-value">{summary.total}</div></div>
         <div className="card stat-card income"><div className="stat-label">{t("resolved")}</div><div className="stat-value">{summary.resolved}</div></div>
-        <div className="card stat-card expense"><div className="stat-label">{t("open_in_progress")}</div><div className="stat-value">{summary.total - summary.resolved}</div></div>
+        <div className="card stat-card expense"><div className="stat-label">{t("open_in_progress")}</div><div className="stat-value">{summary.open + summary.inProgress}</div></div>
+        <div className="card stat-card long-maintenance-stat"><div className="stat-label">⚠ {t("under_long_maintenance")}</div><div className="stat-value">{summary.longMaintenance}</div></div>
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
@@ -138,6 +139,11 @@ export default function Maintenance() {
           </select>
           <input type="date" value={ticketForm.reported_date}
             onChange={(e) => setTicketForm({ ...ticketForm, reported_date: e.target.value })} />
+          <select value={ticketForm.status} onChange={(e) => setTicketForm({ ...ticketForm, status: e.target.value })}>
+            <option value="open">{t("open")}</option>
+            <option value="in_progress">{t("in_progress")}</option>
+            <option value="long_maintenance">{t("under_long_maintenance")}</option>
+          </select>
           <button className="primary" type="submit">{t("log_bus_maintenance")}</button>
         </form>
         {error && <p className="error-text">{error}</p>}
@@ -149,10 +155,11 @@ export default function Maintenance() {
         <h3 style={{ marginTop: 0 }}>{t("bus_maintenance_records")}</h3>
         {tickets.length === 0 && <p style={{ color: "var(--muted)" }}>{t("no_maintenance_tickets")}</p>}
         {tickets.map((ticket) => (
-          <div key={ticket.id} style={{ border: "1px solid var(--border)", borderRadius: 8, marginBottom: 12, padding: 12 }}>
+          <div key={ticket.id} className={ticket.status === "long_maintenance" ? "maintenance-ticket long-maintenance-warning" : "maintenance-ticket"}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
               <div>
                 <strong>{busName(ticket.bus_id)}</strong> — {ticket.issue}
+                {ticket.status === "long_maintenance" && <div className="long-maintenance-label">⚠ {t("long_maintenance_warning")}</div>}
                 <div style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
                   {ticket.location || "No location set"} · {t("reported")} {ticket.reported_date}{ticket.resolved_date ? ` · Resolved ${ticket.resolved_date}` : ""} · {t("total_cost_so_far")}: ৳{ticket.total_cost.toLocaleString()}
                 </div>
@@ -161,6 +168,7 @@ export default function Maintenance() {
                 <select value={ticket.status} onChange={(e) => handleUpdateStatus(ticket, e.target.value)}>
                   <option value="open">{t("open")}</option>
                   <option value="in_progress">{t("in_progress")}</option>
+                  <option value="long_maintenance">{t("under_long_maintenance")}</option>
                   <option value="resolved">{t("resolved")}</option>
                 </select>
                 <button className="primary" onClick={() => toggleTicket(ticket.id)}>
