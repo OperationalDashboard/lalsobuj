@@ -13,6 +13,7 @@ const DEFAULTS = {
   dedicated_call_phone: "",
   login_logo_data: "",
   login_background_data: "",
+  bus_class_types: JSON.stringify(["AC", "Non AC", "Sleeper"]),
 };
 
 // Public login appearance only. It intentionally exposes no contact or
