@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Environment secrets
+.env
+.env.local
+
+# SQLite database (contains real business/staff data — don't commit)
+server/data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Build output
+client/dist/
+client/build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editor/OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
