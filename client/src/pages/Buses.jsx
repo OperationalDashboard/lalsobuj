@@ -4,7 +4,8 @@ import { ROLES, isFullAccess } from "../roles.js";
 import { t } from "../i18n.js";
 import BusIcon from "../components/BusIcon.jsx";
 
-const empty = { reg_number: "", model: "", capacity: "", route: "", status: "active" };
+const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
+const empty = { reg_number: "", model: "", class_type: "", capacity: "", route: "", status: "active" };
 
 export default function Buses() {
   const me = getUser();
@@ -13,11 +14,20 @@ export default function Buses() {
 
   const [buses, setBuses] = useState([]);
   const [form, setForm] = useState(empty);
+  const [busClasses, setBusClasses] = useState(DEFAULT_BUS_CLASSES);
   const [error, setError] = useState("");
   const [statusEditId, setStatusEditId] = useState(null);
 
   function load() {
     api.get("/buses").then(setBuses).catch(() => {});
+    api.get("/settings").then((settings) => {
+      try {
+        const parsed = JSON.parse(settings.bus_class_types || "null");
+        setBusClasses(Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_BUS_CLASSES);
+      } catch {
+        setBusClasses(DEFAULT_BUS_CLASSES);
+      }
+    }).catch(() => {});
   }
   useEffect(load, []);
 
@@ -49,6 +59,15 @@ export default function Buses() {
     }
   }
 
+  async function handleClassChange(id, classType) {
+    try {
+      await api.put(`/buses/${id}`, { class_type: classType || null });
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -68,6 +87,10 @@ export default function Buses() {
               onChange={(e) => setForm({ ...form, reg_number: e.target.value })} />
             <input placeholder={t("model")} value={form.model}
               onChange={(e) => setForm({ ...form, model: e.target.value })} />
+            <select value={form.class_type} onChange={(e) => setForm({ ...form, class_type: e.target.value })}>
+              <option value="">Select bus class</option>
+              {busClasses.map((classType) => <option key={classType} value={classType}>{classType}</option>)}
+            </select>
             <input placeholder={t("capacity")} type="number" value={form.capacity}
               onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
             <input placeholder={t("route")} value={form.route}
@@ -86,7 +109,7 @@ export default function Buses() {
       <div className="card">
         <table>
           <thead>
-            <tr><th></th><th>{t("reg_number")}</th><th>{t("model")}</th><th>{t("capacity")}</th><th>{t("route")}</th><th>{t("status")}</th>{canEditFull && <th></th>}</tr>
+            <tr><th></th><th>{t("reg_number")}</th><th>{t("model")}</th><th>Class</th><th>{t("capacity")}</th><th>{t("route")}</th><th>{t("status")}</th>{canEditFull && <th></th>}</tr>
           </thead>
           <tbody>
             {buses.map((b) => (
@@ -94,6 +117,7 @@ export default function Buses() {
                 <td><BusIcon size={24} muted={b.status !== "active"} /></td>
                 <td>{b.reg_number}</td>
                 <td>{b.model}</td>
+                <td>{canEditFull ? <select value={b.class_type || ""} onChange={(e) => handleClassChange(b.id, e.target.value)}><option value="">No class</option>{b.class_type && !busClasses.includes(b.class_type) && <option value={b.class_type}>{b.class_type} (legacy)</option>}{busClasses.map((classType) => <option key={classType} value={classType}>{classType}</option>)}</select> : (b.class_type || "—")}</td>
                 <td>{b.capacity}</td>
                 <td>{b.route}</td>
                 <td>
