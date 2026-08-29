@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { ROLES, ROLES_REQUIRING_STAFF_LINK, ROLE_LABELS } from "../roles.js";
+import { ROLES, ROLE_LABELS } from "../roles.js";
 
 const empty = { username: "", password: "", full_name: "", role: ROLES.CONTROL_COUNTER, staff_id: "" };
 const newRoleEmpty = { slug: "", label: "" };
@@ -32,7 +32,6 @@ export default function Users() {
   const allRoles = [...rolesInfo.builtIn, ...rolesInfo.custom.map((r) => ({ slug: r.slug, label: r.label }))];
   const roleLabel = (slug) => ROLE_LABELS[slug] || allRoles.find((r) => r.slug === slug)?.label || slug;
 
-  const staffNeedsLink = ROLES_REQUIRING_STAFF_LINK.includes(form.role);
   const unlinkedStaff = staff.filter((s) => !users.some((u) => u.staff_id === s.id));
 
   async function handleCreate(e) {
@@ -136,19 +135,15 @@ export default function Users() {
               </optgroup>
             )}
           </select>
-          {staffNeedsLink && (
-            <select value={form.staff_id} onChange={(e) => setForm({ ...form, staff_id: e.target.value })} required>
-              <option value="">Link to staff member (required)</option>
-              {unlinkedStaff.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.designation})</option>)}
-            </select>
-          )}
+          <select value={form.staff_id} onChange={(e) => setForm({ ...form, staff_id: e.target.value })}>
+            <option value="">Link to staff member (optional)</option>
+            {unlinkedStaff.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.designation})</option>)}
+          </select>
           <button className="primary" type="submit">Create user</button>
         </form>
-        {staffNeedsLink && (
-          <p style={{ color: "var(--muted)", fontSize: "0.8rem", marginTop: 8 }}>
-            Control Counter, Counter, Driver and Helper logins must be linked to a staff member — this is who they check themselves in as, and (for Driver/Helper) which bus they can start a trip on.
-          </p>
-        )}
+        <p style={{ color: "var(--muted)", fontSize: "0.8rem", marginTop: 8 }}>
+          Linking a staff member is optional. Link one only when the account needs staff-based attendance, counter, or bus-duty information.
+        </p>
         {error && <p className="error-text">{error}</p>}
       </div>
 
