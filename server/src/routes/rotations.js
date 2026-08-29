@@ -7,7 +7,7 @@ const router = express.Router();
 router.use(requireAuth);
 const guardWrite = requireModulePermission("rotations", "write");
 
-const WRITABLE = ["bus_id", "driver_id", "helper_id", "supervisor_id", "route", "duty_date", "shift_start", "shift_end", "status", "trip_id"];
+const WRITABLE = ["bus_id", "driver_id", "helper_id", "supervisor_id", "coach_id", "route", "duty_date", "shift_start", "shift_end", "status", "trip_id"];
 
 // Duty roster, with the linked Trip's live status/times folded in when
 // present — that's what keeps this page from getting stuck on "scheduled"
