@@ -1,16 +1,34 @@
 // Central database connection + schema definition.
-// Uses better-sqlite3 for a zero-config, file-based database that's easy to
-// run locally and easy to later swap for MySQL/Postgres if the company grows.
+// Uses libSQL locally and switches to a Turso-backed embedded replica when
+// TURSO_DATABASE_URL and TURSO_AUTH_TOKEN are configured.
 
 const path = require("path");
 const fs = require("fs");
-const Database = require("better-sqlite3");
+const Database = require("libsql");
 require("dotenv").config();
 
-const dbPath = process.env.DB_PATH || path.join(__dirname, "..", "data", "lsp.db");
+const tursoUrl = process.env.TURSO_DATABASE_URL;
+const tursoAuthToken = process.env.TURSO_AUTH_TOKEN;
+
+if (tursoUrl && !tursoAuthToken) {
+  throw new Error("TURSO_AUTH_TOKEN is required when TURSO_DATABASE_URL is set");
+}
+
+const defaultFile = tursoUrl ? "lsp-turso-replica.db" : "lsp.db";
+const dbPath = process.env.DB_PATH || path.join(__dirname, "..", "data", defaultFile);
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
-const db = new Database(dbPath);
+const db = new Database(dbPath, tursoUrl ? {
+  syncUrl: tursoUrl,
+  authToken: tursoAuthToken,
+  syncPeriod: 60,
+} : undefined);
+
+if (tursoUrl) {
+  db.sync();
+  console.log("Database connected to Turso using an embedded replica.");
+}
+
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 
