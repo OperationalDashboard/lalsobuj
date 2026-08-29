@@ -5,6 +5,16 @@ const { FULL_ACCESS, ROLES } = require("../roles");
 
 const router = express.Router();
 router.use(requireAuth);
+const MAINTENANCE_STATUSES = ["open", "in_progress", "long_maintenance", "resolved"];
+
+function validateMaintenanceStatus(req, res) {
+  if (req.body.status === undefined) return true;
+  if (!MAINTENANCE_STATUSES.includes(req.body.status)) {
+    res.status(400).json({ error: "Choose a valid maintenance status" });
+    return false;
+  }
+  return true;
+}
 
 // Maintenance role always has write access here; other roles need an
 // explicit grant from Admin via Users & Permissions.
@@ -129,8 +139,14 @@ router.get("/", (req, res) => {
 
 // Summary stats for the Reports page: total tickets, resolved count, per bus.
 router.get("/summary", (req, res) => {
-  const total = db.prepare("SELECT COUNT(*) as c FROM maintenance").get().c;
-  const resolved = db.prepare("SELECT COUNT(*) as c FROM maintenance WHERE status = 'resolved'").get().c;
+  const counts = db.prepare(
+    `SELECT COUNT(*) AS total,
+            SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved,
+            SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open,
+            SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
+            SUM(CASE WHEN status = 'long_maintenance' THEN 1 ELSE 0 END) AS long_maintenance
+     FROM maintenance`
+  ).get();
   const perBus = db
     .prepare(
       `SELECT b.id as bus_id, b.reg_number,
@@ -142,7 +158,14 @@ router.get("/summary", (req, res) => {
        ORDER BY total_cost DESC`
     )
     .all();
-  res.json({ total, resolved, perBus });
+  res.json({
+    total: counts.total,
+    resolved: counts.resolved || 0,
+    open: counts.open || 0,
+    inProgress: counts.in_progress || 0,
+    longMaintenance: counts.long_maintenance || 0,
+    perBus,
+  });
 });
 
 router.get("/:id", (req, res) => {
@@ -152,6 +175,7 @@ router.get("/:id", (req, res) => {
 });
 
 router.post("/", guardWrite, (req, res) => {
+  if (!validateMaintenanceStatus(req, res)) return;
   const { bus_id, issue, location, reported_date, status, notes } = req.body;
   if (!bus_id || !issue || !reported_date) {
     return res.status(400).json({ error: "bus_id, issue, reported_date required" });
@@ -167,6 +191,7 @@ router.post("/", guardWrite, (req, res) => {
 });
 
 router.put("/:id", guardWrite, (req, res) => {
+  if (!validateMaintenanceStatus(req, res)) return;
   const fields = ["issue", "location", "reported_date", "resolved_date", "status", "notes"];
   const present = fields.filter((f) => req.body[f] !== undefined);
   if (!present.length) return res.status(400).json({ error: "No valid fields" });
