@@ -11,6 +11,39 @@ const guardWrite = requireModulePermission("rotations", "write");
 // coach_id remains readable for older rotations created before this change.
 const WRITABLE = ["bus_id", "driver_id", "helper_id", "supervisor_id", "coach_name", "route", "duty_date", "shift_start", "shift_end", "status", "trip_id"];
 
+// Keep the Rotation rules in sync with the Buses and Maintenance pages.
+// The stored buses.status value is not enough on its own because any
+// unresolved maintenance ticket must take the bus off the road immediately.
+const BUS_STATUS_SELECT = `
+  CASE
+    WHEN b.status = 'retired' THEN 'retired'
+    WHEN EXISTS (SELECT 1 FROM maintenance m WHERE m.bus_id = b.id AND m.status != 'resolved') THEN 'maintenance'
+    ELSE 'active'
+  END`;
+
+function requireActiveBus(busId, res) {
+  if (!busId) {
+    res.status(400).json({ error: "Bus is required" });
+    return false;
+  }
+  const bus = db
+    .prepare(`SELECT b.id, b.reg_number, ${BUS_STATUS_SELECT} AS status FROM buses b WHERE b.id = ?`)
+    .get(busId);
+  if (!bus) {
+    res.status(404).json({ error: "Bus not found" });
+    return false;
+  }
+  if (bus.status === "maintenance") {
+    res.status(400).json({ error: `${bus.reg_number} is under maintenance and cannot be added to Rotation` });
+    return false;
+  }
+  if (bus.status === "retired") {
+    res.status(400).json({ error: `${bus.reg_number} is retired and cannot be added to Rotation` });
+    return false;
+  }
+  return true;
+}
+
 // Duty roster, with the linked Trip's live status/times folded in when
 // present — that's what keeps this page from getting stuck on "scheduled"
 // after the bus has actually completed its run. A row with a trip_id was
@@ -23,7 +56,7 @@ const WRITABLE = ["bus_id", "driver_id", "helper_id", "supervisor_id", "coach_na
 router.get("/", (req, res) => {
   const rows = db
     .prepare(
-      `SELECT r.*, b.reg_number,
+      `SELECT r.*, b.reg_number, ${BUS_STATUS_SELECT} AS bus_status,
               t.rotation_no as trip_rotation_no, t.status as trip_status,
               t.departure_time as trip_departure_time, t.arrival_time as trip_arrival_time
        FROM rotations r
@@ -46,6 +79,7 @@ router.get("/", (req, res) => {
 });
 
 router.post("/", guardWrite, (req, res) => {
+  if (!requireActiveBus(req.body.bus_id, res)) return;
   const present = WRITABLE.filter((c) => req.body[c] !== undefined);
   if (!present.length) return res.status(400).json({ error: "No valid fields provided" });
   const placeholders = present.map(() => "?").join(",");
@@ -55,6 +89,7 @@ router.post("/", guardWrite, (req, res) => {
 });
 
 router.put("/:id", guardWrite, (req, res) => {
+  if (req.body.bus_id !== undefined && !requireActiveBus(req.body.bus_id, res)) return;
   const present = WRITABLE.filter((c) => req.body[c] !== undefined);
   if (!present.length) return res.status(400).json({ error: "No valid fields provided" });
   const setClause = present.map((c) => `${c} = ?`).join(", ");
