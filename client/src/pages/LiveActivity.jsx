@@ -101,7 +101,7 @@ export default function LiveActivity() {
     api.get("/buses").then(setBuses).catch(() => {});
     api.get("/hotels").then(setHotels).catch(() => {});
     api.get("/routes?active=1").then(setRoutesList).catch(() => {});
-    api.get("/rotations").then((rows) => setOpenRotations(rows.filter((r) => !r.trip_id && r.status === "scheduled"))).catch(() => {});
+    api.get("/rotations").then((rows) => setOpenRotations(rows.filter((r) => !r.trip_id && r.status === "scheduled" && r.bus_status === "active"))).catch(() => {});
     api.get("/trips/live").then(setLiveTrips).catch(() => {});
     api.get(`/trips/rotation-counts?date=${today()}`).then((r) => setRotationCounts(r.buses)).catch(() => {});
     if (placeIsAutoFilled) {
