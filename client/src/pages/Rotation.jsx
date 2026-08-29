@@ -3,7 +3,7 @@ import { api } from "../api.js";
 import { t } from "../i18n.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
-const empty = { bus_id: "", driver_id: "", helper_id: "", supervisor_id: "", coach_id: "", route: "", duty_date: today(), shift_start: "" };
+const empty = { bus_id: "", driver_id: "", helper_id: "", supervisor_id: "", coach_name: "", route: "", duty_date: today(), shift_start: "" };
 
 export default function Rotation() {
   const [rows, setRows] = useState([]);
@@ -33,7 +33,7 @@ export default function Rotation() {
         driver_id: form.driver_id || null,
         helper_id: form.helper_id || null,
         supervisor_id: form.supervisor_id || null,
-        coach_id: form.coach_id || null,
+        coach_name: form.coach_name.trim() || null,
       });
       setForm(empty);
       load();
@@ -62,7 +62,7 @@ export default function Rotation() {
       await api.post("/rotations", {
         bus_id: returnModal.bus_id, driver_id: returnModal.driver_id || null, helper_id: returnModal.helper_id || null,
         supervisor_id: returnModal.supervisor_id || null,
-        coach_id: returnModal.coach_id || null,
+        coach_name: returnModal.coach_name || null,
         route: returnRoute, duty_date: returnModal.duty_date || today(), shift_start: "", status: "scheduled",
       });
       setReturnModal(null); setReturnRoute(""); load();
@@ -72,7 +72,6 @@ export default function Rotation() {
   const drivers = staff.filter((s) => s.designation === "driver");
   const helpers = staff.filter((s) => s.designation === "helper");
   const supervisors = staff.filter((s) => s.designation === "supervisor");
-  const coaches = staff.filter((s) => s.designation === "coach");
   const busName = (id) => buses.find((b) => b.id === id)?.reg_number || "—";
   const staffName = (id) => staff.find((s) => s.id === id)?.name || "—";
   const formLinkedRoute = linkedRouteFor(form.route);
@@ -108,10 +107,8 @@ export default function Rotation() {
             <option value="">{t("supervisor")}</option>
             {supervisors.map((sup) => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
           </select>
-          <select value={form.coach_id} onChange={(e) => setForm({ ...form, coach_id: e.target.value })}>
-            <option value="">Coach</option>
-            {coaches.map((coach) => <option key={coach.id} value={coach.id}>{coach.name}</option>)}
-          </select>
+          <input placeholder="Coach" value={form.coach_name}
+            onChange={(e) => setForm({ ...form, coach_name: e.target.value })} />
           <select value={form.route} onChange={(e) => setForm({ ...form, route: e.target.value })}>
             <option value="">{t("select_route")}</option>
             {routesList.map((r) => <option key={r.id} value={r.name}>{r.name}</option>)}
@@ -139,7 +136,7 @@ export default function Rotation() {
                 <td>{staffName(r.driver_id)}</td>
                 <td>{staffName(r.helper_id)}</td>
                 <td>{staffName(r.supervisor_id)}</td>
-                <td>{staffName(r.coach_id)}</td>
+                <td>{r.coach_name || staffName(r.coach_id)}</td>
                 <td>{r.route}</td>
                 <td>{linkedRouteFor(r.route)?.name || "—"}</td>
                 <td>{r.shift_start || "—"} – {r.shift_end || "—"}{r.trip_id ? " (from trip)" : ""}</td>
