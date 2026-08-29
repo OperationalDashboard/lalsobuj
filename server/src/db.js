@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS rotations (
   driver_id     INTEGER REFERENCES staff(id) ON DELETE SET NULL,
   helper_id     INTEGER REFERENCES staff(id) ON DELETE SET NULL,
   supervisor_id INTEGER REFERENCES staff(id) ON DELETE SET NULL,
+  coach_id      INTEGER REFERENCES staff(id) ON DELETE SET NULL,
   route       TEXT,
   duty_date   TEXT NOT NULL,
   shift_start TEXT,
@@ -392,6 +393,7 @@ addColumnIfMissing("trips", "accounts_closed_by", "INTEGER REFERENCES users(id) 
 addColumnIfMissing("trips", "accounts_closed_at", "TEXT");
 addColumnIfMissing("rotations", "trip_id", "INTEGER REFERENCES trips(id) ON DELETE SET NULL");
 addColumnIfMissing("rotations", "supervisor_id", "INTEGER REFERENCES staff(id) ON DELETE SET NULL");
+addColumnIfMissing("rotations", "coach_id", "INTEGER REFERENCES staff(id) ON DELETE SET NULL");
 addColumnIfMissing("routes", "return_route_id", "INTEGER REFERENCES routes(id) ON DELETE SET NULL");
 addColumnIfMissing("trips", "group_id", "INTEGER REFERENCES trips(id) ON DELETE SET NULL");
 addColumnIfMissing("trips", "leg_no", "INTEGER NOT NULL DEFAULT 1");
