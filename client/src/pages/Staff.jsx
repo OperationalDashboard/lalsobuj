@@ -4,7 +4,7 @@ import { api } from "../api.js";
 import { t } from "../i18n.js";
 
 const DESIGNATIONS = [
-  { group: "Bus staff", options: ["driver", "supervisor", "bus_staff", "helper", "conductor", "mechanic"] },
+  { group: "Bus staff", options: ["driver", "coach", "supervisor", "bus_staff", "helper", "conductor", "mechanic"] },
   { group: "Counter staff", options: ["counter_manager", "assistant_counter_manager", "caller_man", "office"] },
   { group: "Admin & office staff", options: ["fourman", "checker", "accounts", "store_manager", "general_manager"] },
 ];
