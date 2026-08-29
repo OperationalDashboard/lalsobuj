@@ -86,7 +86,11 @@ router.get("/payroll", requireRole(...FULL_ACCESS), (req, res) => {
   const assignments = db.prepare("SELECT * FROM salary_assignments").all();
   const assignmentByStaff = new Map(assignments.map((a) => [a.staff_id, a]));
 
-  const staffRows = db.prepare("SELECT id, name, designation, status FROM staff WHERE counter_id IS NOT NULL").all();
+  const staffRows = db.prepare(
+    `SELECT s.id, s.name, s.designation, s.status, s.counter_id, c.place_id
+     FROM staff s JOIN counters c ON c.id = s.counter_id`
+  ).all();
+  const staffById = new Map(staffRows.map((staff) => [staff.id, staff]));
 
   const monthRows = db
     .prepare(
@@ -108,7 +112,11 @@ router.get("/payroll", requireRole(...FULL_ACCESS), (req, res) => {
     // Overtime credits earned BY this staff member for covering others —
     // one credit per (representing_staff_id, work_date) instance, valued
     // at that represented staff's own daily rate.
-    const coverCredits = monthRows.filter((r) => r.staff_id === s.id && r.representing_staff_id);
+    const coverCredits = monthRows.filter((r) => {
+      if (r.staff_id !== s.id || !r.representing_staff_id || !s.place_id) return false;
+      const represented = staffById.get(r.representing_staff_id);
+      return represented?.place_id && Number(represented.place_id) === Number(s.place_id);
+    });
     const overtimePay = coverCredits.reduce((sum, r) => {
       const representedPlan = assignmentByStaff.get(r.representing_staff_id);
       return sum + (representedPlan?.amount || 0);
@@ -118,7 +126,7 @@ router.get("/payroll", requireRole(...FULL_ACCESS), (req, res) => {
     if (salary_type === "monthly") basePay = amount;
     else if (salary_type === "daily") basePay = amount * ownDays.size;
 
-    const covers = coverCredits.map((r) => staffRows.find((staffRow) => staffRow.id === r.representing_staff_id)?.name).filter(Boolean);
+    const covers = coverCredits.map((r) => staffById.get(r.representing_staff_id)?.name).filter(Boolean);
     return {
       staff_id: s.id,
       name: s.name,
@@ -173,11 +181,17 @@ router.post("/post-place-expenses", requireRole(...FULL_ACCESS), (req, res) => {
       .map((plan) => [plan.staff_id, Number(plan.amount) || 0])
   );
   const coverRows = db.prepare(
-    `SELECT staff_id, representing_staff_id, COUNT(*) AS duties
-     FROM attendance
-     WHERE work_date LIKE ? AND check_in IS NOT NULL AND status IN ('present','late')
-       AND representing_staff_id IS NOT NULL
-     GROUP BY staff_id, representing_staff_id`
+    `SELECT a.staff_id, a.representing_staff_id, COUNT(*) AS duties
+     FROM attendance a
+     JOIN staff covering ON covering.id = a.staff_id
+     JOIN counters covering_counter ON covering_counter.id = covering.counter_id
+     JOIN staff represented ON represented.id = a.representing_staff_id
+     JOIN counters represented_counter ON represented_counter.id = represented.counter_id
+     WHERE a.work_date LIKE ? AND a.check_in IS NOT NULL AND a.status IN ('present','late')
+       AND a.representing_staff_id IS NOT NULL
+       AND covering_counter.place_id IS NOT NULL
+       AND covering_counter.place_id = represented_counter.place_id
+     GROUP BY a.staff_id, a.representing_staff_id`
   ).all(`${month}%`);
   const coveringStaff = new Map(
     db.prepare(
