@@ -13,8 +13,9 @@ export default function Reports() {
   const [summary, setSummary] = useState({ income: 0, expense: 0, net: 0 });
   const [attendance, setAttendance] = useState([]);
   const [staff, setStaff] = useState([]);
-  const [maintenanceSummary, setMaintenanceSummary] = useState({ total: 0, resolved: 0, perBus: [] });
+  const [maintenanceSummary, setMaintenanceSummary] = useState({ total: 0, resolved: 0, open: 0, inProgress: 0, longMaintenance: 0, perBus: [] });
   const [openIssues, setOpenIssues] = useState([]);
+  const [longMaintenanceIssues, setLongMaintenanceIssues] = useState([]);
   const [buses, setBuses] = useState([]);
   const [openGroupId, setOpenGroupId] = useState(null);
   const [openStatus, setOpenStatus] = useState(null);
@@ -34,7 +35,10 @@ export default function Reports() {
     api.get("/attendance").then((rows) => setAttendance(rows.filter((r) => r.work_date >= fromDate && r.work_date <= toDate))).catch(() => {});
     api.get("/staff").then(setStaff).catch(() => {});
     api.get("/maintenance/summary").then(setMaintenanceSummary).catch(() => {});
-    api.get("/maintenance").then((rows) => setOpenIssues(rows.filter((row) => row.status !== "resolved"))).catch(() => {});
+    api.get("/maintenance").then((rows) => {
+      setOpenIssues(rows.filter((row) => row.status === "open" || row.status === "in_progress"));
+      setLongMaintenanceIssues(rows.filter((row) => row.status === "long_maintenance"));
+    }).catch(() => {});
     api.get("/buses").then(setBuses).catch(() => {});
     // Same selected date range as the main financial cards; automatic
     // counter salary rows use their actual posting date so they appear here.
@@ -217,9 +221,30 @@ export default function Reports() {
         </tbody></table>
       </div>
 
+      {longMaintenanceIssues.length > 0 && (
+        <div className="card long-maintenance-report" style={{ marginBottom: 20 }}>
+          <h3 style={{ marginTop: 0 }}>⚠ {t("under_long_maintenance")} — {longMaintenanceIssues.length}</h3>
+          <p>{t("long_maintenance_report_hint")}</p>
+          <table>
+            <thead><tr><th>{t("bus")}</th><th>{t("issue")}</th><th>{t("location")}</th><th>{t("reported")}</th><th>{t("status")}</th></tr></thead>
+            <tbody>
+              {longMaintenanceIssues.map((m) => (
+                <tr key={m.id}>
+                  <td><strong>{busName(m.bus_id)}</strong></td>
+                  <td><strong>{m.issue}</strong>{m.parts?.length > 0 && <div style={{ color: "var(--muted)", fontSize: "0.8rem", marginTop: 3 }}>{m.parts.map((part) => `${part.part_name} (৳${part.cost.toLocaleString()})`).join(" · ")}</div>}</td>
+                  <td>{m.location || "—"}</td>
+                  <td>{m.reported_date}</td>
+                  <td><span className="badge long_maintenance">⚠ {t("under_long_maintenance")}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="card" style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <h3 style={{ marginTop: 0 }}>{t("maintenance")} — {maintenanceSummary.resolved} {t("maintenance_resolved_of")} {maintenanceSummary.total}</h3>
+          <h3 style={{ marginTop: 0 }}>{t("open_in_progress_issues")} — {openIssues.length}</h3>
         </div>
         <table>
           <thead><tr><th>{t("bus")}</th><th>{t("issue")}</th><th>{t("location")}</th><th>{t("reported")}</th><th>{t("status")}</th></tr></thead>
