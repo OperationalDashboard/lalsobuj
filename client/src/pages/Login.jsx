@@ -35,12 +35,12 @@ export default function Login() {
   return <main className="portal-login" style={background}>
     <section className="portal-showcase">
       <div className="portal-brand">{branding.login_logo_data ? <img src={branding.login_logo_data} alt="Company logo" /> : <BusIcon size={42} />}<div><strong>{branding.app_name}</strong><span>Operations platform</span></div></div>
-      <div className="portal-copy"><span className="portal-kicker">SECURE OPERATIONS</span><h1>One route.<br />Every operation.</h1><p>Live fleet activity, accounts, staff and counter operations in one secure workspace.</p><div className="portal-stat"><b>24/7</b><span>Operational visibility</span></div></div>
-    </section>
-    <section className="portal-access">
       <button type="button" className="portal-theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
         <span>{theme === "dark" ? "☀" : "◐"}</span>{theme === "dark" ? "Light mode" : "Dark mode"}
       </button>
+      <div className="portal-copy"><span className="portal-kicker">SECURE OPERATIONS</span><h1>One route.<br />Every operation.</h1><p>Live fleet activity, accounts, staff and counter operations in one secure workspace.</p><div className="portal-stat"><b>24/7</b><span>Operational visibility</span></div></div>
+    </section>
+    <section className="portal-access">
       <div className="portal-switch"><button type="button" className={admin ? "selected" : ""} onClick={() => { setPortal("admin"); setError(""); }}>Admin Portal</button><button type="button" className={!admin ? "selected" : ""} onClick={() => { setPortal("staff"); setError(""); }}>Staff Portal</button></div>
       <form className={`portal-card ${admin ? "admin" : "staff"}`} onSubmit={handleSubmit}>
         <div className="portal-emblem"><PortalGlyph admin={admin} /></div><span className="portal-kicker">{admin ? "ADMIN & SUPER ADMIN" : "TEAM MEMBER ACCESS"}</span>
