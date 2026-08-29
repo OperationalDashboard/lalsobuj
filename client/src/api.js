@@ -29,7 +29,10 @@ async function request(path, { method = "GET", body } = {}) {
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  if (res.status === 401) {
+  // A 401 on the login call itself just means wrong credentials — let the
+  // caller (Login.jsx) show that inline. Only an expired/invalid session on
+  // an already-authenticated request should force back to /login.
+  if (res.status === 401 && path !== "/auth/login") {
     setToken(null);
     setUser(null);
     window.location.href = "/login";
