@@ -23,10 +23,6 @@ function isValidRole(role) {
   return Boolean(custom);
 }
 
-// Counter-side roles need their own login tied to a specific staff record
-// ("without a staff member no user account can be opened").
-const ROLES_REQUIRING_STAFF_LINK = [ROLES.CONTROL_COUNTER, ROLES.COUNTER, ROLES.DRIVER, ROLES.HELPER];
-
 function signToken(user) {
   return jwt.sign(
     { id: user.id, username: user.username, role: user.role, full_name: user.full_name, staff_id: user.staff_id || null },
@@ -101,9 +97,6 @@ router.post("/users", (req, res) => {
   }
   if (!isValidRole(role)) {
     return res.status(400).json({ error: "Unknown role" });
-  }
-  if (ROLES_REQUIRING_STAFF_LINK.includes(role) && !staff_id) {
-    return res.status(400).json({ error: "Control Counter and Counter logins must be linked to a staff member" });
   }
   if (staff_id) {
     const staff = db.prepare("SELECT id FROM staff WHERE id = ?").get(staff_id);
