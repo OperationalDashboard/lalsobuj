@@ -11,7 +11,11 @@ const WRITABLE = ["name", "designation", "phone", "nid_number", "joining_date", 
 router.get("/", (req, res) => {
   res.json(
     db.prepare(
-      `SELECT s.*, c.name as counter_name FROM staff s LEFT JOIN counters c ON c.id = s.counter_id ORDER BY s.name ASC`
+      `SELECT s.*, c.name AS counter_name, c.place_id, p.name AS place_name
+       FROM staff s
+       LEFT JOIN counters c ON c.id = s.counter_id
+       LEFT JOIN expense_places p ON p.id = c.place_id
+       ORDER BY s.name ASC`
     ).all()
   );
 });
