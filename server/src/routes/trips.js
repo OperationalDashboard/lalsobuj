@@ -32,7 +32,7 @@ function autoCompleteOverdueTrips() {
       const linkedRotation = db.prepare("SELECT * FROM rotations WHERE trip_id = ?").get(trip.id);
       db.prepare("UPDATE rotations SET shift_end = ?, status = 'completed' WHERE trip_id = ?").run(arrival, trip.id);
       if (linkedRotation) {
-        autoCheckOut([linkedRotation.driver_id, linkedRotation.helper_id, linkedRotation.supervisor_id], trip.trip_date, arrival);
+        autoCheckOut([linkedRotation.driver_id, linkedRotation.helper_id, linkedRotation.supervisor_id, linkedRotation.coach_id], trip.trip_date, arrival);
       }
     }
   }
@@ -353,7 +353,7 @@ router.post("/", requireRole(ROLES.CONTROL_COUNTER, ROLES.DRIVER, ROLES.HELPER, 
   // Management — the moment their bus actually leaves the counter on this
   // rotation, they're checked in automatically, timestamped with the same
   // departure time.
-  autoCheckIn([selectedRotation.driver_id, selectedRotation.helper_id, selectedRotation.supervisor_id], trip_date, departure_time);
+  autoCheckIn([selectedRotation.driver_id, selectedRotation.helper_id, selectedRotation.supervisor_id, selectedRotation.coach_id], trip_date, departure_time);
 
   res.status(201).json(trip);
 });
@@ -404,7 +404,7 @@ router.put(
     // counter is auto-checked-out now that it's finished, same time as the
     // trip's own arrival time.
     if (linkedRotation) {
-      autoCheckOut([linkedRotation.driver_id, linkedRotation.helper_id, linkedRotation.supervisor_id], trip.trip_date, arrival_time);
+      autoCheckOut([linkedRotation.driver_id, linkedRotation.helper_id, linkedRotation.supervisor_id, linkedRotation.coach_id], trip.trip_date, arrival_time);
     }
 
     res.json(db.prepare("SELECT * FROM trips WHERE id = ?").get(req.params.id));
