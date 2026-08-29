@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS buses (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   reg_number    TEXT UNIQUE NOT NULL,
   model         TEXT,
+  class_type    TEXT,
   capacity      INTEGER,
   route         TEXT,
   status        TEXT NOT NULL DEFAULT 'active', -- active | maintenance | retired
@@ -394,6 +395,7 @@ function addColumnIfMissing(table, columnName, columnDef) {
 
 addColumnIfMissing("staff", "status_changed_at", "TEXT NOT NULL DEFAULT (datetime('now'))");
 addColumnIfMissing("staff", "counter_id", "INTEGER REFERENCES counters(id) ON DELETE SET NULL");
+addColumnIfMissing("buses", "class_type", "TEXT");
 addColumnIfMissing("users", "staff_id", "INTEGER REFERENCES staff(id) ON DELETE SET NULL");
 addColumnIfMissing("transactions", "passengers_count", "INTEGER");
 addColumnIfMissing("transactions", "price_per_seat", "REAL");
