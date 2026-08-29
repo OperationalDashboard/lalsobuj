@@ -7,7 +7,29 @@ const router = express.Router();
 router.use(requireAuth);
 const guardWrite = requireModulePermission("buses", "write");
 
-const WRITABLE = ["reg_number", "model", "capacity", "route", "status"];
+const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
+const WRITABLE = ["reg_number", "model", "class_type", "capacity", "route", "status"];
+
+function busClassTypes() {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'bus_class_types'").get();
+  try {
+    const parsed = JSON.parse(row?.value || "null");
+    return Array.isArray(parsed) && parsed.length ? parsed.map(String) : DEFAULT_BUS_CLASSES;
+  } catch {
+    return DEFAULT_BUS_CLASSES;
+  }
+}
+
+function validateClassType(req, res) {
+  if (req.body.class_type === undefined || req.body.class_type === null) return true;
+  const classType = String(req.body.class_type).trim();
+  if (classType && !busClassTypes().some((item) => item.toLowerCase() === classType.toLowerCase())) {
+    res.status(400).json({ error: "Choose a bus class configured in Settings" });
+    return false;
+  }
+  req.body.class_type = classType || null;
+  return true;
+}
 
 // The bus's status is always computed fresh from open maintenance tickets
 // at read time — not just trusted from the stored column. This makes it
@@ -31,6 +53,7 @@ router.get("/:id", (req, res) => {
 });
 
 router.post("/", guardWrite, (req, res) => {
+  if (!validateClassType(req, res)) return;
   const present = WRITABLE.filter((c) => req.body[c] !== undefined);
   if (!present.length) return res.status(400).json({ error: "No valid fields provided" });
   const placeholders = present.map(() => "?").join(",");
@@ -40,6 +63,7 @@ router.post("/", guardWrite, (req, res) => {
 });
 
 router.put("/:id", guardWrite, (req, res) => {
+  if (!validateClassType(req, res)) return;
   const present = WRITABLE.filter((c) => req.body[c] !== undefined);
   if (!present.length) return res.status(400).json({ error: "No valid fields provided" });
   const setClause = present.map((c) => `${c} = ?`).join(", ");
