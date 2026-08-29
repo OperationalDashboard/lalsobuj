@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 
+const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
+
 export default function Settings() {
   const [settings, setSettings] = useState(null);
   const [colors, setColors] = useState({ theme_primary_color: "#046a38", theme_accent_color: "#d21f3c" });
   const [callContact, setCallContact] = useState({ dedicated_call_name: "", dedicated_call_phone: "" });
   const [loginLook, setLoginLook] = useState({ app_name: "Lal Sabuj Paribahan", login_logo_data: "", login_background_data: "" });
   const [savedMsg, setSavedMsg] = useState("");
+  const [busClasses, setBusClasses] = useState(DEFAULT_BUS_CLASSES);
+  const [newBusClass, setNewBusClass] = useState("");
 
   const [hotels, setHotels] = useState([]);
   const [newHotel, setNewHotel] = useState("");
@@ -32,6 +36,12 @@ export default function Settings() {
       setColors({ theme_primary_color: s.theme_primary_color, theme_accent_color: s.theme_accent_color });
       setCallContact({ dedicated_call_name: s.dedicated_call_name, dedicated_call_phone: s.dedicated_call_phone });
       setLoginLook({ app_name: s.app_name || "Lal Sabuj Paribahan", login_logo_data: s.login_logo_data || "", login_background_data: s.login_background_data || "" });
+      try {
+        const parsed = JSON.parse(s.bus_class_types || "null");
+        setBusClasses(Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_BUS_CLASSES);
+      } catch {
+        setBusClasses(DEFAULT_BUS_CLASSES);
+      }
     });
   }
   function loadHotels() { api.get("/hotels").then(setHotels); }
@@ -67,6 +77,22 @@ export default function Settings() {
     e.preventDefault();
     await api.put("/settings", loginLook);
     setSavedMsg("Login branding saved."); setTimeout(() => setSavedMsg(""), 2000);
+  }
+
+  async function addBusClass(e) {
+    e.preventDefault();
+    const className = newBusClass.trim();
+    if (!className || busClasses.some((item) => item.toLowerCase() === className.toLowerCase())) return;
+    const next = [...busClasses, className];
+    await api.put("/settings", { bus_class_types: JSON.stringify(next) });
+    setBusClasses(next); setNewBusClass("");
+    setSavedMsg("Bus classes saved."); setTimeout(() => setSavedMsg(""), 2000);
+  }
+  async function removeBusClass(className) {
+    const next = busClasses.filter((item) => item !== className);
+    await api.put("/settings", { bus_class_types: JSON.stringify(next) });
+    setBusClasses(next);
+    setSavedMsg("Bus classes saved."); setTimeout(() => setSavedMsg(""), 2000);
   }
 
   async function addHotel(e) {
@@ -200,6 +226,19 @@ export default function Settings() {
           {loginLook.login_logo_data && <img src={loginLook.login_logo_data} alt="Logo preview" style={{ width: 48, height: 48, objectFit: "contain" }} />}
           <button className="primary" type="submit">Save login branding</button>
         </form>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <h3 style={{ marginTop: 0 }}>Bus class types</h3>
+        <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 }}>AC, Non AC, and Sleeper are built in. Add more classes here; custom classes can be removed without changing existing buses.</p>
+        <form className="form-row" onSubmit={addBusClass}>
+          <input placeholder="New class (e.g. Business Class)" value={newBusClass} onChange={(e) => setNewBusClass(e.target.value)} />
+          <button className="primary" type="submit">Add class</button>
+        </form>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {busClasses.map((className) => <span key={className} className="badge active">{className}{!DEFAULT_BUS_CLASSES.includes(className) && <> <button className="link-danger" onClick={() => removeBusClass(className)}>Remove</button></>}</span>)}
+          {busClasses.length === 0 && <span style={{ color: "var(--muted)" }}>No bus classes configured.</span>}
+        </div>
       </div>
 
       <div className="grid grid-2">
