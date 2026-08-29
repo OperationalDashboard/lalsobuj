@@ -72,6 +72,11 @@ export default function Rotation() {
   const drivers = staff.filter((s) => s.designation === "driver");
   const helpers = staff.filter((s) => s.designation === "helper");
   const supervisors = staff.filter((s) => s.designation === "supervisor");
+  const activeBuses = buses.filter((b) => b.status === "active");
+  // Keep completed/running history visible, but an unstarted duty for a bus
+  // that has gone into maintenance must disappear until the bus is active.
+  const visibleRows = rows.filter((r) => r.trip_id || r.status !== "scheduled" || r.bus_status === "active");
+  const hiddenUnavailableCount = rows.length - visibleRows.length;
   const busName = (id) => buses.find((b) => b.id === id)?.reg_number || "—";
   const staffName = (id) => staff.find((s) => s.id === id)?.name || "—";
   const formLinkedRoute = linkedRouteFor(form.route);
@@ -93,7 +98,7 @@ export default function Rotation() {
         <form className="form-row" onSubmit={handleAdd}>
           <select value={form.bus_id} onChange={(e) => setForm({ ...form, bus_id: e.target.value })}>
             <option value="">{t("select_bus")}</option>
-            {buses.map((b) => <option key={b.id} value={b.id}>{b.reg_number}</option>)}
+            {activeBuses.map((b) => <option key={b.id} value={b.id}>{b.reg_number}</option>)}
           </select>
           <select value={form.driver_id} onChange={(e) => setForm({ ...form, driver_id: e.target.value })}>
             <option value="">{t("driver")}</option>
@@ -124,12 +129,17 @@ export default function Rotation() {
       </div>
 
       <div className="card">
+        {hiddenUnavailableCount > 0 && (
+          <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 }}>
+            {hiddenUnavailableCount} scheduled rotation{hiddenUnavailableCount === 1 ? " is" : "s are"} hidden because the bus is under maintenance or retired.
+          </p>
+        )}
         <table>
           <thead>
             <tr><th>{t("date")}</th><th>{t("bus")}</th><th>{t("driver")}</th><th>{t("helper")}</th><th>{t("supervisor")}</th><th>Coach</th><th>{t("route")}</th><th>Linked trip</th><th>{t("shift")}</th><th>{t("status")}</th><th></th></tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {visibleRows.map((r) => (
               <tr key={r.id}>
                 <td>{r.duty_date}</td>
                 <td>{r.reg_number || busName(r.bus_id)}{r.rotation_no ? ` — #${r.rotation_no}` : ""}</td>
@@ -141,10 +151,10 @@ export default function Rotation() {
                 <td>{linkedRouteFor(r.route)?.name || "—"}</td>
                 <td>{r.shift_start || "—"} – {r.shift_end || "—"}{r.trip_id ? " (from trip)" : ""}</td>
                 <td><span className={`badge ${r.status}`}>{r.status}</span></td>
-                <td><button className="primary" onClick={() => openReturnModal(r)} disabled={!linkedRouteFor(r.route)}>Start linked trip</button> <button className="link-danger" onClick={() => handleDelete(r.id)}>{t("remove")}</button></td>
+                <td><button className="primary" onClick={() => openReturnModal(r)} disabled={!linkedRouteFor(r.route) || r.bus_status !== "active"} title={r.bus_status !== "active" ? "This bus is unavailable" : ""}>Start linked trip</button> <button className="link-danger" onClick={() => handleDelete(r.id)}>{t("remove")}</button></td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={11}>{t("no_rotations_yet")}</td></tr>}
+            {visibleRows.length === 0 && <tr><td colSpan={11}>{t("no_rotations_yet")}</td></tr>}
           </tbody>
         </table>
       </div>
