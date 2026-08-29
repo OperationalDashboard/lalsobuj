@@ -48,6 +48,47 @@ router.post("/login", loginRateLimit, (req, res) => {
   });
 });
 
+// Authenticated users can change only their own sign-in credentials. Requiring
+// the current password keeps even an unattended admin session from silently
+// changing the account owner. A fresh token is returned because the username
+// is embedded in the session token.
+router.put("/credentials", requireAuth, (req, res) => {
+  const currentPassword = String(req.body.current_password || "");
+  const username = String(req.body.username || "").trim();
+  const newPassword = String(req.body.new_password || "");
+
+  if (!currentPassword) return res.status(400).json({ error: "Current password is required" });
+  if (!username && !newPassword) return res.status(400).json({ error: "Enter a new username or password" });
+
+  const current = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+  if (!current || !bcrypt.compareSync(currentPassword, current.password_hash)) {
+    return res.status(401).json({ error: "Current password is incorrect" });
+  }
+
+  const updates = [];
+  const values = [];
+
+  if (username) {
+    if (!/^[A-Za-z0-9._-]{3,40}$/.test(username)) {
+      return res.status(400).json({ error: "Username must be 3–40 characters using letters, numbers, dot, underscore, or dash" });
+    }
+    const existing = db.prepare("SELECT id FROM users WHERE username = ? AND id != ?").get(username, req.user.id);
+    if (existing) return res.status(400).json({ error: "That username is already in use" });
+    updates.push("username = ?");
+    values.push(username);
+  }
+
+  if (newPassword) {
+    if (newPassword.length < 8) return res.status(400).json({ error: "New password must be at least 8 characters" });
+    updates.push("password_hash = ?");
+    values.push(bcrypt.hashSync(newPassword, 10));
+  }
+
+  db.prepare(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`).run(...values, req.user.id);
+  const user = db.prepare("SELECT id, username, full_name, role, staff_id FROM users WHERE id = ?").get(req.user.id);
+  res.json({ token: signToken(user), user });
+});
+
 // Includes the linked staff record + counter name, so the frontend can
 // show "logging as: <counter name>" for Counter-role users. For roles
 // that aren't Admin/Super Admin/one of the special built-ins, also
