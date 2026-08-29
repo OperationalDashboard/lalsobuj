@@ -152,17 +152,60 @@ router.post("/post-place-expenses", requireRole(...FULL_ACCESS), (req, res) => {
   const countDays = db.prepare("SELECT COUNT(DISTINCT work_date) AS days FROM attendance WHERE staff_id = ? AND representing_staff_id IS NULL AND check_in IS NOT NULL AND status IN ('present','late') AND work_date LIKE ?");
   const exists = db.prepare("SELECT id FROM transactions WHERE category = 'place_expense' AND description = ? LIMIT 1");
   const insert = db.prepare("INSERT INTO transactions (type, category, amount, description, txn_date, place_name, counter_id, created_by) VALUES ('expense','place_expense',?,?,?,?,?,?)");
+  const update = db.prepare("UPDATE transactions SET amount = ?, txn_date = ?, place_name = ?, counter_id = ? WHERE id = ?");
   let posted = 0;
   const work = db.transaction(() => staffRows.forEach((staff) => {
     const amount = staff.salary_type === 'monthly' ? staff.amount : staff.amount * countDays.get(staff.id, `${month}%`).days;
     const description = `Counter Staff Salary — ${staff.name} — ${month}`;
     const old = exists.get(description);
     if (!amount) { if (old) db.prepare("DELETE FROM transactions WHERE id = ?").run(old.id); return; }
-    if (old) db.prepare("UPDATE transactions SET amount = ?, txn_date = ?, place_name = ?, counter_id = ? WHERE id = ?").run(amount, `${month}-01`, staff.place_name, staff.counter_id, old.id);
+    if (old) update.run(amount, `${month}-01`, staff.place_name, staff.counter_id, old.id);
     else { insert.run(amount, description, `${month}-01`, staff.place_name, staff.counter_id, req.user.id); posted += 1; }
   }));
   work();
-  res.json({ posted, month, counter_id: counterId, total: staffRows.reduce((sum, staff) => sum + (staff.salary_type === "monthly" ? staff.amount : staff.amount * countDays.get(staff.id, `${month}%`).days), 0) });
+
+  // Cover-duty overtime is paid to the person who actually covered the
+  // shift, at the represented staff member's configured rate. Post it to
+  // the covering person's own place and update the same monthly row when
+  // payroll is recalculated, so repeated posting never creates duplicates.
+  const plans = new Map(
+    db.prepare("SELECT staff_id, amount FROM salary_assignments WHERE salary_type IN ('monthly','daily')").all()
+      .map((plan) => [plan.staff_id, Number(plan.amount) || 0])
+  );
+  const coverRows = db.prepare(
+    `SELECT staff_id, representing_staff_id, COUNT(*) AS duties
+     FROM attendance
+     WHERE work_date LIKE ? AND check_in IS NOT NULL AND status IN ('present','late')
+       AND representing_staff_id IS NOT NULL
+     GROUP BY staff_id, representing_staff_id`
+  ).all(`${month}%`);
+  const coveringStaff = new Map(
+    db.prepare(
+      `SELECT s.id, s.name, s.counter_id, p.name AS place_name
+       FROM staff s JOIN counters c ON c.id = s.counter_id
+       JOIN expense_places p ON p.id = c.place_id
+       ${counterId ? "WHERE s.counter_id = ?" : ""}`
+    ).all(...(counterId ? [counterId] : [])).map((staff) => [staff.id, staff])
+  );
+  const overtimeByStaff = new Map();
+  coverRows.forEach((cover) => {
+    if (!coveringStaff.has(cover.staff_id)) return;
+    const amount = (plans.get(cover.representing_staff_id) || 0) * Number(cover.duties);
+    overtimeByStaff.set(cover.staff_id, (overtimeByStaff.get(cover.staff_id) || 0) + amount);
+  });
+  let overtimeTotal = 0;
+  overtimeByStaff.forEach((amount, staffId) => {
+    const staff = coveringStaff.get(staffId);
+    if (!staff || !amount) return;
+    overtimeTotal += amount;
+    const description = `Overtime (Covering Others) — ${staff.name} — ${month}`;
+    const old = exists.get(description);
+    if (old) update.run(amount, `${month}-01`, staff.place_name, staff.counter_id, old.id);
+    else { insert.run(amount, description, `${month}-01`, staff.place_name, staff.counter_id, req.user.id); posted += 1; }
+  });
+
+  const baseTotal = staffRows.reduce((sum, staff) => sum + (staff.salary_type === "monthly" ? staff.amount : staff.amount * countDays.get(staff.id, `${month}%`).days), 0);
+  res.json({ posted, month, counter_id: counterId, total: baseTotal + overtimeTotal, overtime_total: overtimeTotal });
 });
 
 module.exports = router;
