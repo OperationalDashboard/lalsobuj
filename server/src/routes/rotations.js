@@ -7,7 +7,9 @@ const router = express.Router();
 router.use(requireAuth);
 const guardWrite = requireModulePermission("rotations", "write");
 
-const WRITABLE = ["bus_id", "driver_id", "helper_id", "supervisor_id", "coach_id", "route", "duty_date", "shift_start", "shift_end", "status", "trip_id"];
+// Coach is deliberately a free-text rotation detail, not a Staff record.
+// coach_id remains readable for older rotations created before this change.
+const WRITABLE = ["bus_id", "driver_id", "helper_id", "supervisor_id", "coach_name", "route", "duty_date", "shift_start", "shift_end", "status", "trip_id"];
 
 // Duty roster, with the linked Trip's live status/times folded in when
 // present — that's what keeps this page from getting stuck on "scheduled"
