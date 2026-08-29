@@ -35,6 +35,16 @@ function isBusStaff(staffId) {
   const staff = db.prepare("SELECT designation FROM staff WHERE id = ?").get(staffId);
   return staff && BUS_DESIGNATIONS.includes(staff.designation);
 }
+function getStaffPlace(staffId) {
+  return db.prepare(
+    `SELECT s.id, s.name, s.counter_id, c.name AS counter_name,
+            c.place_id, p.name AS place_name
+     FROM staff s
+     LEFT JOIN counters c ON c.id = s.counter_id
+     LEFT JOIN expense_places p ON p.id = c.place_id
+     WHERE s.id = ?`
+  ).get(staffId);
+}
 function clearForAbsence(staffId, workDate, status = "absent") {
   const current = db.prepare("SELECT * FROM attendance WHERE staff_id = ? AND work_date = ? ORDER BY id DESC LIMIT 1").get(staffId, workDate);
   if (current) db.prepare("UPDATE attendance SET status = ?, check_in = NULL, check_out = NULL WHERE id = ?").run(status, current.id);
@@ -57,9 +67,9 @@ router.get("/", (req, res) => {
 // shift, or standing in for an absent colleague more than once).
 //
 // representing_staff_id: pass this when staff_id is covering FOR someone
-// else who's absent — the row is filed under whoever actually showed up
-// (staff_id), but salary for that day goes to the person they're
-// representing (see salary.js), at that absent person's own rate.
+// else who's absent. Both staff members must belong to counters grouped
+// under the same parent place. The person who actually works receives an
+// overtime credit at the absent staff member's configured salary rate.
 router.post("/checkin", guardWrite, (req, res) => {
   const { staff_id, representing_staff_id } = req.body;
   if (!staff_id) return res.status(400).json({ error: "staff_id required" });
@@ -67,11 +77,20 @@ router.post("/checkin", guardWrite, (req, res) => {
     return res.status(400).json({ error: "Bus staff are checked in/out automatically from Live Activity/Rotation, not here" });
   }
 
+  let coverPlace = null;
   if (representing_staff_id) {
     if (String(staff_id) === String(representing_staff_id)) return res.status(400).json({ error: "A staff member cannot cover their own shift" });
-    const covered = db.prepare("SELECT id FROM staff WHERE id = ?").get(representing_staff_id);
+    const covering = getStaffPlace(staff_id);
+    const covered = getStaffPlace(representing_staff_id);
+    if (!covering) return res.status(404).json({ error: "Covering staff member not found" });
     if (!covered) return res.status(404).json({ error: "Covered staff member not found" });
-    clearForAbsence(representing_staff_id, today());
+    if (!covering.counter_id || !covered.counter_id || !covering.place_id || !covered.place_id) {
+      return res.status(400).json({ error: "Both staff members must be assigned to counters grouped under a parent place" });
+    }
+    if (Number(covering.place_id) !== Number(covered.place_id)) {
+      return res.status(400).json({ error: `Covering is only allowed between counters in the same place. ${covering.name} belongs to ${covering.place_name}; ${covered.name} belongs to ${covered.place_name}.` });
+    }
+    coverPlace = covering.place_id;
   }
 
   const { c } = db
@@ -93,6 +112,8 @@ router.post("/checkin", guardWrite, (req, res) => {
       return res.json(db.prepare("SELECT * FROM attendance WHERE id = ?").get(openRow.id));
     }
   }
+
+  if (representing_staff_id && coverPlace) clearForAbsence(representing_staff_id, today());
 
   const info = db
     .prepare(
