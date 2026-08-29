@@ -202,7 +202,7 @@ CREATE TABLE IF NOT EXISTS maintenance (
   location       TEXT, -- e.g. "Dhaka", "Chattogram" -- where the work is being done
   reported_date  TEXT NOT NULL,
   resolved_date  TEXT,
-  status         TEXT NOT NULL DEFAULT 'open', -- open | in_progress | resolved
+  status         TEXT NOT NULL DEFAULT 'open', -- open | in_progress | long_maintenance | resolved
   notes          TEXT,
   linked_transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
