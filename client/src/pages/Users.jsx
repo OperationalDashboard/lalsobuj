@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
+import { api, getUser, setToken, setUser } from "../api.js";
 import { ROLES, ROLE_LABELS } from "../roles.js";
 
 const empty = { username: "", password: "", full_name: "", role: ROLES.CONTROL_COUNTER, staff_id: "" };
@@ -10,6 +10,8 @@ const MODULE_LABELS = {
 };
 
 export default function Users() {
+  const currentUser = getUser();
+  const requestedUsername = new URLSearchParams(window.location.search).get("username");
   const [users, setUsers] = useState([]);
   const [staff, setStaff] = useState([]);
   const [rolesInfo, setRolesInfo] = useState({ builtIn: [], custom: [], modules: [] });
@@ -17,6 +19,14 @@ export default function Users() {
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editRole, setEditRole] = useState("");
+  const [credentials, setCredentials] = useState({
+    username: requestedUsername || currentUser?.username || "",
+    current_password: "",
+    new_password: "",
+    confirm_password: "",
+  });
+  const [credentialError, setCredentialError] = useState("");
+  const [credentialMessage, setCredentialMessage] = useState("");
 
   const [newRole, setNewRole] = useState(newRoleEmpty);
   const [permsRole, setPermsRole] = useState("");
@@ -71,6 +81,30 @@ export default function Users() {
     }
   }
 
+  async function handleCredentials(e) {
+    e.preventDefault();
+    setCredentialError("");
+    setCredentialMessage("");
+    if (credentials.new_password !== credentials.confirm_password) {
+      setCredentialError("New passwords do not match");
+      return;
+    }
+    try {
+      const result = await api.put("/auth/credentials", {
+        username: credentials.username,
+        current_password: credentials.current_password,
+        new_password: credentials.new_password,
+      });
+      setToken(result.token);
+      setUser(result.user);
+      setCredentials((prev) => ({ ...prev, current_password: "", new_password: "", confirm_password: "" }));
+      setCredentialMessage("Super Admin credentials updated successfully.");
+      load();
+    } catch (err) {
+      setCredentialError(err.message);
+    }
+  }
+
   async function handleCreateRole(e) {
     e.preventDefault();
     setError("");
@@ -115,6 +149,32 @@ export default function Users() {
           <p>Create staff logins, add new roles, and control what each role can do</p>
         </div>
       </div>
+
+      {currentUser?.role === ROLES.SUPER_ADMIN && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <h3 style={{ marginTop: 0 }}>Super Admin sign-in</h3>
+          <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+            Change your own username or password. Your current password is required for security.
+          </p>
+          <form className="form-row" onSubmit={handleCredentials}>
+            <input placeholder="Username" value={credentials.username} required
+              autoComplete="username"
+              onChange={(e) => setCredentials({ ...credentials, username: e.target.value })} />
+            <input placeholder="Current password" type="password" value={credentials.current_password} required
+              autoComplete="current-password"
+              onChange={(e) => setCredentials({ ...credentials, current_password: e.target.value })} />
+            <input placeholder="New password (8+ characters)" type="password" value={credentials.new_password} required minLength={8}
+              autoComplete="new-password"
+              onChange={(e) => setCredentials({ ...credentials, new_password: e.target.value })} />
+            <input placeholder="Confirm new password" type="password" value={credentials.confirm_password} required minLength={8}
+              autoComplete="new-password"
+              onChange={(e) => setCredentials({ ...credentials, confirm_password: e.target.value })} />
+            <button className="primary" type="submit">Update my credentials</button>
+          </form>
+          {credentialError && <p className="error-text">{credentialError}</p>}
+          {credentialMessage && <p style={{ color: "var(--green)", fontWeight: 700 }}>{credentialMessage}</p>}
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ marginTop: 0 }}>Add a user</h3>
