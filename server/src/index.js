@@ -1,4 +1,5 @@
 require("dotenv").config();
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
@@ -68,7 +69,14 @@ app.use("/api/roles", permissionsRoutes);
 app.use("/api/discount-types", discountTypesRoutes);
 app.use("/api/salary", salaryRoutes);
 
-app.use((req, res) => res.status(404).json({ error: "Not found" }));
+app.use("/api", (req, res) => res.status(404).json({ error: "Not found" }));
+
+// Serve the built React frontend (client/dist) and let client-side routing
+// handle any non-API path. Build it first with `npm run build` in client/.
+const clientDist = path.join(__dirname, "../../client/dist");
+app.use(express.static(clientDist));
+app.get(/^\/(?!api\/).*/, (req, res) => res.sendFile(path.join(clientDist, "index.html")));
+
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error(err);
