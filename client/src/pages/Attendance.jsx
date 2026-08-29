@@ -39,6 +39,13 @@ export default function Attendance() {
   const todaysRowFor = (staffId) => todaysRows.find((r) => r.staff_id === staffId && !r.representing_staff_id);
   const todaysCheckinCount = (staffId) => todaysRows.filter((r) => r.staff_id === staffId).length;
   const absentToday = manualStaff.filter((s) => !todaysRowFor(s.id) || todaysRowFor(s.id)?.status === "absent");
+  const selectedCoveringStaff = manualStaff.find((s) => String(s.id) === String(coverStaffId));
+  const samePlaceAbsentees = absentToday.filter((s) =>
+    String(s.id) !== String(coverStaffId)
+    && selectedCoveringStaff?.place_id
+    && Number(s.place_id) === Number(selectedCoveringStaff.place_id)
+  );
+  const staffLocation = (s) => [s.counter_name, s.place_name].filter(Boolean).join(" — ") || "No counter/place assigned";
 
   async function handleCheckIn(staffId) {
     setError("");
@@ -204,19 +211,22 @@ export default function Attendance() {
         <h3 style={{ marginTop: 0 }}>Covering for an absent colleague</h3>
         <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 }}>
           If someone is absent and another staff member is doing their job today, check that person in here as
-          covering for them — it's recorded as their own extra check-in, credited toward the absent colleague's pay.
+          covering for them. Covering is allowed only between counters in the same parent place. The person who
+          covers receives the absent staff member's configured salary amount as overtime.
         </p>
         <form className="form-row" onSubmit={handleCoverCheckIn}>
-          <select value={coverStaffId} onChange={(e) => setCoverStaffId(e.target.value)}>
+          <select value={coverStaffId} onChange={(e) => { setCoverStaffId(e.target.value); setCoverForId(""); }}>
             <option value="">Who's checking in</option>
-            {manualStaff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {manualStaff.map((s) => <option key={s.id} value={s.id}>{s.name} — {staffLocation(s)}</option>)}
           </select>
-          <select value={coverForId} onChange={(e) => setCoverForId(e.target.value)}>
-            <option value="">Covering for (absent today)</option>
-            {absentToday.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          <select value={coverForId} disabled={!selectedCoveringStaff?.place_id} onChange={(e) => setCoverForId(e.target.value)}>
+            <option value="">Covering for (same place, absent today)</option>
+            {samePlaceAbsentees.map((s) => <option key={s.id} value={s.id}>{s.name} — {staffLocation(s)}</option>)}
           </select>
           <button className="primary" type="submit">Check in as cover</button>
         </form>
+        {coverStaffId && !selectedCoveringStaff?.place_id && <p className="error-text">Assign this staff member's counter to a parent place in Settings before using cover duty.</p>}
+        {selectedCoveringStaff?.place_id && samePlaceAbsentees.length === 0 && <p style={{ color: "var(--muted)", fontSize: "0.82rem" }}>No absent staff from {selectedCoveringStaff.place_name} are currently available to cover.</p>}
       </div>
 
       <div className="card">
