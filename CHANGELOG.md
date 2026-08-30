@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.8.0 — 2026-08-30
+
+- Added a Super-Admin-only “Currently active users” dashboard in Users & Permissions, with live session refresh and one card for each signed-in device.
+- Added live user-session presence tracking with a lightweight heartbeat and automatic inactivity after two minutes.
+- Added structured device detection for Windows, Mac, iPhone, Android, iPad, and other computer devices without storing IP addresses or raw browser identifiers.
+- Added immediate presence removal on Log out and backward-compatible tracking for sessions created before this release.
+
 ## 1.7.0 — 2026-08-30
 
 - Made every date point on the Online Accounts sales and passenger graph clickable and keyboard accessible.

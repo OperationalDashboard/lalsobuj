@@ -24,7 +24,13 @@ export default function Login() {
     try {
       const data = await api.post("/auth/login", { username, password });
       const admin = isFullAccess(data.user.role);
-      if ((portal === "admin") !== admin) { setError(admin ? "Use the Admin Portal on the left." : "Use the Staff Portal on the right."); return; }
+      if ((portal === "admin") !== admin) {
+        setToken(data.token);
+        try { await api.post("/auth/presence/logout"); } catch { /* the unused session expires automatically */ }
+        setToken(null);
+        setError(admin ? "Use the Admin Portal on the left." : "Use the Staff Portal on the right.");
+        return;
+      }
       setToken(data.token); setUser(data.user);
       try { const me = await api.get("/auth/me"); if (me.permissions) setUser({ ...data.user, permissions: me.permissions }); } catch { /* optional navigation data */ }
       navigate(homeRouteFor(data.user.role));

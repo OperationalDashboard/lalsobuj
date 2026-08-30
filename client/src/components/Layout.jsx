@@ -34,6 +34,26 @@ export default function Layout() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    const heartbeat = () => {
+      if (!active || document.visibilityState === "hidden") return;
+      api.post("/auth/presence/heartbeat").catch(() => {});
+    };
+    heartbeat();
+    const interval = window.setInterval(heartbeat, 45_000);
+    const onFocus = () => heartbeat();
+    const onVisibility = () => { if (document.visibilityState === "visible") heartbeat(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!navOpen) return undefined;
     const closeOnEscape = (event) => {
       if (event.key === "Escape") setNavOpen(false);

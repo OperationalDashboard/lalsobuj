@@ -1,6 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const db = require("../db");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { ROLES, ASSIGNABLE_ROLES, FULL_ACCESS } = require("../roles");
@@ -23,12 +24,56 @@ function isValidRole(role) {
   return Boolean(custom);
 }
 
-function signToken(user) {
+function signToken(user, sessionId) {
   return jwt.sign(
-    { id: user.id, username: user.username, role: user.role, full_name: user.full_name, staff_id: user.staff_id || null },
+    { id: user.id, username: user.username, role: user.role, full_name: user.full_name, staff_id: user.staff_id || null, session_id: sessionId },
     process.env.JWT_SECRET || "dev_secret",
     { expiresIn: "12h" }
   );
+}
+
+function detectDevice(userAgent = "") {
+  const ua = String(userAgent);
+  let deviceType = "Computer";
+  let deviceName = "Other";
+  if (/iPhone|iPod/i.test(ua)) { deviceType = "Phone"; deviceName = "iPhone"; }
+  else if (/iPad/i.test(ua)) { deviceType = "Tablet"; deviceName = "iPad"; }
+  else if (/Android/i.test(ua)) { deviceType = /Mobile/i.test(ua) ? "Phone" : "Tablet"; deviceName = "Android"; }
+  else if (/Windows/i.test(ua)) deviceName = "Windows";
+  else if (/Macintosh|Mac OS X/i.test(ua)) deviceName = "Mac";
+  else if (/Linux/i.test(ua)) deviceName = "Linux";
+
+  let browserName = "Browser";
+  if (/Edg\//i.test(ua)) browserName = "Microsoft Edge";
+  else if (/OPR\//i.test(ua)) browserName = "Opera";
+  else if (/CriOS|Chrome\//i.test(ua)) browserName = "Google Chrome";
+  else if (/FxiOS|Firefox\//i.test(ua)) browserName = "Firefox";
+  else if (/Safari\//i.test(ua)) browserName = "Safari";
+  return { deviceType, deviceName, browserName };
+}
+
+function requestSessionId(req) {
+  if (req.user?.session_id) return req.user.session_id;
+  const fingerprint = crypto.createHash("sha256").update(String(req.headers["user-agent"] || "unknown")).digest("hex").slice(0, 18);
+  return `legacy-${req.user.id}-${fingerprint}`;
+}
+
+function updatePresence(req, sessionId, userId = req.user?.id, signedIn = false) {
+  const device = detectDevice(req.headers["user-agent"]);
+  db.prepare(
+    `INSERT INTO user_presence (session_id, user_id, device_type, device_name, browser_name)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(session_id) DO UPDATE SET
+       user_id = excluded.user_id,
+       device_type = excluded.device_type,
+       device_name = excluded.device_name,
+       browser_name = excluded.browser_name,
+       last_seen_at = datetime('now'),
+       signed_out_at = NULL`
+  ).run(sessionId, userId, device.deviceType, device.deviceName, device.browserName);
+  if (signedIn) {
+    db.prepare("UPDATE user_presence SET signed_in_at = datetime('now'), last_seen_at = datetime('now'), signed_out_at = NULL WHERE session_id = ?").run(sessionId);
+  }
 }
 
 router.post("/login", loginRateLimit, (req, res) => {
@@ -40,7 +85,10 @@ router.post("/login", loginRateLimit, (req, res) => {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  const token = signToken(user);
+  db.prepare("DELETE FROM user_presence WHERE last_seen_at < datetime('now', '-30 days')").run();
+  const sessionId = crypto.randomUUID();
+  updatePresence(req, sessionId, user.id, true);
+  const token = signToken(user, sessionId);
   attempts.delete(req.ip || "unknown");
   res.json({
     token,
@@ -86,7 +134,9 @@ router.put("/credentials", requireAuth, (req, res) => {
 
   db.prepare(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`).run(...values, req.user.id);
   const user = db.prepare("SELECT id, username, full_name, role, staff_id FROM users WHERE id = ?").get(req.user.id);
-  res.json({ token: signToken(user), user });
+  const sessionId = requestSessionId(req);
+  updatePresence(req, sessionId, req.user.id);
+  res.json({ token: signToken(user, sessionId), user });
 });
 
 // Includes the linked staff record + counter name, so the frontend can
@@ -115,6 +165,34 @@ router.get("/me", requireAuth, (req, res) => {
   }
 
   res.json({ user: req.user, staff, permissions });
+});
+
+// Every authenticated page sends a small heartbeat. Older tokens issued
+// before presence tracking receive a stable per-user/device fallback session
+// so deployment does not force everyone to sign in again.
+router.post("/presence/heartbeat", requireAuth, (req, res) => {
+  updatePresence(req, requestSessionId(req), req.user.id);
+  res.json({ ok: true });
+});
+
+router.post("/presence/logout", requireAuth, (req, res) => {
+  db.prepare("UPDATE user_presence SET signed_out_at = datetime('now'), last_seen_at = datetime('now') WHERE session_id = ?").run(requestSessionId(req));
+  res.json({ ok: true });
+});
+
+router.get("/presence", requireAuth, requireRole(ROLES.SUPER_ADMIN), (req, res) => {
+  const rows = db.prepare(
+    `SELECT p.session_id, p.user_id, u.username, u.full_name, u.role,
+            p.device_type, p.device_name, p.browser_name,
+            p.signed_in_at, p.last_seen_at,
+            CAST((julianday('now') - julianday(p.last_seen_at)) * 86400 AS INTEGER) AS seconds_since_seen
+     FROM user_presence p
+     JOIN users u ON u.id = p.user_id
+     WHERE p.signed_out_at IS NULL
+       AND p.last_seen_at >= datetime('now', '-2 minutes')
+     ORDER BY p.last_seen_at DESC, p.signed_in_at DESC`
+  ).all();
+  res.json(rows);
 });
 
 // --- User / role management -------------------------------------------

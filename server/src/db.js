@@ -54,6 +54,23 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- One row per signed-in browser session. A lightweight client heartbeat
+-- updates last_seen_at; the Super Admin view treats sessions without a
+-- heartbeat for two minutes as inactive. No IP address or raw user-agent is
+-- stored — only the device category needed by the activity screen.
+CREATE TABLE IF NOT EXISTS user_presence (
+  session_id    TEXT PRIMARY KEY,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_type   TEXT NOT NULL,
+  device_name   TEXT NOT NULL,
+  browser_name  TEXT NOT NULL,
+  signed_in_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  last_seen_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  signed_out_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_user_presence_active ON user_presence(last_seen_at, signed_out_at);
+CREATE INDEX IF NOT EXISTS idx_user_presence_user ON user_presence(user_id);
+
 CREATE TABLE IF NOT EXISTS buses (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   reg_number    TEXT UNIQUE NOT NULL,

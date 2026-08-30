@@ -224,7 +224,8 @@ export default function Sidebar({ isOpen = false, onNavigate = () => {} }) {
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    try { await api.post("/auth/presence/logout"); } catch { /* local sign-out still completes */ }
     setToken(null);
     setUser(null);
     onNavigate();

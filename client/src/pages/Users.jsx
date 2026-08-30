@@ -9,8 +9,32 @@ const MODULE_LABELS = {
   attendance: "Time Management", accounts: "Accounts", online_accounts: "Online Accounts", maintenance: "Maintenance",
 };
 
+function parseDatabaseTime(value) {
+  if (!value) return null;
+  const parsed = new Date(`${String(value).replace(" ", "T")}Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function readablePresenceTime(value) {
+  const parsed = parseDatabaseTime(value);
+  if (!parsed) return "Unknown";
+  return parsed.toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+}
+
+function presenceFreshness(seconds) {
+  const age = Math.max(0, Number(seconds || 0));
+  if (age < 15) return "Active now";
+  if (age < 60) return `Active ${age}s ago`;
+  return `Active ${Math.max(1, Math.floor(age / 60))}m ago`;
+}
+
+function userInitials(name) {
+  return String(name || "U").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+}
+
 export default function Users() {
   const currentUser = getUser();
+  const isSuperAdmin = currentUser?.role === ROLES.SUPER_ADMIN;
   const requestedUsername = new URLSearchParams(window.location.search).get("username");
   const [users, setUsers] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -27,6 +51,9 @@ export default function Users() {
   });
   const [credentialError, setCredentialError] = useState("");
   const [credentialMessage, setCredentialMessage] = useState("");
+  const [presence, setPresence] = useState([]);
+  const [presenceLoading, setPresenceLoading] = useState(false);
+  const [presenceError, setPresenceError] = useState("");
 
   const [newRole, setNewRole] = useState(newRoleEmpty);
   const [permsRole, setPermsRole] = useState("");
@@ -39,6 +66,26 @@ export default function Users() {
     api.get("/roles").then(setRolesInfo).catch(() => {});
   }
   useEffect(load, []);
+
+  async function loadPresence(showLoading = false) {
+    if (!isSuperAdmin) return;
+    if (showLoading) setPresenceLoading(true);
+    setPresenceError("");
+    try {
+      setPresence(await api.get("/auth/presence"));
+    } catch (err) {
+      setPresenceError(err.message);
+    } finally {
+      if (showLoading) setPresenceLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!isSuperAdmin) return undefined;
+    loadPresence(true);
+    const interval = window.setInterval(() => loadPresence(false), 30_000);
+    return () => window.clearInterval(interval);
+  }, [isSuperAdmin]);
 
   const allRoles = [...rolesInfo.builtIn, ...rolesInfo.custom.map((r) => ({ slug: r.slug, label: r.label }))];
   const roleLabel = (slug) => ROLE_LABELS[slug] || allRoles.find((r) => r.slug === slug)?.label || slug;
@@ -166,7 +213,26 @@ export default function Users() {
       </div>
       {permissionMessage && <p className="success-text" style={{ marginBottom: 16 }}>{permissionMessage}</p>}
 
-      {currentUser?.role === ROLES.SUPER_ADMIN && (
+      {isSuperAdmin && (
+        <section className="card active-users-card">
+          <div className="active-users-heading">
+            <div><span className="settings-eyebrow">LIVE ACCESS</span><h3>Currently active users</h3><p>Each signed-in device appears separately and becomes inactive after two minutes without a heartbeat.</p></div>
+            <div className="active-users-actions"><span className="active-users-count"><i aria-hidden="true" />{presence.length} active {presence.length === 1 ? "session" : "sessions"}</span><button type="button" className="settings-edit-button" disabled={presenceLoading} onClick={() => loadPresence(true)}>{presenceLoading ? "Refreshing…" : "Refresh"}</button></div>
+          </div>
+          {presenceError && <p className="error-text">{presenceError}</p>}
+          {presenceLoading && presence.length === 0 && <div className="active-users-empty">Checking active users…</div>}
+          {!presenceLoading && presence.length === 0 && <div className="active-users-empty"><strong>No active users</strong><span>A user will appear here after signing in or returning to the website.</span></div>}
+          {presence.length > 0 && <div className="active-users-grid">
+            {presence.map((session) => <article className="active-user-session" key={session.session_id}>
+              <div className="active-user-identity"><span className="active-user-avatar">{userInitials(session.full_name)}</span><div><strong>{session.full_name}</strong><small>@{session.username} · {roleLabel(session.role)}</small></div><span className="active-user-live"><i aria-hidden="true" />Live</span></div>
+              <div className="active-user-device"><span className={`active-device-icon ${session.device_type.toLowerCase()}`}>{session.device_type === "Phone" ? "PHONE" : session.device_type === "Tablet" ? "TABLET" : "PC"}</span><div><strong>{session.device_type} · {session.device_name}</strong><small>{session.browser_name}</small></div></div>
+              <div className="active-user-times"><span><small>Signed in</small><strong>{readablePresenceTime(session.signed_in_at)}</strong></span><span><small>Last activity</small><strong>{presenceFreshness(session.seconds_since_seen)}</strong></span></div>
+            </article>)}
+          </div>}
+        </section>
+      )}
+
+      {isSuperAdmin && (
         <div className="card" style={{ marginBottom: 20 }}>
           <h3 style={{ marginTop: 0 }}>Super Admin sign-in</h3>
           <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
