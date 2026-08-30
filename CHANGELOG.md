@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.2.4 — 2026-08-30
+
+- Made the Digital Sales, Cash Sales, and Daily Cash Costs date selectors change the active Daily Collection Sheet day and immediately load that day’s records.
+- Preserved independent date changes while editing an existing sale or expense so records can still be moved to another day.
+
 ## 1.2.3 — 2026-08-30
 
 - Added passenger totals to every daily sale summary in Online Accounts.

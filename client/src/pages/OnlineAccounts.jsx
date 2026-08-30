@@ -119,6 +119,23 @@ export default function OnlineAccounts() {
     window.setTimeout(() => setMessage(""), 2600);
   };
 
+  const changeSectionDate = (section, date) => {
+    if (!date) return;
+    if (section === "online" && editingOnlineId) {
+      setOnlineForm((current) => ({ ...current, entry_date: date }));
+      return;
+    }
+    if (section === "cash" && editingCashId) {
+      setCashForm((current) => ({ ...current, entry_date: date }));
+      return;
+    }
+    if (section === "expense" && editingExpenseId) {
+      setExpenseForm((current) => ({ ...current, expense_date: date }));
+      return;
+    }
+    setSelectedDate(date);
+  };
+
   const loadCategories = useCallback(async () => {
     const rows = await api.get("/online-accounts/expense-categories");
     setCategories(rows);
@@ -460,7 +477,7 @@ export default function OnlineAccounts() {
           <div className="online-panel-title"><div><span className="settings-eyebrow">DIGITAL SALES</span><h3>Website, Android App & iOS App</h3><p>Each platform is recorded separately. Normal and Long passengers are counted separately.</p></div><span className="online-panel-number">01</span></div>
           {canWrite && <form className="online-form-grid" onSubmit={(event) => saveEntry(event, "online")}>
             <Field label="Platform"><select value={onlineForm.channel} onChange={(event) => setOnlineForm({ ...onlineForm, channel: event.target.value })}><option value="website">Website</option><option value="android">Android App</option><option value="ios">iOS App</option>{onlineForm.channel === "website_android" && <option value="website_android" disabled>Legacy combined — choose Website or Android</option>}</select></Field>
-            <Field label="Entry date"><input type="date" value={onlineForm.entry_date} onChange={(event) => setOnlineForm({ ...onlineForm, entry_date: event.target.value })} required /></Field>
+            <Field label="Entry date"><input type="date" value={onlineForm.entry_date} onChange={(event) => changeSectionDate("online", event.target.value)} required /></Field>
             <Field label="Coach number"><input value={onlineForm.coach_number} onChange={(event) => setOnlineForm({ ...onlineForm, coach_number: event.target.value })} placeholder="Coach number" required /></Field>
             <Field label="Bus number"><input value={onlineForm.bus_number} onChange={(event) => setOnlineForm({ ...onlineForm, bus_number: event.target.value })} placeholder="Bus number" required /></Field>
             <Field label="Normal passengers"><input type="number" min="0" step="1" value={onlineForm.normal_passengers} onChange={(event) => setOnlineForm({ ...onlineForm, normal_passengers: event.target.value })} placeholder="0" required /></Field>
@@ -474,7 +491,7 @@ export default function OnlineAccounts() {
         <section className="card online-entry-panel cash-panel">
           <div className="online-panel-title"><div><span className="settings-eyebrow">CASH SALES</span><h3>Manual cash collection</h3><p>Enter the total passenger count exactly as received.</p></div><span className="online-panel-number">02</span></div>
           {canWrite && <form className="online-form-grid" onSubmit={(event) => saveEntry(event, "cash")}>
-            <Field label="Entry date" className="wide"><input type="date" value={cashForm.entry_date} onChange={(event) => setCashForm({ ...cashForm, entry_date: event.target.value })} required /></Field>
+            <Field label="Entry date" className="wide"><input type="date" value={cashForm.entry_date} onChange={(event) => changeSectionDate("cash", event.target.value)} required /></Field>
             <Field label="Coach number"><input value={cashForm.coach_number} onChange={(event) => setCashForm({ ...cashForm, coach_number: event.target.value })} placeholder="Coach number" required /></Field>
             <Field label="Bus number"><input value={cashForm.bus_number} onChange={(event) => setCashForm({ ...cashForm, bus_number: event.target.value })} placeholder="Bus number" required /></Field>
             <Field label="Total passengers"><input type="number" min="0" step="1" value={cashForm.passenger_count} onChange={(event) => setCashForm({ ...cashForm, passenger_count: event.target.value })} placeholder="0" required /></Field>
@@ -490,7 +507,7 @@ export default function OnlineAccounts() {
         {canWrite && <div className="online-expense-layout">
           <form className="online-form-grid online-expense-form" onSubmit={saveExpense}>
             <Field label="Expense category" className="wide"><select value={expenseForm.category_id} onChange={(event) => setExpenseForm({ ...expenseForm, category_id: event.target.value })} required><option value="">Choose category</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}{Number(category.active) ? "" : " (archived)"}</option>)}</select></Field>
-            <Field label="Expense date" className="wide"><input type="date" value={expenseForm.expense_date} onChange={(event) => setExpenseForm({ ...expenseForm, expense_date: event.target.value })} required /></Field>
+            <Field label="Expense date" className="wide"><input type="date" value={expenseForm.expense_date} onChange={(event) => changeSectionDate("expense", event.target.value)} required /></Field>
             <Field label="Amount (BDT)"><input type="number" min="0" step="0.01" value={expenseForm.amount} onChange={(event) => setExpenseForm({ ...expenseForm, amount: event.target.value })} placeholder="0.00" required /></Field>
             <Field label="Note"><input value={expenseForm.description} onChange={(event) => setExpenseForm({ ...expenseForm, description: event.target.value })} placeholder="Optional details" /></Field>
             <div className="online-form-actions wide"><button className="primary" type="submit">{editingExpenseId ? "Update expense" : "Add expense"}</button>{editingExpenseId && <button type="button" className="settings-edit-button" onClick={() => { setEditingExpenseId(null); setExpenseForm(expenseBlank(selectedDate, activeCategories[0] ? String(activeCategories[0].id) : "")); }}>Cancel edit</button>}</div>
