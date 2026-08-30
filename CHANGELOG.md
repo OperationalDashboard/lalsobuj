@@ -2,6 +2,12 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.8.1 — 2026-08-30
+
+- Changed the Place-wise Accounts totals and counter details to show the selected day instead of combining every available date.
+- Added a clear Selected day / Date range control so users can view any single date or choose a From and To date.
+- Linked the place-entry date to the daily summary, so selecting an entry date immediately shows that day's figures below.
+
 ## 1.8.0 — 2026-08-30
 
 - Added a Super-Admin-only “Currently active users” dashboard in Users & Permissions, with live session refresh and one card for each signed-in device.

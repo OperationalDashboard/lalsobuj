@@ -1152,6 +1152,48 @@ table button { white-space: nowrap; }
 .online-positive-text { color: var(--green); }
 .online-negative-text { color: var(--red); }
 
+/* Place-wise Accounts date controls */
+.place-period-toolbar { margin: 14px 0 16px; padding: 14px; display: grid; grid-template-columns: minmax(230px, 1fr) auto minmax(170px, .55fr); align-items: center; gap: 14px; background: linear-gradient(135deg, color-mix(in srgb, var(--green) 7%, var(--bg-soft)), color-mix(in srgb, var(--card) 90%, transparent)); border: 1px solid color-mix(in srgb, var(--green) 20%, var(--border)); border-radius: 13px; }
+.place-period-intro { min-width: 0; display: flex; flex-direction: column; }
+.place-period-intro strong { font: 800 .88rem "Manrope", sans-serif; }
+.place-period-intro small { margin-top: 3px; color: var(--muted); font-size: .68rem; }
+.place-period-controls { display: flex; align-items: flex-end; gap: 10px; }
+.place-period-tabs { padding: 4px; display: flex; gap: 3px; background: var(--control-bg); border: 1px solid var(--border); border-radius: 10px; }
+.place-period-tabs button { min-height: 34px; padding: 7px 12px; color: var(--muted); background: transparent; border: 0; border-radius: 7px; box-shadow: none; font-size: .7rem; white-space: nowrap; }
+.place-period-tabs button.active { color: #fff; background: var(--green); box-shadow: 0 5px 14px color-mix(in srgb, var(--green) 28%, transparent); }
+.place-period-date { min-width: 142px; display: grid; gap: 4px; }
+.place-period-date span { color: var(--muted); font-size: .62rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.place-period-date input { min-height: 42px; }
+.place-period-range { display: flex; align-items: flex-end; gap: 7px; }
+.place-period-current { min-width: 0; padding: 11px 12px; display: flex; flex-direction: column; background: color-mix(in srgb, var(--card) 82%, transparent); border-left: 3px solid var(--green); border-radius: 8px; }
+.place-period-current small { color: var(--muted); font-size: .61rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.place-period-current strong { margin-top: 4px; overflow: hidden; font: 800 .78rem "Manrope", sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.place-results-heading { margin: 16px 0 8px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.place-results-heading > div { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.place-results-heading strong { font: 800 .9rem "Manrope", sans-serif; }
+.place-results-heading span { color: var(--green); font-size: .69rem; font-weight: 800; }
+.place-results-heading small { color: var(--muted); font-size: .67rem; }
+
+@media (max-width: 1180px) {
+  .place-period-toolbar { grid-template-columns: minmax(0, 1fr) auto; }
+  .place-period-current { grid-column: 1 / -1; }
+}
+
+@media (max-width: 760px) {
+  .place-period-toolbar { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+  .place-period-controls { align-items: stretch; flex-direction: column; }
+  .place-period-tabs { width: 100%; }
+  .place-period-tabs button { flex: 1; }
+  .place-period-date { min-width: 0; }
+  .place-period-range { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .place-period-current { grid-column: auto; }
+}
+
+@media (max-width: 440px) {
+  .place-period-range { grid-template-columns: minmax(0, 1fr); }
+  .place-results-heading { align-items: flex-start; flex-direction: column; }
+}
+
 @media (max-width: 1120px) {
   .online-entry-grid, .online-report-grid { grid-template-columns: minmax(0, 1fr); }
   .online-report-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }

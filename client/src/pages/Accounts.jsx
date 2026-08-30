@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api, getUser } from "../api.js";
 import { ROLES, isFullAccess } from "../roles.js";
 import { t } from "../i18n.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
+const readableDate = (value) => value
+  ? new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+  : "Choose a date";
 const entryEmpty = {
   type: "income", category: "ticket_sales", amount: "",
   passengers_count: "", price_per_seat: "", deduction_type: "", deducted_passengers: "",
@@ -55,6 +58,9 @@ export default function Accounts() {
   const [openPlace, setOpenPlace] = useState("");
   const [selectedCounterDetail, setSelectedCounterDetail] = useState("");
   const [placeMessage, setPlaceMessage] = useState("");
+  const [placePeriod, setPlacePeriod] = useState({ mode: "day", day: today(), from: today(), to: today() });
+  const [placeTransactionsLoading, setPlaceTransactionsLoading] = useState(false);
+  const [placePeriodError, setPlacePeriodError] = useState("");
 
   // Manual re-pairing of two legs into one rotation (Accounts/Admin only)
   const [pairA, setPairA] = useState("");
@@ -65,6 +71,7 @@ export default function Accounts() {
     api.get("/buses").then(setBuses).catch(() => {});
     api.get("/discount-types").then(setDiscountTypes).catch(() => {});
     loadPlaceExpenseSector();
+    loadPlaceTransactions();
   }
   useEffect(loadOverview, []);
 
@@ -72,8 +79,25 @@ export default function Accounts() {
     api.get("/accounts/expense-places").then(setExpensePlaces).catch(() => {});
     api.get("/counters").then(setPlaceCounters).catch(() => {});
     api.get("/accounts/expense-types").then(setExpenseTypes).catch(() => {});
-    api.get("/accounts/place-finance").then(setPlaceTransactions).catch(() => {});
   }
+
+  function loadPlaceTransactions() {
+    const from = placePeriod.mode === "day" ? placePeriod.day : placePeriod.from;
+    const to = placePeriod.mode === "day" ? placePeriod.day : placePeriod.to;
+    if (!from || !to || from > to) {
+      setPlaceTransactions([]);
+      setPlacePeriodError("Choose a valid From and To date.");
+      return;
+    }
+    setPlaceTransactionsLoading(true);
+    setPlacePeriodError("");
+    api.get(`/accounts/place-finance?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+      .then(setPlaceTransactions)
+      .catch((err) => { setPlaceTransactions([]); setPlacePeriodError(err.message); })
+      .finally(() => setPlaceTransactionsLoading(false));
+  }
+
+  useEffect(() => { loadPlaceTransactions(); }, [placePeriod.mode, placePeriod.day, placePeriod.from, placePeriod.to]); // eslint-disable-line
 
   async function addExpenseType(e) {
     e.preventDefault(); if (!newExpenseType.trim()) return;
@@ -86,7 +110,7 @@ export default function Accounts() {
       await api.post("/accounts", { type: placeForm.type, category: placeForm.type === "income" ? "place_income" : "place_expense", amount: Number(placeForm.amount), txn_date: placeForm.txn_date, place_name: placeForm.place_name, counter_id: placeForm.counter_id || null, description: `${placeForm.finance_type}${placeForm.note ? ` — ${placeForm.note}` : ""}` });
       setOpenPlace(placeForm.place_name); setSelectedCounterDetail(placeForm.counter_id || "");
       setPlaceMessage(`Saved in ${placeForm.counter_id ? "the selected counter" : "the whole place"} details.`);
-      setPlaceForm({ type: "expense", place_name: "", counter_id: "", finance_type: "", amount: "", txn_date: today(), note: "" }); loadPlaceExpenseSector(); loadOverview();
+      setPlaceForm({ type: "expense", place_name: "", counter_id: "", finance_type: "", amount: "", txn_date: today(), note: "" }); loadOverview();
     } catch (err) { setPlaceMessage(err.message); }
   }
   async function postCounterSalary() {
@@ -95,7 +119,7 @@ export default function Accounts() {
       const result = await api.post("/salary/post-place-expenses", { counter_id: placeForm.counter_id });
       setOpenPlace(placeForm.place_name); setSelectedCounterDetail(placeForm.counter_id);
       setPlaceMessage(result.total ? `Posted staff salary for this counter: ৳${Number(result.total).toLocaleString()}` : "No active salary plan found for this counter.");
-      loadPlaceExpenseSector(); loadOverview();
+      loadOverview();
     } catch (err) { setPlaceMessage(err.message); }
   }
 
@@ -277,6 +301,11 @@ export default function Accounts() {
   }
 
   const busName = (id) => buses.find((b) => b.id === Number(id))?.reg_number || "";
+  const placePeriodLabel = placePeriod.mode === "day"
+    ? readableDate(placePeriod.day)
+    : placePeriod.from === placePeriod.to
+      ? readableDate(placePeriod.from)
+      : `${readableDate(placePeriod.from)} – ${readableDate(placePeriod.to)}`;
 
   // Group this bus's legs into rotations (by group_id) for display, since
   // a rotation = two legs sharing one Done/close state and one expense.
@@ -325,13 +354,27 @@ export default function Accounts() {
         <div className="page-header" style={{ marginBottom: 12 }}>
           <div><h3 style={{ margin: 0 }}>Place-wise Accounts</h3><p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "0.85rem" }}>A separate sector for each Place and its optional counters. Every entry is assigned to one Place only; income and expenses are included in the company Report totals.</p></div>
         </div>
+        <div className="place-period-toolbar">
+          <div className="place-period-intro"><span className="settings-eyebrow">SUMMARY PERIOD</span><strong>Choose which dates appear below</strong><small>The totals and counter details use only this period.</small></div>
+          <div className="place-period-controls">
+            <div className="place-period-tabs" role="group" aria-label="Place accounts period type">
+              <button type="button" className={placePeriod.mode === "day" ? "active" : ""} onClick={() => setPlacePeriod((period) => ({ ...period, mode: "day" }))}>Selected day</button>
+              <button type="button" className={placePeriod.mode === "range" ? "active" : ""} onClick={() => setPlacePeriod((period) => ({ ...period, mode: "range" }))}>Date range</button>
+            </div>
+            {placePeriod.mode === "day" ? <label className="place-period-date"><span>Date</span><input type="date" value={placePeriod.day} onInput={(e) => { const day = e.currentTarget.value; setPlacePeriod((period) => ({ ...period, day })); }} /></label> : <div className="place-period-range">
+              <label className="place-period-date"><span>From</span><input type="date" value={placePeriod.from} onInput={(e) => { const from = e.currentTarget.value; setPlacePeriod((period) => ({ ...period, from, to: period.to && period.to >= from ? period.to : from })); }} /></label>
+              <label className="place-period-date"><span>To</span><input type="date" min={placePeriod.from} value={placePeriod.to} onInput={(e) => { const to = e.currentTarget.value; setPlacePeriod((period) => ({ ...period, to })); }} /></label>
+            </div>}
+          </div>
+          <div className="place-period-current"><small>Showing totals for</small><strong>{placePeriodLabel}</strong></div>
+        </div>
         <form className="form-row" onSubmit={addPlaceExpense}>
           <select value={placeForm.type} onChange={(e) => setPlaceForm({ ...placeForm, type: e.target.value, finance_type: "" })}><option value="expense">Expense</option><option value="income">Income</option></select>
           <select value={placeForm.place_name} onChange={(e) => setPlaceForm({ ...placeForm, place_name: e.target.value, counter_id: "" })}><option value="">Select one place</option>{expensePlaces.map((place) => <option key={place.id} value={place.name}>{place.name}</option>)}</select>
           <select value={placeForm.counter_id} onChange={(e) => setPlaceForm({ ...placeForm, counter_id: e.target.value })}><option value="">No counter / whole place</option>{placeCounters.filter((counter) => counter.place_name === placeForm.place_name).map((counter) => <option key={counter.id} value={counter.id}>{counter.name}</option>)}</select>
           <select value={placeForm.finance_type} onChange={(e) => setPlaceForm({ ...placeForm, finance_type: e.target.value })}><option value="">Select {placeForm.type} type</option>{placeForm.type === "income" ? <><option value="Commission">Commission</option><option value="Other income">Other income</option></> : expenseTypes.map((type) => <option key={type.id} value={type.name}>{type.name}</option>)}</select>
           <input type="number" placeholder="Amount" value={placeForm.amount} onChange={(e) => setPlaceForm({ ...placeForm, amount: e.target.value })} />
-          <input type="date" value={placeForm.txn_date} onChange={(e) => setPlaceForm({ ...placeForm, txn_date: e.target.value })} />
+          <input type="date" value={placeForm.txn_date} onInput={(e) => { const txnDate = e.currentTarget.value; setPlaceForm({ ...placeForm, txn_date: txnDate }); if (placePeriod.mode === "day") setPlacePeriod((period) => ({ ...period, day: txnDate })); }} />
           <input placeholder="Note (optional)" value={placeForm.note} onChange={(e) => setPlaceForm({ ...placeForm, note: e.target.value })} />
           {placeForm.type === "expense" && placeForm.finance_type === "Counter Staff Salary" && <button className="primary" type="button" onClick={postCounterSalary} disabled={!placeForm.counter_id}>Post staff salary for this counter</button>}
           <button className="primary" type="submit">Add place {placeForm.type}</button>
@@ -341,8 +384,10 @@ export default function Accounts() {
             <p style={{ color: "var(--muted)", fontSize: "0.85rem", margin: "8px 0" }}>Manage parent places and assign counters from <strong>Settings → Place and counter setup</strong>.</p>
             <form className="form-row" onSubmit={addExpenseType}><input placeholder="New expense type" value={newExpenseType} onChange={(e) => setNewExpenseType(e.target.value)} /><button className="link-danger" type="submit">Add expense type</button></form>
           </div>
-        <table style={{ marginTop: 14 }}><thead><tr><th>Place</th><th>{t("income")}</th><th>{t("expense")}</th><th>{t("net")}</th><th></th></tr></thead><tbody>
-          {expensePlaces.map((place) => { const rows = placeTransactions.filter((tx) => tx.place_name === place.name); const income = rows.filter((tx) => tx.type === "income").reduce((sum, tx) => sum + tx.amount, 0); const expense = rows.filter((tx) => tx.type === "expense").reduce((sum, tx) => sum + tx.amount, 0); const counters = placeCounters.filter((counter) => counter.place_name === place.name); const detailRows = selectedCounterDetail ? rows.filter((row) => String(row.counter_id) === String(selectedCounterDetail)) : rows; return <><tr key={place.id}><td>{place.name}</td><td>৳{income.toLocaleString()}</td><td>৳{expense.toLocaleString()}</td><td style={{ color: income - expense >= 0 ? "var(--green)" : "var(--red)" }}>৳{(income - expense).toLocaleString()}</td><td><button className="link-danger" onClick={() => { setOpenPlace(openPlace === place.name ? "" : place.name); setSelectedCounterDetail(""); }}>Counter-wise details</button></td></tr>{openPlace === place.name && <tr><td colSpan={5}><div style={{ padding: 8 }}><label style={{ fontSize: "0.82rem", fontWeight: 700 }}>Counter details <select value={selectedCounterDetail} onChange={(e) => setSelectedCounterDetail(e.target.value)} style={{ marginLeft: 8 }}><option value="">All counters and whole-place entries</option>{counters.map((counter) => <option key={counter.id} value={counter.id}>{counter.name}</option>)}</select></label><RotationDetails rows={detailRows} /></div></td></tr>}</>; })}
+        <div className="place-results-heading"><div><strong>Place totals</strong><span>{placePeriodLabel}</span></div><small>{placeTransactionsLoading ? "Updating…" : `${placeTransactions.length} transaction${placeTransactions.length === 1 ? "" : "s"}`}</small></div>
+        {placePeriodError && <p className="error-text">{placePeriodError}</p>}
+        <table><thead><tr><th>Place</th><th>{t("income")}</th><th>{t("expense")}</th><th>{t("net")}</th><th></th></tr></thead><tbody>
+          {expensePlaces.map((place) => { const rows = placeTransactions.filter((tx) => tx.place_name === place.name); const income = rows.filter((tx) => tx.type === "income").reduce((sum, tx) => sum + tx.amount, 0); const expense = rows.filter((tx) => tx.type === "expense").reduce((sum, tx) => sum + tx.amount, 0); const counters = placeCounters.filter((counter) => counter.place_name === place.name); const detailRows = selectedCounterDetail ? rows.filter((row) => String(row.counter_id) === String(selectedCounterDetail)) : rows; return <Fragment key={place.id}><tr><td>{place.name}</td><td>৳{income.toLocaleString()}</td><td>৳{expense.toLocaleString()}</td><td style={{ color: income - expense >= 0 ? "var(--green)" : "var(--red)" }}>৳{(income - expense).toLocaleString()}</td><td><button className="link-danger" onClick={() => { setOpenPlace(openPlace === place.name ? "" : place.name); setSelectedCounterDetail(""); }}>Counter-wise details</button></td></tr>{openPlace === place.name && <tr><td colSpan={5}><div style={{ padding: 8 }}><label style={{ fontSize: "0.82rem", fontWeight: 700 }}>Counter details <select value={selectedCounterDetail} onChange={(e) => setSelectedCounterDetail(e.target.value)} style={{ marginLeft: 8 }}><option value="">All counters and whole-place entries</option>{counters.map((counter) => <option key={counter.id} value={counter.id}>{counter.name}</option>)}</select></label><RotationDetails rows={detailRows} /></div></td></tr>}</Fragment>; })}
           {expensePlaces.length === 0 && <tr><td colSpan={5}>Add a place to begin recording separate place-wise expenses.</td></tr>}
         </tbody></table>
       </div>
