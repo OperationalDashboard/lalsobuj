@@ -2,6 +2,12 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.5.0 — 2026-08-30
+
+- Added a daily line graph to the Online Accounts final report with separate Digital Sales and Cash Sales lines.
+- Combined Website, Android App, iOS App, and legacy digital amounts only for the Digital Sales graph line while leaving every existing report calculation unchanged.
+- Added responsive mobile scrolling, exact per-day chart tooltips, totals in the legend, and print-friendly chart styling.
+
 ## 1.4.1 — 2026-08-30
 
 - Fixed confirmed document imports failing on the live Turso database after import history was introduced.
