@@ -14,7 +14,7 @@ function busClassTypes() {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'bus_class_types'").get();
   try {
     const parsed = JSON.parse(row?.value || "null");
-    return Array.isArray(parsed) && parsed.length ? parsed.map(String) : DEFAULT_BUS_CLASSES;
+    return Array.isArray(parsed) ? parsed.map(String) : DEFAULT_BUS_CLASSES;
   } catch {
     return DEFAULT_BUS_CLASSES;
   }

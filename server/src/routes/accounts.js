@@ -29,9 +29,13 @@ router.post("/expense-places", guardWrite, (req, res) => {
 router.put("/expense-places/:id", guardWrite, (req, res) => {
   const name = req.body.name?.trim();
   if (!name) return res.status(400).json({ error: "Place name required" });
+  const current = db.prepare("SELECT * FROM expense_places WHERE id = ?").get(req.params.id);
+  if (!current) return res.status(404).json({ error: "Not found" });
   try {
-    const info = db.prepare("UPDATE expense_places SET name = ? WHERE id = ?").run(name, req.params.id);
-    if (!info.changes) return res.status(404).json({ error: "Not found" });
+    db.transaction(() => {
+      db.prepare("UPDATE expense_places SET name = ? WHERE id = ?").run(name, req.params.id);
+      db.prepare("UPDATE transactions SET place_name = ? WHERE lower(place_name) = lower(?)").run(name, current.name);
+    })();
     res.json(db.prepare("SELECT * FROM expense_places WHERE id = ?").get(req.params.id));
   } catch { res.status(400).json({ error: "That place already exists" }); }
 });

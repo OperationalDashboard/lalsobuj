@@ -1,9 +1,15 @@
 const express = require("express");
 const db = require("../db");
 const { requireAuth, requireRole } = require("../middleware/auth");
-const { FULL_ACCESS } = require("../roles");
+const { FULL_ACCESS, ROLES } = require("../roles");
 
 const router = express.Router();
+
+const NAV_ROUTES = [
+  "/", "/live-activity", "/accounts", "/rotation", "/attendance", "/staff",
+  "/buses", "/routes", "/counters", "/maintenance", "/reports", "/salary",
+  "/trash", "/chat", "/users", "/settings",
+];
 
 const DEFAULTS = {
   theme_primary_color: "#046a38",
@@ -14,7 +20,25 @@ const DEFAULTS = {
   login_logo_data: "",
   login_background_data: "",
   bus_class_types: JSON.stringify(["AC", "Non AC", "Sleeper"]),
+  sidebar_nav_order: JSON.stringify(NAV_ROUTES),
 };
+
+function getBusClasses() {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'bus_class_types'").get();
+  try {
+    const parsed = JSON.parse(row?.value ?? DEFAULTS.bus_class_types);
+    return Array.isArray(parsed) ? parsed.map(String) : JSON.parse(DEFAULTS.bus_class_types);
+  } catch {
+    return JSON.parse(DEFAULTS.bus_class_types);
+  }
+}
+
+function saveSetting(key, value) {
+  db.prepare(
+    `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`
+  ).run(key, String(value));
+}
 
 // Public login appearance only. It intentionally exposes no contact or
 // financial settings before authentication.
@@ -36,9 +60,60 @@ router.get("/", (req, res) => {
   res.json(settings);
 });
 
+// Sidebar order is global for the full-access navigation, but only the
+// Super Admin may change it. Other users continue to see their role-specific
+// links in the normal fixed order.
+router.put("/sidebar-order", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
+  const order = req.body.order;
+  const valid = Array.isArray(order)
+    && order.length === NAV_ROUTES.length
+    && new Set(order).size === NAV_ROUTES.length
+    && NAV_ROUTES.every((route) => order.includes(route));
+  if (!valid) return res.status(400).json({ error: "Sidebar order must contain every navigation item exactly once" });
+  saveSetting("sidebar_nav_order", JSON.stringify(order));
+  res.json({ order });
+});
+
+// Super Admin can rename or remove any configured bus class, including the
+// original defaults. Renaming also updates buses already using that class;
+// removing only removes it from future choices and keeps existing bus data.
+router.put("/bus-classes", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
+  const { action, currentName } = req.body;
+  const classes = getBusClasses();
+  const index = classes.findIndex((item) => item.toLowerCase() === String(currentName || "").trim().toLowerCase());
+  if (index < 0) return res.status(404).json({ error: "Bus class not found" });
+
+  if (action === "rename") {
+    const newName = String(req.body.newName || "").trim();
+    if (!newName) return res.status(400).json({ error: "New bus class name required" });
+    if (classes.some((item, itemIndex) => itemIndex !== index && item.toLowerCase() === newName.toLowerCase())) {
+      return res.status(400).json({ error: "That bus class already exists" });
+    }
+    const oldName = classes[index];
+    const next = [...classes];
+    next[index] = newName;
+    let updatedBuses = 0;
+    db.transaction(() => {
+      saveSetting("bus_class_types", JSON.stringify(next));
+      updatedBuses = db.prepare("UPDATE buses SET class_type = ? WHERE lower(class_type) = lower(?)").run(newName, oldName).changes;
+    })();
+    return res.json({ bus_classes: next, updated_buses: updatedBuses });
+  }
+
+  if (action === "remove") {
+    const oldName = classes[index];
+    const next = classes.filter((_, itemIndex) => itemIndex !== index);
+    saveSetting("bus_class_types", JSON.stringify(next));
+    const busesUsingClass = db.prepare("SELECT COUNT(*) AS count FROM buses WHERE lower(class_type) = lower(?)").get(oldName).count;
+    return res.json({ bus_classes: next, buses_using_removed_class: busesUsingClass });
+  }
+
+  return res.status(400).json({ error: "Choose rename or remove" });
+});
+
 // Only Admin/Super Admin can change appearance or the dedicated call contact.
 router.put("/", requireRole(...FULL_ACCESS), (req, res) => {
-  const allowedKeys = Object.keys(DEFAULTS);
+  const allowedKeys = Object.keys(DEFAULTS).filter((key) => key !== "sidebar_nav_order");
   const upsert = db.prepare(
     `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`

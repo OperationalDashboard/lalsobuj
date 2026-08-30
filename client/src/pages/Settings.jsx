@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api.js";
+import { api, getUser } from "../api.js";
+import { ROLES } from "../roles.js";
 
 const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
 
 export default function Settings() {
+  const user = getUser();
+  const isSuperAdmin = user?.role === ROLES.SUPER_ADMIN;
   const [settings, setSettings] = useState(null);
   const [colors, setColors] = useState({ theme_primary_color: "#046a38", theme_accent_color: "#d21f3c" });
   const [callContact, setCallContact] = useState({ dedicated_call_name: "", dedicated_call_phone: "" });
@@ -30,6 +33,7 @@ export default function Settings() {
   const [placeEdit, setPlaceEdit] = useState({ name: "", counterIds: [] });
   const [locations, setLocations] = useState([]);
   const [newLocation, setNewLocation] = useState("");
+  const [editingItem, setEditingItem] = useState(null);
 
   function loadSettings() {
     api.get("/settings").then((s) => {
@@ -39,7 +43,7 @@ export default function Settings() {
       setLoginLook({ app_name: s.app_name || "Lal Sabuj Paribahan", login_logo_data: s.login_logo_data || "", login_background_data: s.login_background_data || "" });
       try {
         const parsed = JSON.parse(s.bus_class_types || "null");
-        setBusClasses(Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_BUS_CLASSES);
+        setBusClasses(Array.isArray(parsed) ? parsed : DEFAULT_BUS_CLASSES);
       } catch {
         setBusClasses(DEFAULT_BUS_CLASSES);
       }
@@ -52,6 +56,11 @@ export default function Settings() {
   function loadPlaceSettings() { api.get("/accounts/expense-places").then(setExpensePlaces); api.get("/counters").then(setCounters); }
 
   useEffect(() => { loadSettings(); loadHotels(); loadParts(); loadDiscountTypes(); loadPlaceSettings(); loadLocations(); }, []);
+
+  function flashMessage(message) {
+    setSavedMsg(message);
+    setTimeout(() => setSavedMsg(""), 2600);
+  }
 
   async function saveAppearance(e) {
     e.preventDefault();
@@ -90,10 +99,28 @@ export default function Settings() {
     setSavedMsg("Bus classes saved."); setTimeout(() => setSavedMsg(""), 2000);
   }
   async function removeBusClass(className) {
+    if (!confirm(`Remove '${className}' from the bus class choices? Existing buses will keep the class as historical data.`)) return;
+    if (isSuperAdmin) {
+      const result = await api.put("/settings/bus-classes", { action: "remove", currentName: className });
+      setBusClasses(result.bus_classes);
+      flashMessage(result.buses_using_removed_class
+        ? `Class removed from choices. ${result.buses_using_removed_class} existing bus record(s) kept it as legacy data.`
+        : "Bus class removed.");
+      return;
+    }
     const next = busClasses.filter((item) => item !== className);
     await api.put("/settings", { bus_class_types: JSON.stringify(next) });
     setBusClasses(next);
-    setSavedMsg("Bus classes saved."); setTimeout(() => setSavedMsg(""), 2000);
+    flashMessage("Bus classes saved.");
+  }
+
+  async function saveBusClass(className) {
+    const newName = editingItem?.value?.trim();
+    if (!newName) return;
+    const result = await api.put("/settings/bus-classes", { action: "rename", currentName: className, newName });
+    setBusClasses(result.bus_classes);
+    setEditingItem(null);
+    flashMessage(result.updated_buses ? `Bus class renamed on ${result.updated_buses} bus record(s).` : "Bus class renamed.");
   }
 
   async function addHotel(e) {
@@ -107,6 +134,13 @@ export default function Settings() {
     await api.del(`/hotels/${id}`);
     loadHotels();
   }
+  async function saveHotel(id) {
+    const name = editingItem?.value?.trim();
+    if (!name) return;
+    const result = await api.put(`/hotels/${id}`, { name });
+    setEditingItem(null); loadHotels();
+    flashMessage(result.updated_logs ? `Hotel renamed in ${result.updated_logs} activity record(s).` : "Hotel renamed.");
+  }
 
   async function addPart(e) {
     e.preventDefault();
@@ -119,6 +153,13 @@ export default function Settings() {
     await api.del(`/maintenance/parts-catalog/${id}`);
     loadParts();
   }
+  async function savePart(id) {
+    const partName = editingItem?.value?.trim();
+    if (!partName) return;
+    const result = await api.put(`/maintenance/parts-catalog/${id}`, { part_name: partName, description: editingItem.description?.trim() || "" });
+    setEditingItem(null); loadParts();
+    flashMessage(result.updated_records ? `Part renamed in ${result.updated_records} maintenance record(s).` : "Part updated.");
+  }
 
   async function addDiscountType(e) {
     e.preventDefault();
@@ -130,6 +171,13 @@ export default function Settings() {
   async function removeDiscountType(id) {
     await api.del(`/discount-types/${id}`);
     loadDiscountTypes();
+  }
+  async function saveDiscountType(id) {
+    const name = editingItem?.value?.trim();
+    if (!name) return;
+    const result = await api.put(`/discount-types/${id}`, { name });
+    setEditingItem(null); loadDiscountTypes();
+    flashMessage(result.updated_transactions ? `Deduction type renamed in ${result.updated_transactions} transaction(s).` : "Deduction type renamed.");
   }
 
   async function addExpensePlace(e) {
@@ -179,6 +227,13 @@ export default function Settings() {
     setNewLocation(""); loadLocations();
   }
   async function removeLocation(id) { await api.del(`/maintenance/locations/${id}`); loadLocations(); }
+  async function saveLocation(id) {
+    const name = editingItem?.value?.trim();
+    if (!name) return;
+    const result = await api.put(`/maintenance/locations/${id}`, { name });
+    setEditingItem(null); loadLocations();
+    flashMessage(result.updated_tickets ? `Repair place renamed in ${result.updated_tickets} maintenance ticket(s).` : "Repair place renamed.");
+  }
 
   if (!settings) return null;
   const unassignedCounters = counters.filter((counter) => !counter.place_id);
@@ -194,6 +249,10 @@ export default function Settings() {
       </div>
 
       {savedMsg && <p style={{ color: "var(--green)", fontWeight: 600 }}>{savedMsg}</p>}
+      {isSuperAdmin && <div className="super-admin-control-note">
+        <span aria-hidden="true">◆</span>
+        <div><strong>Super Admin editing enabled</strong><p>You can rename every Settings list item. Linked records are updated automatically so reports keep their data.</p></div>
+      </div>}
 
       <div className="grid grid-2" style={{ marginBottom: 20 }}>
         <div className="card">
@@ -244,14 +303,25 @@ export default function Settings() {
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ marginTop: 0 }}>Bus class types</h3>
-        <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 }}>AC, Non AC, and Sleeper are built in. Add more classes here; custom classes can be removed without changing existing buses.</p>
+        <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 }}>Add classes for the Buses page. Super Admin can rename or remove any class; renaming also updates buses already using it.</p>
         <form className="form-row" onSubmit={addBusClass}>
           <input placeholder="New class (e.g. Business Class)" value={newBusClass} onChange={(e) => setNewBusClass(e.target.value)} />
           <button className="primary" type="submit">Add class</button>
         </form>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {busClasses.map((className) => <span key={className} className="badge active">{className}{!DEFAULT_BUS_CLASSES.includes(className) && <> <button className="link-danger" onClick={() => removeBusClass(className)}>Remove</button></>}</span>)}
-          {busClasses.length === 0 && <span style={{ color: "var(--muted)" }}>No bus classes configured.</span>}
+        <div className="settings-managed-list">
+          {busClasses.map((className) => editingItem?.type === "busClass" && editingItem.id === className
+            ? <div key={className} className="settings-managed-item editing">
+              <input aria-label="Bus class name" value={editingItem.value} onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })} />
+              <div className="settings-item-actions"><button type="button" className="primary" onClick={() => saveBusClass(className)}>Save</button><button type="button" className="place-secondary-action" onClick={() => setEditingItem(null)}>Cancel</button></div>
+            </div>
+            : <div key={className} className="settings-managed-item">
+              <div><strong>{className}</strong>{DEFAULT_BUS_CLASSES.includes(className) && <small>Original class</small>}</div>
+              <div className="settings-item-actions">
+                {isSuperAdmin && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "busClass", id: className, value: className })}>Edit</button>}
+                {(isSuperAdmin || !DEFAULT_BUS_CLASSES.includes(className)) && <button type="button" className="link-danger" onClick={() => removeBusClass(className)}>Remove</button>}
+              </div>
+            </div>)}
+          {busClasses.length === 0 && <div className="settings-list-empty">No bus classes configured. Add one above.</div>}
         </div>
       </div>
 
@@ -264,12 +334,12 @@ export default function Settings() {
           </form>
           <table>
             <tbody>
-              {hotels.map((h) => (
-                <tr key={h.id}>
+              {hotels.map((h) => editingItem?.type === "hotel" && editingItem.id === h.id
+                ? <tr key={h.id} className="settings-edit-row"><td><input aria-label="Hotel name" value={editingItem.value} onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })} /></td><td><div className="settings-item-actions"><button type="button" className="primary" onClick={() => saveHotel(h.id)}>Save</button><button type="button" className="place-secondary-action" onClick={() => setEditingItem(null)}>Cancel</button></div></td></tr>
+                : <tr key={h.id}>
                   <td>{h.name}</td>
-                  <td style={{ textAlign: "right" }}><button className="link-danger" onClick={() => removeHotel(h.id)}>Remove</button></td>
-                </tr>
-              ))}
+                  <td style={{ textAlign: "right" }}><div className="settings-item-actions right">{isSuperAdmin && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "hotel", id: h.id, value: h.name })}>Edit</button>}<button type="button" className="link-danger" onClick={() => removeHotel(h.id)}>Remove</button></div></td>
+                </tr>)}
               {hotels.length === 0 && <tr><td>No hotels added yet.</td></tr>}
             </tbody>
           </table>
@@ -285,12 +355,12 @@ export default function Settings() {
           </form>
           <table>
             <tbody>
-              {parts.map((p) => (
-                <tr key={p.id}>
+              {parts.map((p) => editingItem?.type === "part" && editingItem.id === p.id
+                ? <tr key={p.id} className="settings-edit-row"><td><div className="settings-edit-fields"><input aria-label="Part name" value={editingItem.value} onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })} /><input aria-label="Part description" placeholder="Description (optional)" value={editingItem.description} onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })} /></div></td><td><div className="settings-item-actions"><button type="button" className="primary" onClick={() => savePart(p.id)}>Save</button><button type="button" className="place-secondary-action" onClick={() => setEditingItem(null)}>Cancel</button></div></td></tr>
+                : <tr key={p.id}>
                   <td><strong>{p.part_name}</strong>{p.description && <div style={{ color: "var(--muted)", fontSize: "0.8rem" }}>{p.description}</div>}</td>
-                  <td style={{ textAlign: "right" }}><button className="link-danger" onClick={() => removePart(p.id)}>Remove</button></td>
-                </tr>
-              ))}
+                  <td style={{ textAlign: "right" }}><div className="settings-item-actions right">{isSuperAdmin && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "part", id: p.id, value: p.part_name, description: p.description || "" })}>Edit</button>}<button type="button" className="link-danger" onClick={() => removePart(p.id)}>Remove</button></div></td>
+                </tr>)}
               {parts.length === 0 && <tr><td>No parts added yet.</td></tr>}
             </tbody>
           </table>
@@ -306,12 +376,12 @@ export default function Settings() {
         </form>
         <table>
           <tbody>
-            {discountTypes.map((d) => (
-              <tr key={d.id}>
+            {discountTypes.map((d) => editingItem?.type === "discount" && editingItem.id === d.id
+              ? <tr key={d.id} className="settings-edit-row"><td><input aria-label="Deduction type name" value={editingItem.value} onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })} /></td><td><div className="settings-item-actions"><button type="button" className="primary" onClick={() => saveDiscountType(d.id)}>Save</button><button type="button" className="place-secondary-action" onClick={() => setEditingItem(null)}>Cancel</button></div></td></tr>
+              : <tr key={d.id}>
                 <td>{d.name}</td>
-                <td style={{ textAlign: "right" }}><button className="link-danger" onClick={() => removeDiscountType(d.id)}>Remove</button></td>
-              </tr>
-            ))}
+                <td style={{ textAlign: "right" }}><div className="settings-item-actions right">{isSuperAdmin && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "discount", id: d.id, value: d.name })}>Edit</button>}<button type="button" className="link-danger" onClick={() => removeDiscountType(d.id)}>Remove</button></div></td>
+              </tr>)}
             {discountTypes.length === 0 && <tr><td>No deduction types added yet.</td></tr>}
           </tbody>
         </table>
@@ -435,9 +505,14 @@ export default function Settings() {
 
       <div className="card" style={{ marginTop: 20 }}>
         <h3 style={{ marginTop: 0 }}>Places where repair happens</h3>
-        <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 }}>These places are available when logging bus maintenance.</p>
+        <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 }}>These places are available when logging bus maintenance. Super Admin renaming also updates existing maintenance tickets.</p>
         <form className="form-row" onSubmit={addLocation}><input placeholder="Repair location" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} /><button className="primary" type="submit">Add place</button></form>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{locations.map((location) => <span key={location.id} className="badge">{location.name} <button className="link-danger" onClick={() => removeLocation(location.id)}>Remove</button></span>)}{locations.length === 0 && <span style={{ color: "var(--muted)" }}>No repair places added yet.</span>}</div>
+        <table><tbody>
+          {locations.map((location) => editingItem?.type === "location" && editingItem.id === location.id
+            ? <tr key={location.id} className="settings-edit-row"><td><input aria-label="Repair place name" value={editingItem.value} onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })} /></td><td><div className="settings-item-actions"><button type="button" className="primary" onClick={() => saveLocation(location.id)}>Save</button><button type="button" className="place-secondary-action" onClick={() => setEditingItem(null)}>Cancel</button></div></td></tr>
+            : <tr key={location.id}><td>{location.name}</td><td style={{ textAlign: "right" }}><div className="settings-item-actions right">{isSuperAdmin && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "location", id: location.id, value: location.name })}>Edit</button>}<button type="button" className="link-danger" onClick={() => removeLocation(location.id)}>Remove</button></div></td></tr>)}
+          {locations.length === 0 && <tr><td>No repair places added yet.</td></tr>}
+        </tbody></table>
       </div>
     </div>
   );

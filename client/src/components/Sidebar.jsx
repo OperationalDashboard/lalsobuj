@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { getUser, setToken, setUser } from "../api.js";
+import { api, getUser, setToken, setUser } from "../api.js";
 import { ROLES, ROLE_LABELS, isFullAccess } from "../roles.js";
 import { t, getLanguage, setLanguage } from "../i18n.js";
 import BusIcon from "./BusIcon.jsx";
@@ -104,8 +104,13 @@ function linksFor(role, permissions) {
 export default function Sidebar({ isOpen = false, onNavigate = () => {} }) {
   const navigate = useNavigate();
   const user = getUser();
+  const isSuperAdmin = user?.role === ROLES.SUPER_ADMIN;
   const [lang, setLang] = useState(getLanguage());
   const [theme, setTheme] = useState(() => localStorage.getItem("lsp_theme") || "light");
+  const [navOrder, setNavOrder] = useState([]);
+  const [draggedPath, setDraggedPath] = useState("");
+  const [dropTarget, setDropTarget] = useState({ path: "", position: "" });
+  const [savingOrder, setSavingOrder] = useState(false);
 
   useEffect(() => {
     const handler = () => setLang(getLanguage());
@@ -118,7 +123,70 @@ export default function Sidebar({ isOpen = false, onNavigate = () => {} }) {
     localStorage.setItem("lsp_theme", theme);
   }, [theme]);
 
-  const links = linksFor(user?.role, user?.permissions);
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    api.get("/settings").then((settings) => {
+      try {
+        const parsed = JSON.parse(settings.sidebar_nav_order || "[]");
+        if (Array.isArray(parsed)) setNavOrder(parsed);
+      } catch {
+        setNavOrder([]);
+      }
+    }).catch(() => {});
+  }, [isSuperAdmin]);
+
+  const baseLinks = linksFor(user?.role, user?.permissions);
+  const links = isSuperAdmin && navOrder.length
+    ? [...baseLinks].sort((a, b) => {
+      const aIndex = navOrder.indexOf(a.to);
+      const bIndex = navOrder.indexOf(b.to);
+      return (aIndex < 0 ? Number.MAX_SAFE_INTEGER : aIndex) - (bIndex < 0 ? Number.MAX_SAFE_INTEGER : bIndex);
+    })
+    : baseLinks;
+
+  function handleDragStart(event, path) {
+    if (!isSuperAdmin) return;
+    setDraggedPath(path);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", path);
+  }
+
+  function handleDragOver(event, path) {
+    if (!isSuperAdmin || path === draggedPath) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const position = event.clientY > bounds.top + bounds.height / 2 ? "after" : "before";
+    setDropTarget({ path, position });
+  }
+
+  async function handleDrop(event, targetPath) {
+    if (!isSuperAdmin) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const sourcePath = draggedPath || event.dataTransfer.getData("text/plain");
+    if (!sourcePath || sourcePath === targetPath) {
+      setDraggedPath("");
+      setDropTarget({ path: "", position: "" });
+      return;
+    }
+    const currentOrder = links.map((link) => link.to);
+    const nextOrder = currentOrder.filter((path) => path !== sourcePath);
+    let targetIndex = nextOrder.indexOf(targetPath);
+    if (dropTarget.position === "after") targetIndex += 1;
+    nextOrder.splice(targetIndex, 0, sourcePath);
+    setNavOrder(nextOrder);
+    setDraggedPath("");
+    setDropTarget({ path: "", position: "" });
+    setSavingOrder(true);
+    try {
+      await api.put("/settings/sidebar-order", { order: nextOrder });
+    } catch {
+      setNavOrder(currentOrder);
+    } finally {
+      setSavingOrder(false);
+    }
+  }
 
   function handleLogout() {
     setToken(null);
@@ -141,14 +209,28 @@ export default function Sidebar({ isOpen = false, onNavigate = () => {} }) {
         </div>
       </div>
       <nav>
+        {isSuperAdmin && <div className="sidebar-order-hint">{savingOrder ? "Saving menu order…" : "Drag menu items to reorder"}</div>}
         {links.map((l) => (
           <NavLink
             key={l.to}
             to={l.to}
             end={l.end}
             onClick={onNavigate}
-            className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
+            draggable={isSuperAdmin}
+            onDragStart={(event) => handleDragStart(event, l.to)}
+            onDragOver={(event) => handleDragOver(event, l.to)}
+            onDrop={(event) => handleDrop(event, l.to)}
+            onDragEnd={() => { setDraggedPath(""); setDropTarget({ path: "", position: "" }); }}
+            title={isSuperAdmin ? "Drag to reorder this menu item" : undefined}
+            className={({ isActive }) => [
+              "nav-link",
+              isActive ? "active" : "",
+              isSuperAdmin ? "draggable" : "",
+              draggedPath === l.to ? "dragging" : "",
+              dropTarget.path === l.to ? `drop-${dropTarget.position}` : "",
+            ].filter(Boolean).join(" ")}
           >
+            {isSuperAdmin && <span className="nav-drag-handle" aria-hidden="true">⋮⋮</span>}
             <span className="nav-icon"><NavIcon name={NAV_ICONS[l.to]} /></span>{l.label}
           </NavLink>
         ))}

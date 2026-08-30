@@ -67,6 +67,23 @@ router.post("/locations", guardWrite, (req, res) => {
   }
 });
 
+router.put("/locations/:id", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
+  const name = req.body.name?.trim();
+  if (!name) return res.status(400).json({ error: "name required" });
+  const current = db.prepare("SELECT * FROM maintenance_locations WHERE id = ?").get(req.params.id);
+  if (!current) return res.status(404).json({ error: "Not found" });
+  try {
+    let updatedTickets = 0;
+    db.transaction(() => {
+      db.prepare("UPDATE maintenance_locations SET name = ? WHERE id = ?").run(name, req.params.id);
+      updatedTickets = db.prepare("UPDATE maintenance SET location = ? WHERE lower(location) = lower(?)").run(name, current.name).changes;
+    })();
+    res.json({ ...db.prepare("SELECT * FROM maintenance_locations WHERE id = ?").get(req.params.id), updated_tickets: updatedTickets });
+  } catch {
+    res.status(400).json({ error: "That place is already on the list" });
+  }
+});
+
 router.delete("/locations/:id", guardWrite, (req, res) => {
   const info = db.prepare("DELETE FROM maintenance_locations WHERE id = ?").run(req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: "Not found" });
@@ -91,10 +108,15 @@ router.post("/parts-catalog", requireRole(...FULL_ACCESS), (req, res) => {
 router.put("/parts-catalog/:id", requireRole(...FULL_ACCESS), (req, res) => {
   const { part_name, description } = req.body;
   if (!part_name?.trim()) return res.status(400).json({ error: "part_name required" });
+  const current = db.prepare("SELECT * FROM parts_catalog WHERE id = ?").get(req.params.id);
+  if (!current) return res.status(404).json({ error: "Not found" });
   try {
-    const info = db.prepare("UPDATE parts_catalog SET part_name = ?, description = ? WHERE id = ?").run(part_name.trim(), description?.trim() || null, req.params.id);
-    if (!info.changes) return res.status(404).json({ error: "Not found" });
-    res.json(db.prepare("SELECT * FROM parts_catalog WHERE id = ?").get(req.params.id));
+    let updatedRecords = 0;
+    db.transaction(() => {
+      db.prepare("UPDATE parts_catalog SET part_name = ?, description = ? WHERE id = ?").run(part_name.trim(), description?.trim() || null, req.params.id);
+      updatedRecords = db.prepare("UPDATE maintenance_parts SET part_name = ? WHERE lower(part_name) = lower(?)").run(part_name.trim(), current.part_name).changes;
+    })();
+    res.json({ ...db.prepare("SELECT * FROM parts_catalog WHERE id = ?").get(req.params.id), updated_records: updatedRecords });
   } catch { res.status(400).json({ error: "That part already exists" }); }
 });
 
