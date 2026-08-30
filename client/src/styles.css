@@ -1036,29 +1036,43 @@ table button { white-space: nowrap; }
 .online-report-summary .expense { border-top-color: var(--red); }
 .online-report-summary .expense strong, .online-report-summary .negative strong { color: var(--red); }
 .online-report-summary .final { border-top-color: #e5a42e; background: linear-gradient(145deg, color-mix(in srgb, #e5a42e 10%, var(--card)), var(--card)); }
-.online-sales-trend { margin-bottom: 16px; padding: 18px; overflow: hidden; }
+.online-sales-trend { --chart-accent: #2f8fe6; --chart-accent-rgb: 47, 143, 230; position: relative; margin-bottom: 16px; padding: 18px; overflow: hidden; background: radial-gradient(circle at 92% 3%, rgba(var(--chart-accent-rgb), .11), transparent 34%), var(--card); }
+.online-sales-trend.cash { --chart-accent: #e5a42e; --chart-accent-rgb: 229, 164, 46; }
+.online-sales-trend::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: linear-gradient(180deg, var(--chart-accent), transparent 72%); }
 .online-sales-trend-heading { margin-bottom: 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .online-sales-trend-heading h3 { margin: 2px 0 4px; }
 .online-sales-trend-heading p { margin: 0; color: var(--muted); font-size: .74rem; }
-.online-sales-chart-legend { display: flex; align-items: stretch; gap: 8px; }
-.online-sales-chart-legend > span { min-width: 138px; padding: 9px 11px; display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 7px; background: color-mix(in srgb, var(--bg-soft) 80%, transparent); border: 1px solid var(--border); border-radius: 9px; }
-.online-sales-chart-legend i { width: 20px; height: 3px; display: block; border-radius: 999px; }
-.online-sales-chart-legend .digital i { background: #2f8fe6; }
-.online-sales-chart-legend .cash i { background: #e5a42e; }
-.online-sales-chart-legend span span { color: var(--muted); font-size: .65rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
-.online-sales-chart-legend strong { grid-column: 2; margin-top: 2px; font: 800 .78rem "Manrope", sans-serif; }
+.online-sales-chart-controls { display: grid; gap: 6px; justify-items: end; }
+.online-sales-chart-controls > span { color: var(--muted); font-size: .6rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.online-sales-view-toggle { padding: 4px; display: flex; gap: 4px; background: color-mix(in srgb, var(--bg-soft) 86%, transparent); border: 1px solid var(--border); border-radius: 10px; }
+.online-sales-view-toggle button { min-width: 104px; min-height: 34px; padding: 7px 15px; color: var(--muted); background: transparent; border: 0; border-radius: 7px; box-shadow: none; font-size: .72rem; }
+.online-sales-view-toggle button.active { color: #fff; background: var(--chart-accent); box-shadow: 0 6px 18px rgba(var(--chart-accent-rgb), .24); }
+.online-sales-chart-summary { margin-bottom: 6px; display: grid; grid-template-columns: minmax(180px, .8fr) minmax(160px, .55fr) minmax(220px, 1fr); gap: 9px; }
+.online-sales-chart-summary > div { min-width: 0; padding: 12px 14px; background: color-mix(in srgb, var(--bg-soft) 78%, transparent); border: 1px solid color-mix(in srgb, var(--chart-accent) 18%, var(--border)); border-radius: 11px; }
+.online-sales-chart-summary > div > span { display: block; color: var(--muted); font-size: .62rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.online-sales-chart-summary strong { margin: 5px 0 3px; display: block; color: var(--text); font: 800 1.05rem "Manrope", sans-serif; }
+.online-sales-chart-summary small { color: var(--muted); font-size: .64rem; }
+.online-sales-chart-summary .passengers strong { color: #9b77e5; }
+.online-sales-chart-key { display: flex; align-items: center; justify-content: flex-end; gap: 18px; }
+.online-sales-chart-key span { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: .68rem; font-weight: 700; }
+.online-sales-chart-key i { width: 24px; height: 3px; display: block; background: var(--chart-accent); border-radius: 999px; }
+.online-sales-chart-key .passenger i { height: 0; background: transparent; border-top: 3px dashed #9b77e5; border-radius: 0; }
 .online-sales-chart-scroll { width: 100%; overflow-x: auto; }
-.online-sales-chart { width: 100%; min-width: 680px; height: auto; display: block; }
+.online-sales-chart { width: 100%; min-width: 720px; height: auto; display: block; }
 .online-sales-grid-line { stroke: color-mix(in srgb, var(--border) 76%, transparent); stroke-width: 1; stroke-dasharray: 4 7; }
 .online-sales-axis-title, .online-sales-axis-label { fill: var(--muted); font: 700 11px "Manrope", sans-serif; }
 .online-sales-axis-title { font-size: 10px; letter-spacing: .06em; }
+.online-sales-axis-title.passenger, .online-sales-axis-label.passenger { fill: #9b77e5; }
 .online-sales-date-label { font-size: 10px; }
 .online-sales-line { fill: none; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
-.online-sales-line.digital { stroke: #2f8fe6; }
-.online-sales-line.cash { stroke: #e5a42e; }
+.online-sales-line { stroke: var(--chart-accent); filter: drop-shadow(0 3px 5px rgba(var(--chart-accent-rgb), .24)); }
+.online-sales-area { fill: url(#online-sales-area-digital); stroke: none; }
+.online-sales-trend.cash .online-sales-area { fill: url(#online-sales-area-cash); }
+.online-sales-gradient-stop { stop-color: var(--chart-accent); }
+.online-passenger-line { fill: none; stroke: #9b77e5; stroke-width: 3; stroke-dasharray: 7 7; stroke-linecap: round; stroke-linejoin: round; }
 .online-sales-point { stroke: var(--card); stroke-width: 2; }
-.online-sales-point.digital { fill: #2f8fe6; }
-.online-sales-point.cash { fill: #e5a42e; }
+.online-sales-point { fill: var(--chart-accent); }
+.online-passenger-point { fill: #9b77e5; stroke: var(--card); stroke-width: 2; }
 .online-sales-chart-empty { min-height: 180px; display: grid; place-items: center; color: var(--muted); background: color-mix(in srgb, var(--bg-soft) 75%, transparent); border: 1px dashed var(--border); border-radius: 10px; font-size: .8rem; }
 .online-report-grid { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr); gap: 16px; align-items: start; }
 .online-report-grid .card { min-width: 0; }
@@ -1085,8 +1099,10 @@ table button { white-space: nowrap; }
   .online-expense-layout { grid-template-columns: minmax(0, 1fr); }
   .online-import-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .online-report-actions { justify-content: flex-start; }
-  .online-sales-chart-legend { width: 100%; }
-  .online-sales-chart-legend > span { min-width: 0; flex: 1; }
+  .online-sales-chart-controls { width: 100%; justify-items: stretch; }
+  .online-sales-view-toggle button { flex: 1; }
+  .online-sales-chart-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .online-sales-chart-key { grid-column: 1 / -1; justify-content: flex-start; }
   .online-final-report { padding: 14px; border-radius: 13px; }
   .online-import-history-summary { grid-template-columns: minmax(0, 1fr); }
   .online-import-history-file, .online-import-history-actions { grid-column: auto; }
@@ -1108,7 +1124,8 @@ table button { white-space: nowrap; }
   .online-range-fields { display: grid; grid-template-columns: 1fr 1fr; }
   .online-range-fields > button { grid-column: 1 / -1; }
   .online-report-actions { display: grid; grid-template-columns: 1fr 1fr; }
-  .online-sales-chart-legend { align-items: stretch; flex-direction: column; }
+  .online-sales-chart-summary { grid-template-columns: minmax(0, 1fr); }
+  .online-sales-chart-key { grid-column: auto; align-items: flex-start; flex-direction: column; }
 }
 
 @media print {

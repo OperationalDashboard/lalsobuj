@@ -99,53 +99,87 @@ function chartMaximum(value) {
 }
 
 function DailySalesChart({ days }) {
+  const [activeSeries, setActiveSeries] = useState("digital");
   const series = days.map((day) => ({
     date: day.date,
     digital: Number(day.website_sales || 0) + Number(day.android_sales || 0) + Number(day.ios_sales || 0) + Number(day.website_android_sales || 0),
     cash: Number(day.cash_sales || 0),
+    digitalPassengers: Number(day.online_passengers || 0),
+    cashPassengers: Number(day.cash_passengers || 0),
   }));
-  const digitalTotal = series.reduce((sum, day) => sum + day.digital, 0);
-  const cashTotal = series.reduce((sum, day) => sum + day.cash, 0);
 
   if (series.length === 0) {
-    return <section className="card online-sales-trend"><div className="online-sales-trend-heading"><div><span className="settings-eyebrow">DAILY SALES TREND</span><h3>Digital vs Cash sales</h3><p>Generate a report containing sales to see the daily graph.</p></div></div><div className="online-sales-chart-empty">No sales data in this report period.</div></section>;
+    return <section className="card online-sales-trend"><div className="online-sales-trend-heading"><div><span className="settings-eyebrow">DAILY SALES TREND</span><h3>Sales & passenger journey</h3><p>Generate a report containing sales to see the daily graph.</p></div></div><div className="online-sales-chart-empty">No sales data in this report period.</div></section>;
   }
 
   const width = 1000;
-  const height = 330;
-  const plot = { left: 76, right: 28, top: 28, bottom: 58 };
+  const height = 370;
+  const plot = { left: 76, right: 76, top: 42, bottom: 62 };
   const plotWidth = width - plot.left - plot.right;
   const plotHeight = height - plot.top - plot.bottom;
-  const maximum = chartMaximum(Math.max(...series.flatMap((day) => [day.digital, day.cash])));
+  const selected = activeSeries === "digital" ? {
+    label: "Digital Sales",
+    shortLabel: "Digital",
+    amountKey: "digital",
+    passengerKey: "digitalPassengers",
+    description: "Website + Android App + iOS App",
+  } : {
+    label: "Cash Sales",
+    shortLabel: "Cash",
+    amountKey: "cash",
+    passengerKey: "cashPassengers",
+    description: "Manual cash collection",
+  };
+  const saleTotal = series.reduce((sum, day) => sum + day[selected.amountKey], 0);
+  const passengerTotal = series.reduce((sum, day) => sum + day[selected.passengerKey], 0);
+  const amountMaximum = chartMaximum(Math.max(...series.map((day) => day[selected.amountKey])));
+  const passengerMaximum = Math.max(4, Math.ceil(Math.max(...series.map((day) => day[selected.passengerKey])) / 4) * 4);
   const x = (index) => series.length === 1 ? plot.left + (plotWidth / 2) : plot.left + (index / (series.length - 1)) * plotWidth;
-  const y = (value) => plot.top + plotHeight - (value / maximum) * plotHeight;
-  const pathFor = (key) => series.map((day, index) => `${index ? "L" : "M"} ${x(index).toFixed(2)} ${y(day[key]).toFixed(2)}`).join(" ");
-  const yTicks = Array.from({ length: 5 }, (_, index) => maximum * (4 - index) / 4);
+  const amountY = (value) => plot.top + plotHeight - (value / amountMaximum) * plotHeight;
+  const passengerY = (value) => plot.top + plotHeight - (value / passengerMaximum) * plotHeight;
+  const pathFor = (key, scale) => series.map((day, index) => `${index ? "L" : "M"} ${x(index).toFixed(2)} ${scale(day[key]).toFixed(2)}`).join(" ");
+  const salePath = pathFor(selected.amountKey, amountY);
+  const passengerPath = pathFor(selected.passengerKey, passengerY);
+  const areaPath = `${salePath} L ${x(series.length - 1).toFixed(2)} ${(plot.top + plotHeight).toFixed(2)} L ${x(0).toFixed(2)} ${(plot.top + plotHeight).toFixed(2)} Z`;
+  const amountTicks = Array.from({ length: 5 }, (_, index) => amountMaximum * (4 - index) / 4);
+  const passengerTicks = Array.from({ length: 5 }, (_, index) => passengerMaximum * (4 - index) / 4);
   const labelStep = Math.max(1, Math.ceil(series.length / 7));
 
-  return <section className="card online-sales-trend">
+  return <section className={`card online-sales-trend ${activeSeries}`}>
     <div className="online-sales-trend-heading">
-      <div><span className="settings-eyebrow">DAILY SALES TREND</span><h3>Digital vs Cash sales</h3><p>Digital combines Website, Android App, and iOS App sales. Cash is shown separately.</p></div>
-      <div className="online-sales-chart-legend" aria-label="Chart legend">
-        <span className="digital"><i aria-hidden="true" /><span>Digital</span><strong>{money(digitalTotal)}</strong></span>
-        <span className="cash"><i aria-hidden="true" /><span>Cash</span><strong>{money(cashTotal)}</strong></span>
+      <div><span className="settings-eyebrow">DAILY SALES TREND</span><h3>Sales & passenger journey</h3><p>Select Digital or Cash to see one clear daily graph at a time.</p></div>
+      <div className="online-sales-chart-controls">
+        <span>Show graph</span>
+        <div className="online-sales-view-toggle" role="group" aria-label="Choose sales graph">
+          <button type="button" className={activeSeries === "digital" ? "active" : ""} aria-pressed={activeSeries === "digital"} onClick={() => setActiveSeries("digital")}>Digital</button>
+          <button type="button" className={activeSeries === "cash" ? "active" : ""} aria-pressed={activeSeries === "cash"} onClick={() => setActiveSeries("cash")}>Cash</button>
+        </div>
       </div>
+    </div>
+    <div className="online-sales-chart-summary">
+      <div className="sales"><span>{selected.label}</span><strong>{money(saleTotal)}</strong><small>{selected.description}</small></div>
+      <div className="passengers"><span>Total passengers</span><strong>{passengerTotal.toLocaleString()}</strong><small>For the selected report period</small></div>
+      <div className="online-sales-chart-key" aria-label="Chart lines"><span className="sale"><i aria-hidden="true" />Sale amount</span><span className="passenger"><i aria-hidden="true" />Passenger count</span></div>
     </div>
     <div className="online-sales-chart-scroll">
       <svg className="online-sales-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="online-sales-chart-title online-sales-chart-description">
-        <title id="online-sales-chart-title">Daily Digital and Cash sales line graph</title>
-        <desc id="online-sales-chart-description">Two separate lines compare the Digital and Cash sale amounts for every day containing report data.</desc>
-        <text className="online-sales-axis-title" x="12" y="17">SALE (BDT)</text>
-        {yTicks.map((tick) => <g key={tick}>
-          <line className="online-sales-grid-line" x1={plot.left} x2={width - plot.right} y1={y(tick)} y2={y(tick)} />
-          <text className="online-sales-axis-label" x={plot.left - 12} y={y(tick) + 4} textAnchor="end">{compactAmount(tick)}</text>
+        <title id="online-sales-chart-title">Daily {selected.label} and passenger count graph</title>
+        <desc id="online-sales-chart-description">The solid filled line shows daily {selected.shortLabel} sale amounts, and the dotted line shows the matching daily passenger count.</desc>
+        <defs><linearGradient id={`online-sales-area-${activeSeries}`} x1="0" x2="0" y1="0" y2="1"><stop className="online-sales-gradient-stop" offset="0%" stopOpacity=".34" /><stop className="online-sales-gradient-stop" offset="100%" stopOpacity="0" /></linearGradient></defs>
+        <text className="online-sales-axis-title" x="12" y="19">SALE (BDT)</text>
+        <text className="online-sales-axis-title passenger" x={width - 10} y="19" textAnchor="end">PASSENGERS</text>
+        {amountTicks.map((tick, index) => <g key={tick}>
+          <line className="online-sales-grid-line" x1={plot.left} x2={width - plot.right} y1={amountY(tick)} y2={amountY(tick)} />
+          <text className="online-sales-axis-label" x={plot.left - 12} y={amountY(tick) + 4} textAnchor="end">{compactAmount(tick)}</text>
+          <text className="online-sales-axis-label passenger" x={width - plot.right + 12} y={amountY(tick) + 4}>{compactAmount(passengerTicks[index])}</text>
         </g>)}
         {series.map((day, index) => ((index % labelStep === 0) || index === series.length - 1) && <text className="online-sales-axis-label online-sales-date-label" key={day.date} x={x(index)} y={height - 20} textAnchor="middle">{formatChartDate(day.date)}</text>)}
-        <path className="online-sales-line digital" d={pathFor("digital")} />
-        <path className="online-sales-line cash" d={pathFor("cash")} />
+        <path className="online-sales-area" d={areaPath} />
+        <path className="online-sales-line" d={salePath} />
+        <path className="online-passenger-line" d={passengerPath} />
         {series.map((day, index) => <g key={day.date}>
-          <circle className="online-sales-point digital" cx={x(index)} cy={y(day.digital)} r={series.length > 60 ? 2.5 : 4}><title>{`${day.date} — Digital: ${money(day.digital)}`}</title></circle>
-          <circle className="online-sales-point cash" cx={x(index)} cy={y(day.cash)} r={series.length > 60 ? 2.5 : 4}><title>{`${day.date} — Cash: ${money(day.cash)}`}</title></circle>
+          <circle className="online-sales-point" cx={x(index)} cy={amountY(day[selected.amountKey])} r={series.length > 60 ? 2.5 : 4.5}><title>{`${day.date} — ${selected.shortLabel} sale: ${money(day[selected.amountKey])} · Passengers: ${day[selected.passengerKey]}`}</title></circle>
+          <circle className="online-passenger-point" cx={x(index)} cy={passengerY(day[selected.passengerKey])} r={series.length > 60 ? 2 : 3.5}><title>{`${day.date} — Passengers: ${day[selected.passengerKey]} · ${selected.shortLabel} sale: ${money(day[selected.amountKey])}`}</title></circle>
         </g>)}
       </svg>
     </div>

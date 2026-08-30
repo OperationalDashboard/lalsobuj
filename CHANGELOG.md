@@ -2,6 +2,12 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.6.0 — 2026-08-30
+
+- Redesigned the Online Accounts daily sales graph with a cleaner focused layout and improved visual hierarchy.
+- Added Digital and Cash selectors so only one sales graph is shown at a time.
+- Added the matching daily passenger count as a separate dotted line with its own scale, period total, and exact per-day chart details.
+
 ## 1.5.0 — 2026-08-30
 
 - Added a daily line graph to the Online Accounts final report with separate Digital Sales and Cash Sales lines.
