@@ -981,6 +981,29 @@ table button { white-space: nowrap; }
 .online-import-confirm strong { font-size: .8rem; }
 .online-import-confirm small { color: var(--muted); font-size: .69rem; }
 
+.online-import-history-heading { margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 18px; border-color: color-mix(in srgb, #3679c7 24%, var(--border)); }
+.online-import-history-heading h3 { margin: 0; font: 800 1.2rem "Manrope", sans-serif; letter-spacing: -.035em; }
+.online-import-history-heading p { margin: 4px 0 0; color: var(--muted); font-size: .8rem; }
+.online-import-history-list { display: grid; gap: 11px; }
+.online-import-history-card { padding: 15px; transition: border-color .2s ease, box-shadow .2s ease; }
+.online-import-history-card.expanded { border-color: color-mix(in srgb, #3679c7 38%, var(--border)); box-shadow: 0 10px 25px color-mix(in srgb, #3679c7 10%, transparent); }
+.online-import-history-summary { display: grid; grid-template-columns: minmax(235px, 1.45fr) repeat(3, minmax(125px, .72fr)) auto; align-items: center; gap: 14px; }
+.online-import-history-file { min-width: 0; display: flex; align-items: center; gap: 11px; }
+.online-import-history-file > div, .online-import-history-meta { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.online-import-history-file strong { overflow: hidden; font-size: .86rem; text-overflow: ellipsis; white-space: nowrap; }
+.online-import-history-file small, .online-import-history-meta small { color: var(--muted); font-size: .66rem; line-height: 1.35; }
+.online-import-history-icon { width: 35px; height: 35px; display: grid; place-items: center; flex: 0 0 auto; color: #2467b2; background: color-mix(in srgb, #3679c7 9%, var(--card)); border: 1px solid color-mix(in srgb, #3679c7 26%, var(--border)); border-radius: 10px; font-size: 1rem; font-weight: 900; }
+.online-import-history-meta > span { color: var(--muted); font-size: .61rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.online-import-history-meta strong { overflow: hidden; font-size: .75rem; text-overflow: ellipsis; white-space: nowrap; }
+.online-import-history-actions { display: flex; align-items: center; justify-content: flex-end; gap: 5px; white-space: nowrap; }
+.online-import-history-detail { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.online-import-history-table { min-width: 760px !important; font-size: .75rem; }
+.online-import-history-table th, .online-import-history-table td { padding: 9px 10px; vertical-align: middle; }
+.online-import-history-table td small { color: var(--muted); font-size: .63rem; white-space: nowrap; }
+.online-import-history-empty { padding: 28px; text-align: center; }
+.online-import-history-empty strong { font: 800 1rem "Manrope", sans-serif; }
+.online-import-history-empty p { margin: 5px 0 0; color: var(--muted); font-size: .78rem; }
+
 .online-expense-panel { margin-top: 18px; }
 .online-expense-layout { margin-bottom: 18px; display: grid; grid-template-columns: minmax(0, .9fr) minmax(300px, 1.1fr); gap: 16px; align-items: start; }
 .online-expense-form { margin: 0; }
@@ -1023,10 +1046,13 @@ table button { white-space: nowrap; }
   .online-entry-grid, .online-report-grid { grid-template-columns: minmax(0, 1fr); }
   .online-report-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .online-import-map-grid { grid-template-columns: minmax(0, 1fr); }
+  .online-import-history-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .online-import-history-file, .online-import-history-actions { grid-column: 1 / -1; }
+  .online-import-history-actions { justify-content: flex-start; }
 }
 
 @media (max-width: 760px) {
-  .online-page-header, .online-day-toolbar, .online-report-toolbar, .online-report-heading { align-items: stretch; flex-direction: column; }
+  .online-page-header, .online-day-toolbar, .online-report-toolbar, .online-report-heading, .online-import-history-heading { align-items: stretch; flex-direction: column; }
   .online-isolated-mark { align-self: flex-start; }
   .online-module-tabs { width: 100%; }
   .online-module-tabs button { flex: 1; padding-inline: 10px; }
@@ -1036,6 +1062,9 @@ table button { white-space: nowrap; }
   .online-import-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .online-report-actions { justify-content: flex-start; }
   .online-final-report { padding: 14px; border-radius: 13px; }
+  .online-import-history-summary { grid-template-columns: minmax(0, 1fr); }
+  .online-import-history-file, .online-import-history-actions { grid-column: auto; }
+  .online-import-history-actions { align-items: stretch; flex-direction: column; }
 }
 
 @media (max-width: 480px) {

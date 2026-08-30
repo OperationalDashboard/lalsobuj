@@ -201,6 +201,76 @@ function parseExpense(body) {
   };
 }
 
+function cleanImportLabel(value, fallback, maximum = 180) {
+  return String(value || "").trim().slice(0, maximum) || fallback;
+}
+
+function importBatchById(id) {
+  return db.prepare(
+    `SELECT b.*, u.full_name AS created_by_name,
+       CASE WHEN b.destination = 'expense'
+         THEN (SELECT COUNT(*) FROM online_cash_expenses x WHERE x.import_batch_id = b.id)
+         ELSE (SELECT COUNT(*) FROM online_sales_entries e WHERE e.import_batch_id = b.id)
+       END AS current_count
+     FROM online_import_batches b
+     LEFT JOIN users u ON u.id = b.created_by
+     WHERE b.id = ?`
+  ).get(id);
+}
+
+router.get("/imports", guardRead, (req, res) => {
+  const rows = db.prepare(
+    `SELECT b.*, u.full_name AS created_by_name,
+       CASE WHEN b.destination = 'expense'
+         THEN (SELECT COUNT(*) FROM online_cash_expenses x WHERE x.import_batch_id = b.id)
+         ELSE (SELECT COUNT(*) FROM online_sales_entries e WHERE e.import_batch_id = b.id)
+       END AS current_count,
+       CASE WHEN b.destination = 'expense'
+         THEN (SELECT MIN(x.expense_date) FROM online_cash_expenses x WHERE x.import_batch_id = b.id)
+         ELSE (SELECT MIN(e.entry_date) FROM online_sales_entries e WHERE e.import_batch_id = b.id)
+       END AS first_date,
+       CASE WHEN b.destination = 'expense'
+         THEN (SELECT MAX(x.expense_date) FROM online_cash_expenses x WHERE x.import_batch_id = b.id)
+         ELSE (SELECT MAX(e.entry_date) FROM online_sales_entries e WHERE e.import_batch_id = b.id)
+       END AS last_date
+     FROM online_import_batches b
+     LEFT JOIN users u ON u.id = b.created_by
+     ORDER BY b.created_at DESC, b.id DESC
+     LIMIT 50`
+  ).all();
+  res.json(rows);
+});
+
+router.get("/imports/:id", guardRead, (req, res) => {
+  const batch = importBatchById(req.params.id);
+  if (!batch) return res.status(404).json({ error: "Import not found" });
+  const rows = batch.destination === "expense"
+    ? db.prepare(
+      `SELECT e.*, c.name AS category_name
+       FROM online_cash_expenses e
+       JOIN online_expense_categories c ON c.id = e.category_id
+       WHERE e.import_batch_id = ? ORDER BY e.expense_date, e.id`
+    ).all(batch.id)
+    : db.prepare(
+      `SELECT * FROM online_sales_entries
+       WHERE import_batch_id = ? ORDER BY entry_date, id`
+    ).all(batch.id);
+  res.json({ batch, rows });
+});
+
+router.delete("/imports/:id", guardWrite, (req, res) => {
+  const batch = importBatchById(req.params.id);
+  if (!batch) return res.status(404).json({ error: "Import not found" });
+  const removeImport = db.transaction(() => {
+    const removed = batch.destination === "expense"
+      ? db.prepare("DELETE FROM online_cash_expenses WHERE import_batch_id = ?").run(batch.id).changes
+      : db.prepare("DELETE FROM online_sales_entries WHERE import_batch_id = ?").run(batch.id).changes;
+    db.prepare("DELETE FROM online_import_batches WHERE id = ?").run(batch.id);
+    return removed;
+  });
+  res.json({ deleted: removeImport() });
+});
+
 router.post("/import", guardWrite, (req, res) => {
   try {
     const destination = String(req.body.destination || "").trim();
@@ -220,23 +290,33 @@ router.post("/import", guardWrite, (req, res) => {
       }
     });
 
+    const fileName = cleanImportLabel(req.body.file_name, "Imported document");
+    const sourceName = cleanImportLabel(req.body.source_name, "Detected table", 120);
+    const insertBatch = db.prepare(
+      `INSERT INTO online_import_batches (file_name, source_name, destination, imported_count, created_by)
+       VALUES (?, ?, ?, ?, ?)`
+    );
     const insertEntry = db.prepare(
       `INSERT INTO online_sales_entries
-       (entry_date, channel, coach_number, bus_number, normal_passengers, long_passengers, passenger_count, amount, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       (entry_date, channel, coach_number, bus_number, normal_passengers, long_passengers, passenger_count, amount, import_batch_id, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     const insertExpense = db.prepare(
-      `INSERT INTO online_cash_expenses (expense_date, category_id, description, amount, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO online_cash_expenses (expense_date, category_id, description, amount, import_batch_id, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     );
-    const importRows = db.transaction(() => parsed.map((row) => {
-      if (destination === "expense") {
-        return insertExpense.run(row.expenseDate, row.categoryId, row.description, row.amount, req.user.id, req.user.id).lastInsertRowid;
-      }
-      return insertEntry.run(row.entryDate, row.channel, row.coachNumber, row.busNumber, row.normalPassengers, row.longPassengers, row.passengerCount, row.amount, req.user.id, req.user.id).lastInsertRowid;
-    }));
-    const ids = importRows();
-    res.status(201).json({ imported: ids.length, destination });
+    const importRows = db.transaction(() => {
+      const batchId = insertBatch.run(fileName, sourceName, destination, parsed.length, req.user.id).lastInsertRowid;
+      const ids = parsed.map((row) => {
+        if (destination === "expense") {
+          return insertExpense.run(row.expenseDate, row.categoryId, row.description, row.amount, batchId, req.user.id, req.user.id).lastInsertRowid;
+        }
+        return insertEntry.run(row.entryDate, row.channel, row.coachNumber, row.busNumber, row.normalPassengers, row.longPassengers, row.passengerCount, row.amount, batchId, req.user.id, req.user.id).lastInsertRowid;
+      });
+      return { batchId, ids };
+    });
+    const result = importRows();
+    res.status(201).json({ imported: result.ids.length, destination, import_batch_id: result.batchId });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

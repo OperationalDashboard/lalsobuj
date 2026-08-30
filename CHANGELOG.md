@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.4.0 — 2026-08-30
+
+- Added persistent document-import history for the 50 most recent Online Accounts uploads, including the file, detected sheet/table, destination, uploader, record dates, and remaining record count.
+- Added expandable batch details with Change and Delete actions for individual imported entries.
+- Added safe batch deletion that removes only the records created by that upload, without affecting manually entered data or other imports.
+- Import history begins with uploads confirmed after this version because older imported records cannot be safely distinguished from manual entries.
+
 ## 1.3.1 — 2026-08-30
 
 - Fixed document-import dates so schedule headings and values such as `27-08-26` are recognized, converted to `2026-08-27`, and opened automatically after import.

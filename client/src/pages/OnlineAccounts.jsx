@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, getUser } from "../api.js";
 import OnlineAccountsImporter from "../components/OnlineAccountsImporter.jsx";
+import OnlineAccountsImportHistory from "../components/OnlineAccountsImportHistory.jsx";
 import { ROLES, isFullAccess } from "../roles.js";
 
 const today = () => {
@@ -93,6 +94,7 @@ export default function OnlineAccounts() {
   const [editingOnlineId, setEditingOnlineId] = useState(null);
   const [editingCashId, setEditingCashId] = useState(null);
   const [editingExpenseId, setEditingExpenseId] = useState(null);
+  const [pendingImportedEdit, setPendingImportedEdit] = useState(null);
   const [newCategory, setNewCategory] = useState("");
   const [editingCategory, setEditingCategory] = useState(null);
   const [range, setRange] = useState({ from: firstDayOfMonth(), to: today() });
@@ -207,6 +209,15 @@ export default function OnlineAccounts() {
     if (view === "report" && !report) loadReport();
   }, [loadReport, report, view]);
 
+  useEffect(() => {
+    if (!pendingImportedEdit || view !== "daily") return;
+    const rowDate = pendingImportedEdit.destination === "expense" ? pendingImportedEdit.row.expense_date : pendingImportedEdit.row.entry_date;
+    if (rowDate !== selectedDate) return;
+    if (pendingImportedEdit.destination === "expense") editExpense(pendingImportedEdit.row);
+    else editEntry(pendingImportedEdit.row);
+    setPendingImportedEdit(null);
+  }, [pendingImportedEdit, selectedDate, view]);
+
   async function saveEntry(event, kind) {
     event.preventDefault();
     if (savingEntry) return;
@@ -275,7 +286,7 @@ export default function OnlineAccounts() {
         amount: String(entry.amount),
       });
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.setTimeout(() => document.getElementById(entry.channel === "cash" ? "online-cash-sales" : "online-digital-sales")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
 
   async function deleteEntry(id) {
@@ -321,6 +332,7 @@ export default function OnlineAccounts() {
       description: expense.description || "",
       amount: String(expense.amount),
     });
+    window.setTimeout(() => document.getElementById("online-daily-costs")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
 
   async function deleteExpense(id) {
@@ -382,6 +394,18 @@ export default function OnlineAccounts() {
       await Promise.all([loadDaily(selectedDate), loadCategories()]);
     }
     flash(`${result.imported} ${result.imported === 1 ? "entry" : "entries"} imported. Showing ${result.imported_date || selectedDate}.`);
+  }
+
+  function changeImportedRow(batch, row) {
+    const rowDate = batch.destination === "expense" ? row.expense_date : row.entry_date;
+    setPendingImportedEdit({ destination: batch.destination, row });
+    if (rowDate !== selectedDate) setSelectedDate(rowDate);
+    setView("daily");
+  }
+
+  async function handleImportHistoryChanged() {
+    setReport(null);
+    await Promise.all([loadDaily(selectedDate), loadCategories()]);
   }
 
   function reportText() {
@@ -481,6 +505,7 @@ export default function OnlineAccounts() {
 
     <div className="online-module-tabs" role="tablist" aria-label="Online Accounts sections">
       <button type="button" className={view === "daily" ? "active" : ""} onClick={() => setView("daily")}>Daily entries</button>
+      <button type="button" className={view === "history" ? "active" : ""} onClick={() => setView("history")}>Import history</button>
       <button type="button" className={view === "report" ? "active" : ""} onClick={() => setView("report")}>Final report</button>
     </div>
     {error && <p className="error-text online-notice">{error}</p>}
@@ -508,7 +533,7 @@ export default function OnlineAccounts() {
       {canWrite && <OnlineAccountsImporter selectedDate={selectedDate} categories={categories} onImported={handleImported} />}
 
       <div className="online-entry-grid">
-        <section className="card online-entry-panel">
+        <section className="card online-entry-panel" id="online-digital-sales">
           <div className="online-panel-title"><div><span className="settings-eyebrow">DIGITAL SALES</span><h3>Website, Android App & iOS App</h3><p>Each platform is recorded separately. Normal and Long passengers are counted separately.</p></div><span className="online-panel-number">01</span></div>
           {canWrite && <form className="online-form-grid" onSubmit={(event) => saveEntry(event, "online")}>
             <Field label="Platform"><select value={onlineForm.channel} onChange={(event) => setOnlineForm({ ...onlineForm, channel: event.target.value })}><option value="website">Website</option><option value="android">Android App</option><option value="ios">iOS App</option>{onlineForm.channel === "website_android" && <option value="website_android" disabled>Legacy combined — choose Website or Android</option>}</select></Field>
@@ -523,7 +548,7 @@ export default function OnlineAccounts() {
           <EntryTable rows={onlineEntries} type="online" onEdit={editEntry} onDelete={deleteEntry} canWrite={canWrite} />
         </section>
 
-        <section className="card online-entry-panel cash-panel">
+        <section className="card online-entry-panel cash-panel" id="online-cash-sales">
           <div className="online-panel-title"><div><span className="settings-eyebrow">CASH SALES</span><h3>Manual cash collection</h3><p>Enter the total passenger count exactly as received.</p></div><span className="online-panel-number">02</span></div>
           {canWrite && <form className="online-form-grid" onSubmit={(event) => saveEntry(event, "cash")}>
             <Field label="Entry date" className="wide"><input type="date" value={cashForm.entry_date} onChange={(event) => changeSectionDate("cash", event.target.value)} required /></Field>
@@ -537,7 +562,7 @@ export default function OnlineAccounts() {
         </section>
       </div>
 
-      <section className="card online-expense-panel">
+      <section className="card online-expense-panel" id="online-daily-costs">
         <div className="online-panel-title"><div><span className="settings-eyebrow">DAILY CASH COSTS</span><h3>Expenses</h3><p>Every entry is grouped by category in the final report.</p></div><span className="online-panel-number">03</span></div>
         {canWrite && <div className="online-expense-layout">
           <form className="online-form-grid online-expense-form" onSubmit={saveExpense}>
@@ -570,6 +595,8 @@ export default function OnlineAccounts() {
       </section>
       {loading && <p className="online-loading">Loading this day…</p>}
     </>}
+
+    {view === "history" && <OnlineAccountsImportHistory canWrite={canWrite} onChangeRow={changeImportedRow} onChanged={handleImportHistoryChanged} />}
 
     {view === "report" && <>
       <div className="card online-report-toolbar">

@@ -161,7 +161,12 @@ export default function OnlineAccountsImporter({ selectedDate, categories, onImp
     setNotice("");
     try {
       const rows = selectedRows.map(({ selected, sourceRow, ...row }) => row);
-      const result = await api.post("/online-accounts/import", { destination, rows });
+      const result = await api.post("/online-accounts/import", {
+        destination,
+        rows,
+        file_name: fileName,
+        source_name: table?.name,
+      });
       setNotice(`${result.imported} ${result.imported === 1 ? "entry" : "entries"} imported successfully.`);
       setPreviewRows([]);
       await onImported?.({

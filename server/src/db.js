@@ -371,6 +371,16 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 
 -- Standalone Online Accounts. These tables deliberately have no link to the
 -- regular transactions/accounts workflow or its reports.
+CREATE TABLE IF NOT EXISTS online_import_batches (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  file_name      TEXT NOT NULL,
+  source_name    TEXT,
+  destination    TEXT NOT NULL CHECK(destination IN ('digital', 'cash', 'expense')),
+  imported_count INTEGER NOT NULL DEFAULT 0,
+  created_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS online_sales_entries (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
   entry_date        TEXT NOT NULL,
@@ -381,6 +391,7 @@ CREATE TABLE IF NOT EXISTS online_sales_entries (
   long_passengers   INTEGER NOT NULL DEFAULT 0 CHECK(long_passengers >= 0),
   passenger_count   INTEGER NOT NULL DEFAULT 0 CHECK(passenger_count >= 0),
   amount            REAL NOT NULL DEFAULT 0 CHECK(amount >= 0),
+  import_batch_id   INTEGER REFERENCES online_import_batches(id) ON DELETE SET NULL,
   created_by        INTEGER REFERENCES users(id) ON DELETE SET NULL,
   updated_by        INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at        TEXT NOT NULL DEFAULT (datetime('now')),
@@ -402,6 +413,7 @@ CREATE TABLE IF NOT EXISTS online_cash_expenses (
   category_id INTEGER NOT NULL REFERENCES online_expense_categories(id),
   description TEXT,
   amount      REAL NOT NULL DEFAULT 0 CHECK(amount >= 0),
+  import_batch_id INTEGER REFERENCES online_import_batches(id) ON DELETE SET NULL,
   created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
   updated_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
@@ -509,6 +521,14 @@ addColumnIfMissing("transactions", "attachment_data", "TEXT");
 addColumnIfMissing("transactions", "counter_id", "INTEGER REFERENCES counters(id) ON DELETE SET NULL");
 addColumnIfMissing("counters", "place_id", "INTEGER REFERENCES expense_places(id) ON DELETE SET NULL");
 addColumnIfMissing("parts_catalog", "description", "TEXT");
+addColumnIfMissing("online_sales_entries", "import_batch_id", "INTEGER REFERENCES online_import_batches(id) ON DELETE SET NULL");
+addColumnIfMissing("online_cash_expenses", "import_batch_id", "INTEGER REFERENCES online_import_batches(id) ON DELETE SET NULL");
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_online_sales_import_batch ON online_sales_entries(import_batch_id);
+  CREATE INDEX IF NOT EXISTS idx_online_expenses_import_batch ON online_cash_expenses(import_batch_id);
+  CREATE INDEX IF NOT EXISTS idx_online_import_batches_created ON online_import_batches(created_at, id);
+`);
 
 // Earlier automatic counter-salary postings used the first day of the
 // month, which could hide them from a selected daily report. Treat those
