@@ -917,6 +917,10 @@ table button { white-space: nowrap; }
 .online-form-grid .wide { grid-column: 1 / -1; }
 .online-form-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .online-form-actions button { min-height: 38px; }
+.online-button-content { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.online-button-spinner { width: 14px; height: 14px; flex: 0 0 auto; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: online-button-spin .7s linear infinite; }
+@keyframes online-button-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .online-button-spinner { animation: none; opacity: .6; } }
 .online-table-scroll { width: 100%; overflow-x: auto; border-radius: 11px; }
 .online-table-scroll table { min-width: 580px; }
 .online-entry-table { font-size: .8rem; }

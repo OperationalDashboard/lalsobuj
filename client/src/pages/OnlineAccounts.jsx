@@ -47,6 +47,10 @@ function Field({ label, children, className = "" }) {
   return <label className={`online-field ${className}`}><span>{label}</span>{children}</label>;
 }
 
+function BusyButtonContent({ busy, busyText, children }) {
+  return <span className="online-button-content">{busy && <span className="online-button-spinner" aria-hidden="true" />}{busy ? busyText : children}</span>;
+}
+
 function EntryTable({ rows, type, onEdit, onDelete, canWrite }) {
   const isOnline = type === "online";
   return (
@@ -94,6 +98,9 @@ export default function OnlineAccounts() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
+  const [savingEntry, setSavingEntry] = useState("");
+  const [savingExpense, setSavingExpense] = useState(false);
+  const [categoryAction, setCategoryAction] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -201,6 +208,7 @@ export default function OnlineAccounts() {
 
   async function saveEntry(event, kind) {
     event.preventDefault();
+    if (savingEntry) return;
     setError("");
     const isOnline = kind === "online";
     const form = isOnline ? onlineForm : cashForm;
@@ -220,6 +228,7 @@ export default function OnlineAccounts() {
       passenger_count: Number(form.passenger_count || 0),
       amount: Number(form.amount),
     };
+    setSavingEntry(kind);
     try {
       if (editingId) await api.put(`/online-accounts/entries/${editingId}`, payload);
       else await api.post("/online-accounts/entries", payload);
@@ -236,6 +245,8 @@ export default function OnlineAccounts() {
       flash(editingId ? "Sale entry updated." : "Sale entry added.");
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSavingEntry("");
     }
   }
 
@@ -278,11 +289,13 @@ export default function OnlineAccounts() {
 
   async function saveExpense(event) {
     event.preventDefault();
+    if (savingExpense) return;
     setError("");
     if (!expenseForm.category_id || expenseForm.amount === "") {
       setError("Choose an expense category and enter the amount.");
       return;
     }
+    setSavingExpense(true);
     try {
       const payload = { ...expenseForm, category_id: Number(expenseForm.category_id), amount: Number(expenseForm.amount) };
       if (editingExpenseId) await api.put(`/online-accounts/expenses/${editingExpenseId}`, payload);
@@ -296,6 +309,7 @@ export default function OnlineAccounts() {
       } else await Promise.all([loadDaily(selectedDate), loadCategories()]);
       flash(editingExpenseId ? "Expense updated." : "Expense added.");
     } catch (err) { setError(err.message); }
+    finally { setSavingExpense(false); }
   }
 
   function editExpense(expense) {
@@ -320,18 +334,21 @@ export default function OnlineAccounts() {
 
   async function addCategory(event) {
     event.preventDefault();
-    if (!newCategory.trim()) return;
+    if (!newCategory.trim() || categoryAction) return;
+    setCategoryAction("add");
     try {
       await api.post("/online-accounts/expense-categories", { name: newCategory.trim() });
       setNewCategory("");
       await loadCategories();
       flash("Expense category added.");
     } catch (err) { setError(err.message); }
+    finally { setCategoryAction(""); }
   }
 
   async function saveCategory(category) {
     const name = editingCategory?.name?.trim();
-    if (!name) return;
+    if (!name || categoryAction) return;
+    setCategoryAction(`save:${category.id}`);
     try {
       await api.put(`/online-accounts/expense-categories/${category.id}`, { name });
       setEditingCategory(null);
@@ -339,16 +356,20 @@ export default function OnlineAccounts() {
       await Promise.all([loadCategories(), loadDaily(selectedDate)]);
       flash("Expense category renamed everywhere.");
     } catch (err) { setError(err.message); }
+    finally { setCategoryAction(""); }
   }
 
   async function toggleCategory(category) {
     const willActivate = !Number(category.active);
     if (!willActivate && !window.confirm(`Archive '${category.name}'? Previous expenses will remain in reports.`)) return;
+    if (categoryAction) return;
+    setCategoryAction(`toggle:${category.id}`);
     try {
       await api.put(`/online-accounts/expense-categories/${category.id}`, { active: willActivate });
       await loadCategories();
       flash(willActivate ? "Expense category restored." : "Expense category archived.");
     } catch (err) { setError(err.message); }
+    finally { setCategoryAction(""); }
   }
 
   function reportText() {
@@ -483,7 +504,7 @@ export default function OnlineAccounts() {
             <Field label="Normal passengers"><input type="number" min="0" step="1" value={onlineForm.normal_passengers} onChange={(event) => setOnlineForm({ ...onlineForm, normal_passengers: event.target.value })} placeholder="0" required /></Field>
             <Field label="Long passengers"><input type="number" min="0" step="1" value={onlineForm.long_passengers} onChange={(event) => setOnlineForm({ ...onlineForm, long_passengers: event.target.value })} placeholder="0" required /></Field>
             <Field label="Sale amount (BDT)" className="wide"><input type="number" min="0" step="0.01" value={onlineForm.amount} onChange={(event) => setOnlineForm({ ...onlineForm, amount: event.target.value })} placeholder="0.00" required /></Field>
-            <div className="online-form-actions wide"><button className="primary" type="submit">{editingOnlineId ? "Update online entry" : "Add online entry"}</button>{editingOnlineId && <button type="button" className="settings-edit-button" onClick={() => { setEditingOnlineId(null); setOnlineForm(onlineBlank(selectedDate)); }}>Cancel edit</button>}</div>
+            <div className="online-form-actions wide"><button className="primary" type="submit" disabled={Boolean(savingEntry)} aria-busy={savingEntry === "online"}><BusyButtonContent busy={savingEntry === "online"} busyText={editingOnlineId ? "Updating online entry…" : "Adding online entry…"}>{editingOnlineId ? "Update online entry" : "Add online entry"}</BusyButtonContent></button>{editingOnlineId && <button type="button" className="settings-edit-button" disabled={Boolean(savingEntry)} onClick={() => { setEditingOnlineId(null); setOnlineForm(onlineBlank(selectedDate)); }}>Cancel edit</button>}</div>
           </form>}
           <EntryTable rows={onlineEntries} type="online" onEdit={editEntry} onDelete={deleteEntry} canWrite={canWrite} />
         </section>
@@ -496,7 +517,7 @@ export default function OnlineAccounts() {
             <Field label="Bus number"><input value={cashForm.bus_number} onChange={(event) => setCashForm({ ...cashForm, bus_number: event.target.value })} placeholder="Bus number" required /></Field>
             <Field label="Total passengers"><input type="number" min="0" step="1" value={cashForm.passenger_count} onChange={(event) => setCashForm({ ...cashForm, passenger_count: event.target.value })} placeholder="0" required /></Field>
             <Field label="Cash sale (BDT)"><input type="number" min="0" step="0.01" value={cashForm.amount} onChange={(event) => setCashForm({ ...cashForm, amount: event.target.value })} placeholder="0.00" required /></Field>
-            <div className="online-form-actions wide"><button className="primary" type="submit">{editingCashId ? "Update cash entry" : "Add cash entry"}</button>{editingCashId && <button type="button" className="settings-edit-button" onClick={() => { setEditingCashId(null); setCashForm(cashBlank(selectedDate)); }}>Cancel edit</button>}</div>
+            <div className="online-form-actions wide"><button className="primary" type="submit" disabled={Boolean(savingEntry)} aria-busy={savingEntry === "cash"}><BusyButtonContent busy={savingEntry === "cash"} busyText={editingCashId ? "Updating cash entry…" : "Adding cash entry…"}>{editingCashId ? "Update cash entry" : "Add cash entry"}</BusyButtonContent></button>{editingCashId && <button type="button" className="settings-edit-button" disabled={Boolean(savingEntry)} onClick={() => { setEditingCashId(null); setCashForm(cashBlank(selectedDate)); }}>Cancel edit</button>}</div>
           </form>}
           <EntryTable rows={cashEntries} type="cash" onEdit={editEntry} onDelete={deleteEntry} canWrite={canWrite} />
         </section>
@@ -510,17 +531,17 @@ export default function OnlineAccounts() {
             <Field label="Expense date" className="wide"><input type="date" value={expenseForm.expense_date} onChange={(event) => changeSectionDate("expense", event.target.value)} required /></Field>
             <Field label="Amount (BDT)"><input type="number" min="0" step="0.01" value={expenseForm.amount} onChange={(event) => setExpenseForm({ ...expenseForm, amount: event.target.value })} placeholder="0.00" required /></Field>
             <Field label="Note"><input value={expenseForm.description} onChange={(event) => setExpenseForm({ ...expenseForm, description: event.target.value })} placeholder="Optional details" /></Field>
-            <div className="online-form-actions wide"><button className="primary" type="submit">{editingExpenseId ? "Update expense" : "Add expense"}</button>{editingExpenseId && <button type="button" className="settings-edit-button" onClick={() => { setEditingExpenseId(null); setExpenseForm(expenseBlank(selectedDate, activeCategories[0] ? String(activeCategories[0].id) : "")); }}>Cancel edit</button>}</div>
+            <div className="online-form-actions wide"><button className="primary" type="submit" disabled={savingExpense} aria-busy={savingExpense}><BusyButtonContent busy={savingExpense} busyText={editingExpenseId ? "Updating expense…" : "Adding expense…"}>{editingExpenseId ? "Update expense" : "Add expense"}</BusyButtonContent></button>{editingExpenseId && <button type="button" className="settings-edit-button" disabled={savingExpense} onClick={() => { setEditingExpenseId(null); setExpenseForm(expenseBlank(selectedDate, activeCategories[0] ? String(activeCategories[0].id) : "")); }}>Cancel edit</button>}</div>
           </form>
 
           <div className="online-category-manager">
             <h4>Expense categories</h4>
-            <form onSubmit={addCategory}><input value={newCategory} onChange={(event) => setNewCategory(event.target.value)} placeholder="New category name" /><button className="primary" type="submit">Add</button></form>
+            <form onSubmit={addCategory}><input value={newCategory} onChange={(event) => setNewCategory(event.target.value)} placeholder="New category name" /><button className="primary" type="submit" disabled={Boolean(categoryAction)} aria-busy={categoryAction === "add"}><BusyButtonContent busy={categoryAction === "add"} busyText="Adding…">Add</BusyButtonContent></button></form>
             <div className="online-category-list">
               {categories.map((category) => <div className={`online-category-item ${Number(category.active) ? "" : "archived"}`} key={category.id}>
                 {editingCategory?.id === category.id ? <input value={editingCategory.name} onChange={(event) => setEditingCategory({ ...editingCategory, name: event.target.value })} /> : <div><strong>{category.name}</strong><small>{category.expense_count} entries · {money(category.lifetime_total)}</small></div>}
                 <div className="online-row-actions">
-                  {editingCategory?.id === category.id ? <><button type="button" className="settings-edit-button" onClick={() => saveCategory(category)}>Save</button><button type="button" className="link-danger" onClick={() => setEditingCategory(null)}>Cancel</button></> : <><button type="button" className="settings-edit-button" onClick={() => setEditingCategory({ id: category.id, name: category.name })}>Edit</button><button type="button" className="link-danger" onClick={() => toggleCategory(category)}>{Number(category.active) ? "Archive" : "Restore"}</button></>}
+                  {editingCategory?.id === category.id ? <><button type="button" className="settings-edit-button" disabled={Boolean(categoryAction)} aria-busy={categoryAction === `save:${category.id}`} onClick={() => saveCategory(category)}><BusyButtonContent busy={categoryAction === `save:${category.id}`} busyText="Saving…">Save</BusyButtonContent></button><button type="button" className="link-danger" disabled={Boolean(categoryAction)} onClick={() => setEditingCategory(null)}>Cancel</button></> : <><button type="button" className="settings-edit-button" disabled={Boolean(categoryAction)} onClick={() => setEditingCategory({ id: category.id, name: category.name })}>Edit</button><button type="button" className="link-danger" disabled={Boolean(categoryAction)} aria-busy={categoryAction === `toggle:${category.id}`} onClick={() => toggleCategory(category)}><BusyButtonContent busy={categoryAction === `toggle:${category.id}`} busyText={Number(category.active) ? "Archiving…" : "Restoring…"}>{Number(category.active) ? "Archive" : "Restore"}</BusyButtonContent></button></>}
                 </div>
               </div>)}
             </div>

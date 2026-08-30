@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.2.5 — 2026-08-30
+
+- Added animated loading indicators and progress text to Online Accounts sale, cash, expense, and expense-category action buttons.
+- Disabled related actions while a save is in progress to prevent accidental duplicate entries.
+
 ## 1.2.4 — 2026-08-30
 
 - Made the Digital Sales, Cash Sales, and Daily Cash Costs date selectors change the active Daily Collection Sheet day and immediately load that day’s records.
