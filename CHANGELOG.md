@@ -2,6 +2,12 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.9.1 — 2026-08-30
+
+- Simplified rotation rows to a single compact crew line instead of four large staff badges.
+- Added 25-rotation pagination with a clear showing count, page number, and Previous / Next controls for busy daily reports.
+- Kept full Driver, Helper, Supervisor, and Coach details inside the expanded leg view.
+
 ## 1.9.0 — 2026-08-30
 
 - Added Driver, Helper, Supervisor, and Coach details to each rotation shown in Reports.

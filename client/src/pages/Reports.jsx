@@ -4,21 +4,27 @@ import { t } from "../i18n.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const BUS_DESIGNATIONS = ["Driver", "Supervisor", "Bus Staff", "Helper", "Conductor", "Mechanic"];
+const ROTATIONS_PER_PAGE = 25;
 const ROTATION_STAFF_FIELDS = [
-  ["Driver", "driver_name"],
-  ["Helper", "helper_name"],
-  ["Supervisor", "supervisor_name"],
-  ["Coach", "coach_name"],
+  ["Driver", "driver_name", "D"],
+  ["Helper", "helper_name", "H"],
+  ["Supervisor", "supervisor_name", "S"],
+  ["Coach", "coach_name", "C"],
 ];
 
 function RotationStaffDetails({ legs, compact = false }) {
-  const crew = ROTATION_STAFF_FIELDS.map(([label, field]) => {
+  const crew = ROTATION_STAFF_FIELDS.map(([label, field, shortLabel]) => {
     const names = [...new Set(legs.map((leg) => leg[field]).filter(Boolean))];
-    return names.length ? { label, names: names.join(", ") } : null;
+    return names.length ? { label, shortLabel, names: names.join(", ") } : null;
   }).filter(Boolean);
 
   if (!crew.length) return <span className="rotation-staff-empty">No bus staff recorded</span>;
-  return <div className={`rotation-staff-list${compact ? " compact" : ""}`}>
+  if (compact) return (
+    <span className="rotation-crew-summary" title={crew.map((member) => `${member.label}: ${member.names}`).join(" | ")}>
+      {crew.map((member, index) => <Fragment key={member.label}>{index > 0 && <span className="rotation-crew-divider">·</span>}<b>{member.shortLabel}:</b> {member.names}</Fragment>)}
+    </span>
+  );
+  return <div className="rotation-staff-list">
     {crew.map((member) => <span key={member.label}><small>{member.label}</small><strong>{member.names}</strong></span>)}
   </div>;
 }
@@ -38,6 +44,7 @@ export default function Reports() {
   const [openGroupId, setOpenGroupId] = useState(null);
   const [openStatus, setOpenStatus] = useState(null);
   const [openExpenseGroupId, setOpenExpenseGroupId] = useState(null);
+  const [rotationPage, setRotationPage] = useState(1);
   const [placeFinance, setPlaceFinance] = useState([]);
   const [openPlaceFinance, setOpenPlaceFinance] = useState("");
 
@@ -74,6 +81,9 @@ export default function Reports() {
   const attendanceFor = (status, group) => attendance.filter((a) => a.status === status && (group === "bus" ? busStaffIds.has(a.staff_id) : group === "other" ? !busStaffIds.has(a.staff_id) : true));
   const presentToday = attendanceFor("present", "all").length + attendanceFor("late", "all").length;
   const totalRotations = rotations.length;
+  const totalRotationPages = Math.max(1, Math.ceil(totalRotations / ROTATIONS_PER_PAGE));
+  const rotationStart = (rotationPage - 1) * ROTATIONS_PER_PAGE;
+  const visibleRotations = rotations.slice(rotationStart, rotationStart + ROTATIONS_PER_PAGE);
   const totalPassengers = rotations.reduce((s, g) => s + (g.passengers || 0), 0);
   const busName = (id) => buses.find((b) => b.id === id)?.reg_number || `Bus #${id}`;
   const rangeLabel = fromDate === toDate ? fromDate : `${fromDate} → ${toDate}`;
@@ -88,6 +98,16 @@ export default function Reports() {
   const maxMaintenanceCost = Math.max(1, ...maintenanceSummary.perBus.map((b) => b.total_cost));
   const busRotationPassengers = busRotations.reduce((s, g) => s + (g.passengers || 0), 0);
 
+  useEffect(() => {
+    setRotationPage((page) => Math.min(page, totalRotationPages));
+  }, [totalRotationPages]);
+
+  const changeRotationPage = (page) => {
+    setRotationPage(page);
+    setOpenGroupId(null);
+    setOpenExpenseGroupId(null);
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -96,9 +116,9 @@ export default function Reports() {
           <p>{t("reports_subtitle")}</p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setRotationPage(1); }} />
           <span style={{ color: "var(--muted)" }}>{t("to_date")}</span>
-          <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setRotationPage(1); }} />
         </div>
       </div>
 
@@ -124,15 +144,26 @@ export default function Reports() {
 
       <div className="grid reports-rotation-attendance-grid" style={{ marginBottom: 20 }}>
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>{t("buses_ran_rotation")} — {rangeLabel}</h3>
+          <div className="rotation-report-heading">
+            <div>
+              <h3>{t("buses_ran_rotation")} — {rangeLabel}</h3>
+              <p>{totalRotations ? `Showing ${rotationStart + 1}–${Math.min(rotationStart + ROTATIONS_PER_PAGE, totalRotations)} of ${totalRotations} rotations` : "No rotations in this period"}</p>
+            </div>
+            {totalRotationPages > 1 && <div className="rotation-report-pagination" aria-label="Rotation report pages">
+              <button type="button" disabled={rotationPage === 1} onClick={() => changeRotationPage(rotationPage - 1)}>Previous</button>
+              <span>Page {rotationPage} of {totalRotationPages}</span>
+              <button type="button" disabled={rotationPage === totalRotationPages} onClick={() => changeRotationPage(rotationPage + 1)}>Next</button>
+            </div>}
+          </div>
           <table>
-            <thead><tr><th>{t("bus")}</th><th>{t("rotation_details")}</th><th>Passengers</th><th>{t("income")}</th><th>{t("expense")}</th><th>{t("net")}</th><th>{t("running_now")}</th></tr></thead>
+            <thead><tr><th>{t("bus")}</th><th>{t("rotation_details")}</th><th>Bus staff</th><th>Passengers</th><th>{t("income")}</th><th>{t("expense")}</th><th>{t("net")}</th><th>{t("running_now")}</th></tr></thead>
             <tbody>
-              {rotations.map((g) => (
+              {visibleRotations.map((g) => (
                 <Fragment key={g.group_id}>
                   <tr style={{ cursor: "pointer" }} onClick={() => setOpenGroupId(openGroupId === g.group_id ? null : g.group_id)}>
-                    <td><strong>{g.reg_number}</strong></td>
-                    <td><div className="rotation-report-details"><strong>Rotation #{g.rotation_no} — {g.legs.length === 2 ? "2 legs" : "1 leg"} {openGroupId === g.group_id ? "▲" : "▼"}</strong><RotationStaffDetails legs={g.legs} compact /></div></td>
+                    <td><strong className="rotation-report-bus">{g.reg_number}</strong></td>
+                    <td><strong className="rotation-report-title">#{g.rotation_no} · {g.legs.length} {g.legs.length === 1 ? "leg" : "legs"} {openGroupId === g.group_id ? "▲" : "▼"}</strong></td>
+                    <td><RotationStaffDetails legs={g.legs} compact /></td>
                     <td>{g.passengers || 0}</td>
                     <td style={{ color: "var(--green)" }}>৳{g.income.toLocaleString()}</td>
                     <td style={{ color: "var(--red)" }}>৳{g.expense.toLocaleString()}</td>
@@ -141,7 +172,7 @@ export default function Reports() {
                   </tr>
                   {openGroupId === g.group_id && (
                     <tr>
-                      <td colSpan={7} style={{ background: "var(--bg-soft, #f7f7f7)" }}>
+                      <td colSpan={8} style={{ background: "var(--bg-soft, #f7f7f7)" }}>
                         <table>
                           <thead><tr><th>Leg</th><th>{t("route")}</th><th>Bus staff</th><th>{t("departure_time")}</th><th>Arrival</th><th>Passengers</th><th>{t("income")}</th></tr></thead>
                           <tbody>
@@ -178,11 +209,11 @@ export default function Reports() {
                   )}
                 </Fragment>
               ))}
-              {rotations.length === 0 && <tr><td colSpan={7}>{t("no_rotation_today")}</td></tr>}
+              {rotations.length === 0 && <tr><td colSpan={8}>{t("no_rotation_today")}</td></tr>}
             </tbody>
             {rotations.length > 0 && (
               <tfoot>
-                <tr><td colSpan={2} style={{ textAlign: "right" }}><strong>Total</strong></td><td><strong>{totalPassengers}</strong></td><td style={{ color: "var(--green)" }}><strong>৳{rotations.reduce((sum, row) => sum + row.income, 0).toLocaleString()}</strong></td><td style={{ color: "var(--red)" }}><strong>৳{rotations.reduce((sum, row) => sum + row.expense, 0).toLocaleString()}</strong></td><td colSpan={2}></td></tr>
+                <tr><td colSpan={3} style={{ textAlign: "right" }}><strong>Total</strong></td><td><strong>{totalPassengers}</strong></td><td style={{ color: "var(--green)" }}><strong>৳{rotations.reduce((sum, row) => sum + row.income, 0).toLocaleString()}</strong></td><td style={{ color: "var(--red)" }}><strong>৳{rotations.reduce((sum, row) => sum + row.expense, 0).toLocaleString()}</strong></td><td colSpan={2}></td></tr>
               </tfoot>
             )}
           </table>

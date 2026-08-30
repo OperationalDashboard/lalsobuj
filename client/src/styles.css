@@ -1155,17 +1155,27 @@ table button { white-space: nowrap; }
 /* Rotation report duty roster */
 .reports-rotation-attendance-grid { grid-template-columns: minmax(0, 1fr); }
 .reports-rotation-attendance-grid > .card { min-width: 0; }
-.rotation-report-details { min-width: 230px; display: grid; gap: 8px; }
-.rotation-report-details > strong { font-size: .78rem; }
+.rotation-report-heading { margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.rotation-report-heading h3 { margin: 0; }
+.rotation-report-heading p { margin: 4px 0 0; color: var(--muted); font-size: .7rem; }
+.rotation-report-pagination { display: flex; align-items: center; gap: 7px; }
+.rotation-report-pagination button { min-height: 34px; padding: 6px 10px; }
+.rotation-report-pagination span { min-width: 92px; color: var(--muted); font-size: .68rem; font-weight: 750; text-align: center; }
+.rotation-report-bus { font-size: .7rem; white-space: nowrap; }
+.rotation-report-title { font-size: .76rem; white-space: nowrap; }
+.rotation-crew-summary { max-width: 320px; display: block; overflow: hidden; color: var(--muted); font-size: .68rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.rotation-crew-summary b { color: var(--green); font-size: .62rem; }
+.rotation-crew-divider { margin: 0 5px; color: var(--border-strong); }
 .rotation-staff-list { min-width: 190px; display: grid; gap: 5px; }
 .rotation-staff-list > span { min-width: 0; display: flex; align-items: baseline; gap: 7px; }
 .rotation-staff-list small { min-width: 62px; color: var(--muted); font-size: .58rem; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; }
 .rotation-staff-list strong { overflow-wrap: anywhere; color: var(--ink); font-size: .7rem; font-weight: 750; }
-.rotation-staff-list.compact { min-width: 0; display: flex; flex-wrap: wrap; gap: 5px; }
-.rotation-staff-list.compact > span { padding: 4px 7px; background: color-mix(in srgb, var(--green) 7%, var(--card)); border: 1px solid color-mix(in srgb, var(--green) 18%, var(--border)); border-radius: 7px; }
-.rotation-staff-list.compact small { min-width: 0; }
-.rotation-staff-list.compact small::after { content: ":"; }
 .rotation-staff-empty { color: var(--muted); font-size: .67rem; font-style: italic; }
+
+@media (max-width: 760px) {
+  .rotation-report-heading { align-items: stretch; flex-direction: column; }
+  .rotation-report-pagination { justify-content: space-between; }
+}
 
 /* Place-wise Accounts date controls */
 .place-period-toolbar { margin: 14px 0 16px; padding: 14px; display: grid; grid-template-columns: minmax(230px, 1fr) auto minmax(170px, .55fr); align-items: center; gap: 14px; background: linear-gradient(135deg, color-mix(in srgb, var(--green) 7%, var(--bg-soft)), color-mix(in srgb, var(--card) 90%, transparent)); border: 1px solid color-mix(in srgb, var(--green) 20%, var(--border)); border-radius: 13px; }
