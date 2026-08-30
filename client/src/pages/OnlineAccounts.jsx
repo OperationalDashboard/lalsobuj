@@ -10,7 +10,7 @@ const today = () => {
 const firstDayOfMonth = () => `${today().slice(0, 8)}01`;
 const onlineBlank = (date = today()) => ({
   entry_date: date,
-  channel: "website_android",
+  channel: "website",
   coach_number: "",
   bus_number: "",
   normal_passengers: "",
@@ -33,8 +33,10 @@ const expenseBlank = (date = today(), categoryId = "") => ({
 });
 
 const channelLabels = {
-  website_android: "Website / Android App",
-  ios: "iOS",
+  website: "Website",
+  android: "Android App",
+  ios: "iOS App",
+  website_android: "Website / Android App (legacy)",
   cash: "Cash",
 };
 
@@ -169,6 +171,10 @@ export default function OnlineAccounts() {
     const isOnline = kind === "online";
     const form = isOnline ? onlineForm : cashForm;
     const editingId = isOnline ? editingOnlineId : editingCashId;
+    if (isOnline && form.channel === "website_android") {
+      setError("Choose Website or Android App for this older combined entry before saving.");
+      return;
+    }
     if (!form.coach_number.trim() || !form.bus_number.trim() || form.amount === "") {
       setError("Coach number, bus number, and amount are required.");
       return;
@@ -315,8 +321,10 @@ export default function OnlineAccounts() {
     if (!report) return "";
     return [
       `Online Accounts final report (${report.from} to ${report.to})`,
-      `Website / Android: ${money(report.platforms.find((item) => item.channel === "website_android")?.sales)}`,
-      `iOS: ${money(report.platforms.find((item) => item.channel === "ios")?.sales)}`,
+      `Website: ${money(report.platforms.find((item) => item.channel === "website")?.sales)}`,
+      `Android App: ${money(report.platforms.find((item) => item.channel === "android")?.sales)}`,
+      `iOS App: ${money(report.platforms.find((item) => item.channel === "ios")?.sales)}`,
+      ...(report.has_legacy_entries ? [`Legacy Website / Android: ${money(report.platforms.find((item) => item.channel === "website_android")?.sales)}`] : []),
       `Cash: ${money(report.totals.cash_sale)}`,
       `Online sale: ${money(report.totals.online_sale)}`,
       `Total sale: ${money(report.totals.combined_sale)}`,
@@ -385,8 +393,8 @@ export default function OnlineAccounts() {
       ...report.expense_categories.map((item) => [item.category_name, item.entry_count, item.days_used, item.total]),
       [],
       ["DAILY SUMMARY"],
-      ["Date", "Website/Android", "iOS", "Cash", "Online passengers", "Cash passengers", "Expenses", "Final cash"],
-      ...report.daily.map((day) => [day.date, day.website_android_sales, day.ios_sales, day.cash_sales, day.online_passengers, day.cash_passengers, day.expenses, day.final_cash]),
+      ["Date", "Website", "Android App", "iOS App", ...(report.has_legacy_entries ? ["Legacy Website/Android"] : []), "Cash", "Online passengers", "Cash passengers", "Expenses", "Final cash"],
+      ...report.daily.map((day) => [day.date, day.website_sales, day.android_sales, day.ios_sales, ...(report.has_legacy_entries ? [day.website_android_sales] : []), day.cash_sales, day.online_passengers, day.cash_passengers, day.expenses, day.final_cash]),
     ];
     const escape = (cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`;
     const csv = `\ufeff${rows.map((row) => row.map(escape).join(",")).join("\r\n")}`;
@@ -427,9 +435,9 @@ export default function OnlineAccounts() {
 
       <div className="online-entry-grid">
         <section className="card online-entry-panel">
-          <div className="online-panel-title"><div><span className="settings-eyebrow">DIGITAL SALES</span><h3>Website / Android App & iOS</h3><p>Normal and Long passengers are counted separately.</p></div><span className="online-panel-number">01</span></div>
+          <div className="online-panel-title"><div><span className="settings-eyebrow">DIGITAL SALES</span><h3>Website, Android App & iOS App</h3><p>Each platform is recorded separately. Normal and Long passengers are counted separately.</p></div><span className="online-panel-number">01</span></div>
           {canWrite && <form className="online-form-grid" onSubmit={(event) => saveEntry(event, "online")}>
-            <Field label="Platform"><select value={onlineForm.channel} onChange={(event) => setOnlineForm({ ...onlineForm, channel: event.target.value })}><option value="website_android">Website / Android App</option><option value="ios">iOS</option></select></Field>
+            <Field label="Platform"><select value={onlineForm.channel} onChange={(event) => setOnlineForm({ ...onlineForm, channel: event.target.value })}><option value="website">Website</option><option value="android">Android App</option><option value="ios">iOS App</option>{onlineForm.channel === "website_android" && <option value="website_android" disabled>Legacy combined — choose Website or Android</option>}</select></Field>
             <Field label="Entry date"><input type="date" value={onlineForm.entry_date} onChange={(event) => setOnlineForm({ ...onlineForm, entry_date: event.target.value })} required /></Field>
             <Field label="Coach number"><input value={onlineForm.coach_number} onChange={(event) => setOnlineForm({ ...onlineForm, coach_number: event.target.value })} placeholder="Coach number" required /></Field>
             <Field label="Bus number"><input value={onlineForm.bus_number} onChange={(event) => setOnlineForm({ ...onlineForm, bus_number: event.target.value })} placeholder="Bus number" required /></Field>
@@ -499,7 +507,7 @@ export default function OnlineAccounts() {
         <div className="online-report-heading"><div><span className="settings-eyebrow">FINAL REPORT</span><h2>Online Accounts</h2><p>{report.from} to {report.to}</p></div><div className="online-report-actions"><button type="button" className="settings-edit-button" onClick={() => window.print()}>Print</button><button type="button" className="settings-edit-button" onClick={makePdf}>Make PDF</button><button type="button" className="settings-edit-button" onClick={shareReport}>Share</button><button type="button" className="primary" onClick={exportExcel}>Move to Excel</button></div></div>
 
         <div className="online-report-summary">
-          <div><span>Online sale</span><strong>{money(report.totals.online_sale)}</strong><small>Website / Android + iOS</small></div>
+          <div><span>Online sale</span><strong>{money(report.totals.online_sale)}</strong><small>Website + Android App + iOS App</small></div>
           <div><span>Cash sale</span><strong>{money(report.totals.cash_sale)}</strong><small>{report.totals.cash_passengers} passengers</small></div>
           <div><span>Total sale</span><strong>{money(report.totals.combined_sale)}</strong><small>All platforms and cash</small></div>
           <div className="expense"><span>Total expense</span><strong>{money(report.totals.total_expense)}</strong><small>Clustered below</small></div>
@@ -516,9 +524,9 @@ export default function OnlineAccounts() {
           </tbody><tfoot><tr><td colSpan="3"><strong>Total expense</strong></td><td><strong>{money(report.totals.total_expense)}</strong></td></tr></tfoot></table></div></section>
         </div>
 
-        <section className="card online-daily-report"><h3>Day-by-day report</h3><div className="online-table-scroll"><table><thead><tr><th>Date</th><th>Website / Android</th><th>iOS</th><th>Cash</th><th>Online passengers</th><th>Cash passengers</th><th>Expenses</th><th>Final cash</th></tr></thead><tbody>
-          {report.daily.map((day) => <tr key={day.date}><td><strong>{day.date}</strong></td><td>{money(day.website_android_sales)}</td><td>{money(day.ios_sales)}</td><td>{money(day.cash_sales)}</td><td>{day.online_passengers}</td><td>{day.cash_passengers}</td><td>{money(day.expenses)}</td><td className={day.final_cash < 0 ? "online-negative-text" : "online-positive-text"}><strong>{money(day.final_cash)}</strong></td></tr>)}
-          {report.daily.length === 0 && <tr><td colSpan="8">No data in this report period.</td></tr>}
+        <section className="card online-daily-report"><h3>Day-by-day report</h3><div className="online-table-scroll"><table><thead><tr><th>Date</th><th>Website</th><th>Android App</th><th>iOS App</th>{report.has_legacy_entries && <th>Legacy Website / Android</th>}<th>Cash</th><th>Online passengers</th><th>Cash passengers</th><th>Expenses</th><th>Final cash</th></tr></thead><tbody>
+          {report.daily.map((day) => <tr key={day.date}><td><strong>{day.date}</strong></td><td>{money(day.website_sales)}</td><td>{money(day.android_sales)}</td><td>{money(day.ios_sales)}</td>{report.has_legacy_entries && <td>{money(day.website_android_sales)}</td>}<td>{money(day.cash_sales)}</td><td>{day.online_passengers}</td><td>{day.cash_passengers}</td><td>{money(day.expenses)}</td><td className={day.final_cash < 0 ? "online-negative-text" : "online-positive-text"}><strong>{money(day.final_cash)}</strong></td></tr>)}
+          {report.daily.length === 0 && <tr><td colSpan={report.has_legacy_entries ? 10 : 9}>No data in this report period.</td></tr>}
         </tbody></table></div></section>
       </div>}
     </>}

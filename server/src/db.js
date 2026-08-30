@@ -374,7 +374,7 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 CREATE TABLE IF NOT EXISTS online_sales_entries (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
   entry_date        TEXT NOT NULL,
-  channel           TEXT NOT NULL CHECK(channel IN ('website_android', 'ios', 'cash')),
+  channel           TEXT NOT NULL CHECK(channel IN ('website', 'android', 'ios', 'website_android', 'cash')),
   coach_number      TEXT NOT NULL,
   bus_number        TEXT NOT NULL,
   normal_passengers INTEGER NOT NULL DEFAULT 0 CHECK(normal_passengers >= 0),
@@ -420,6 +420,41 @@ CREATE INDEX IF NOT EXISTS idx_maintenance_bus ON maintenance(bus_id);
 CREATE INDEX IF NOT EXISTS idx_online_sales_date ON online_sales_entries(entry_date, channel);
 CREATE INDEX IF NOT EXISTS idx_online_expenses_date ON online_cash_expenses(expense_date, category_id);
 `);
+
+// v1.2.2 separates Website and Android App. SQLite cannot alter a CHECK
+// constraint in place, so rebuild only the Online Accounts sales table when
+// upgrading from the former combined-channel schema. Existing combined rows
+// remain tagged as website_android until a user edits and classifies them.
+const onlineSalesTable = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'online_sales_entries'").get();
+if (onlineSalesTable?.sql && !onlineSalesTable.sql.includes("'website'")) {
+  db.exec(`
+    BEGIN IMMEDIATE;
+    DROP INDEX IF EXISTS idx_online_sales_date;
+    ALTER TABLE online_sales_entries RENAME TO online_sales_entries_combined_backup;
+    CREATE TABLE online_sales_entries (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      entry_date        TEXT NOT NULL,
+      channel           TEXT NOT NULL CHECK(channel IN ('website', 'android', 'ios', 'website_android', 'cash')),
+      coach_number      TEXT NOT NULL,
+      bus_number        TEXT NOT NULL,
+      normal_passengers INTEGER NOT NULL DEFAULT 0 CHECK(normal_passengers >= 0),
+      long_passengers   INTEGER NOT NULL DEFAULT 0 CHECK(long_passengers >= 0),
+      passenger_count   INTEGER NOT NULL DEFAULT 0 CHECK(passenger_count >= 0),
+      amount            REAL NOT NULL DEFAULT 0 CHECK(amount >= 0),
+      created_by        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      updated_by        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    INSERT INTO online_sales_entries
+      (id, entry_date, channel, coach_number, bus_number, normal_passengers, long_passengers, passenger_count, amount, created_by, updated_by, created_at, updated_at)
+    SELECT id, entry_date, channel, coach_number, bus_number, normal_passengers, long_passengers, passenger_count, amount, created_by, updated_by, created_at, updated_at
+    FROM online_sales_entries_combined_backup;
+    DROP TABLE online_sales_entries_combined_backup;
+    CREATE INDEX idx_online_sales_date ON online_sales_entries(entry_date, channel);
+    COMMIT;
+  `);
+}
 
 db.prepare("INSERT OR IGNORE INTO online_expense_categories (name) VALUES ('Transport Cost')").run();
 

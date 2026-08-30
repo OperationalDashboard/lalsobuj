@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.2.2 — 2026-08-30
+
+- Split Digital Sales into separate Website, Android App, and iOS App platforms for entry, totals, daily reports, PDF/share summaries, and Excel-compatible exports.
+- Preserved older combined Website/Android entries as a clearly marked legacy category until they are edited and assigned to the correct platform.
+
 ## 1.2.1 — 2026-08-30
 
 - Added Online Accounts to the Users & Permissions module checklist so it can be granted to any built-in or custom role.

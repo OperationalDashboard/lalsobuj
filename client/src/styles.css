@@ -922,7 +922,9 @@ table button { white-space: nowrap; }
 .online-entry-table th, .online-entry-table td { padding: 10px 11px; }
 .online-row-actions { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
 .online-channel-badge { width: fit-content; padding: 5px 8px; display: inline-flex; color: var(--green); background: color-mix(in srgb, var(--green) 8%, var(--card)); border: 1px solid color-mix(in srgb, var(--green) 20%, var(--border)); border-radius: 999px; font-size: .67rem; font-weight: 800; white-space: nowrap; }
+.online-channel-badge.android { color: #176d8a; background: color-mix(in srgb, #2596be 10%, var(--card)); border-color: color-mix(in srgb, #2596be 27%, var(--border)); }
 .online-channel-badge.ios { color: #58639b; background: color-mix(in srgb, #7887d1 10%, var(--card)); border-color: color-mix(in srgb, #7887d1 27%, var(--border)); }
+.online-channel-badge.website_android { color: #785686; background: color-mix(in srgb, #9d70ad 10%, var(--card)); border-color: color-mix(in srgb, #9d70ad 27%, var(--border)); }
 .online-channel-badge.cash { color: #8a5a08; background: color-mix(in srgb, #e5a42e 11%, var(--card)); border-color: color-mix(in srgb, #e5a42e 31%, var(--border)); }
 .online-loading { margin: 12px 0; color: var(--muted); font-size: .8rem; }
 

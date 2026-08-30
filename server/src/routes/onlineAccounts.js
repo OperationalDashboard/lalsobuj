@@ -4,7 +4,8 @@ const { requireAuth, requireModulePermission } = require("../middleware/auth");
 const { ROLES } = require("../roles");
 
 const router = express.Router();
-const CHANNELS = ["website_android", "ios", "cash"];
+const CHANNELS = ["website", "android", "ios", "website_android", "cash"];
+const ENTRY_CHANNELS = ["website", "android", "ios", "cash"];
 
 router.use(requireAuth);
 
@@ -36,7 +37,7 @@ function cleanNumber(value, field, integer = false) {
 
 function parseEntry(body) {
   const channel = String(body.channel || "").trim();
-  if (!CHANNELS.includes(channel)) throw new Error("Choose Website/Android App, iOS, or Cash");
+  if (!ENTRY_CHANNELS.includes(channel)) throw new Error("Choose Website, Android App, iOS App, or Cash");
   const coachNumber = String(body.coach_number || "").trim();
   const busNumber = String(body.bus_number || "").trim();
   if (!coachNumber || !busNumber) throw new Error("Coach number and bus number are required");
@@ -270,7 +271,7 @@ router.get("/report", guardRead, (req, res) => {
     }]));
     const dailyMap = new Map();
     const getDay = (date) => {
-      if (!dailyMap.has(date)) dailyMap.set(date, { date, website_android_sales: 0, ios_sales: 0, cash_sales: 0, online_passengers: 0, cash_passengers: 0, expenses: 0, final_cash: 0 });
+      if (!dailyMap.has(date)) dailyMap.set(date, { date, website_sales: 0, android_sales: 0, ios_sales: 0, website_android_sales: 0, cash_sales: 0, online_passengers: 0, cash_passengers: 0, expenses: 0, final_cash: 0 });
       return dailyMap.get(date);
     };
 
@@ -300,11 +301,14 @@ router.get("/report", guardRead, (req, res) => {
 
     const round = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
     for (const platform of Object.values(platformMap)) platform.sales = round(platform.sales);
-    const onlineSale = platformMap.website_android.sales + platformMap.ios.sales;
+    const digitalPlatforms = CHANNELS.filter((channel) => channel !== "cash");
+    const onlineSale = digitalPlatforms.reduce((sum, channel) => sum + platformMap[channel].sales, 0);
     const cashSale = platformMap.cash.sales;
     const totalExpense = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
     const daily = [...dailyMap.values()].sort((a, b) => a.date.localeCompare(b.date)).map((day) => ({
       ...day,
+      website_sales: round(day.website_sales),
+      android_sales: round(day.android_sales),
       website_android_sales: round(day.website_android_sales),
       ios_sales: round(day.ios_sales),
       cash_sales: round(day.cash_sales),
@@ -315,14 +319,15 @@ router.get("/report", guardRead, (req, res) => {
     res.json({
       from,
       to,
-      platforms: Object.values(platformMap),
+      platforms: Object.values(platformMap).filter((platform) => platform.channel !== "website_android" || platform.passenger_count > 0 || platform.sales > 0),
+      has_legacy_entries: platformMap.website_android.passenger_count > 0 || platformMap.website_android.sales > 0,
       totals: {
         online_sale: round(onlineSale),
         cash_sale: round(cashSale),
         combined_sale: round(onlineSale + cashSale),
         total_expense: round(totalExpense),
         final_cash: round(cashSale - totalExpense),
-        online_passengers: platformMap.website_android.passenger_count + platformMap.ios.passenger_count,
+        online_passengers: digitalPlatforms.reduce((sum, channel) => sum + platformMap[channel].passenger_count, 0),
         cash_passengers: platformMap.cash.passenger_count,
       },
       expense_categories: [...categoryMap.values()].map((category) => ({ ...category, total: round(category.total), days_used: category.days.size, days: undefined })).sort((a, b) => b.total - a.total),
