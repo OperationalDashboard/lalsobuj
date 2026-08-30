@@ -22,6 +22,7 @@ export function setUser(user) {
 async function request(path, { method = "GET", body } = {}) {
   const res = await fetch(`${BASE}${path}`, {
     method,
+    cache: method === "GET" ? "no-store" : "default",
     headers: {
       "Content-Type": "application/json",
       ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),

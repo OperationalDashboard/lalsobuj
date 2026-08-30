@@ -109,6 +109,8 @@ a { color: inherit; text-decoration: none; }
 .nav-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .sidebar-order-hint { margin: 1px 8px 8px; color: rgba(255,255,255,.58); font-size: .66rem; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
+.sidebar-order-hint.saved { color: #a9edc0; }
+.sidebar-order-hint.error { color: #ffd0d8; }
 .nav-link.draggable { position: relative; cursor: grab; }
 .nav-link.draggable:active { cursor: grabbing; }
 .nav-drag-handle { width: 11px; margin-left: -5px; color: rgba(255,255,255,.42); font-size: .72rem; letter-spacing: -3px; line-height: 1; }

@@ -40,6 +40,18 @@ function saveSetting(key, value) {
   ).run(key, String(value));
 }
 
+function isValidNavOrder(order) {
+  return Array.isArray(order)
+    && order.length === NAV_ROUTES.length
+    && new Set(order).size === NAV_ROUTES.length
+    && NAV_ROUTES.every((route) => order.includes(route));
+}
+
+function preventCaching(res) {
+  res.set("Cache-Control", "private, no-store, no-cache, must-revalidate");
+  res.set("Pragma", "no-cache");
+}
+
 // Public login appearance only. It intentionally exposes no contact or
 // financial settings before authentication.
 router.get("/public", (req, res) => {
@@ -54,10 +66,26 @@ router.use(requireAuth);
 // Anyone logged in can read settings (colors need to render for every role,
 // the call contact needs to show in everyone's chat box).
 router.get("/", (req, res) => {
+  preventCaching(res);
   const rows = db.prepare("SELECT key, value FROM settings").all();
   const settings = { ...DEFAULTS };
   rows.forEach((r) => { settings[r.key] = r.value; });
   res.json(settings);
+});
+
+// A dedicated no-cache read prevents the browser from restoring an older
+// order after a successful drag-and-drop save.
+router.get("/sidebar-order", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
+  preventCaching(res);
+  const row = db.prepare("SELECT value, updated_at FROM settings WHERE key = 'sidebar_nav_order'").get();
+  let order = NAV_ROUTES;
+  try {
+    const parsed = JSON.parse(row?.value || DEFAULTS.sidebar_nav_order);
+    if (isValidNavOrder(parsed)) order = parsed;
+  } catch {
+    order = NAV_ROUTES;
+  }
+  res.json({ order, updated_at: row?.updated_at || null });
 });
 
 // Sidebar order is global for the full-access navigation, but only the
@@ -65,13 +93,11 @@ router.get("/", (req, res) => {
 // links in the normal fixed order.
 router.put("/sidebar-order", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
   const order = req.body.order;
-  const valid = Array.isArray(order)
-    && order.length === NAV_ROUTES.length
-    && new Set(order).size === NAV_ROUTES.length
-    && NAV_ROUTES.every((route) => order.includes(route));
-  if (!valid) return res.status(400).json({ error: "Sidebar order must contain every navigation item exactly once" });
+  if (!isValidNavOrder(order)) return res.status(400).json({ error: "Sidebar order must contain every navigation item exactly once" });
   saveSetting("sidebar_nav_order", JSON.stringify(order));
-  res.json({ order });
+  const saved = db.prepare("SELECT value, updated_at FROM settings WHERE key = 'sidebar_nav_order'").get();
+  preventCaching(res);
+  res.json({ order: JSON.parse(saved.value), updated_at: saved.updated_at });
 });
 
 // Super Admin can rename or remove any configured bus class, including the

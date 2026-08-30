@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.1.1 — 2026-08-30
+
+- Fixed Super Admin sidebar ordering reverting after a page refresh.
+- Added a dedicated uncached server read, verified save response, local refresh fallback, and visible saved/error feedback.
+
 ## 1.1.0 — 2026-08-30
 
 - Added the visible app version and exact build ID to Settings and the sidebar.

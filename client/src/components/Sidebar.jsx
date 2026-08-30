@@ -15,6 +15,20 @@ const MODULE_ROUTES = {
   maintenance: { to: "/maintenance", key: "maintenance" },
 };
 const NAV_ICONS = { "/": "home", "/live-activity": "pulse", "/accounts": "wallet", "/rotation": "rotate", "/attendance": "clock", "/staff": "people", "/buses": "bus", "/routes": "route", "/counters": "pin", "/maintenance": "tool", "/reports": "chart", "/salary": "money", "/trash": "trash", "/chat": "chat", "/users": "shield", "/settings": "gear" };
+const SIDEBAR_ORDER_STORAGE_KEY = "lsp_sidebar_order";
+
+function readStoredSidebarOrder() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SIDEBAR_ORDER_STORAGE_KEY) || "[]");
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+}
+
+function storeSidebarOrder(order) {
+  try { localStorage.setItem(SIDEBAR_ORDER_STORAGE_KEY, JSON.stringify(order)); } catch { /* server copy remains authoritative */ }
+}
 
 function NavIcon({ name }) {
   const paths = { home: "M3 11.5 12 4l9 7.5v7.8a1.7 1.7 0 0 1-1.7 1.7H4.7A1.7 1.7 0 0 1 3 19.3z M9 21v-6h6v6", pulse: "M3 12h4l2-5 4 10 2-5h6", wallet: "M3 7h15a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H5a2 2 0 0 1-2-2V7zm0 4h18M16 16h.01", rotate: "M20 11a8 8 0 1 0 1 4M20 4v7h-7", clock: "M12 6v6l4 2 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0", people: "M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M22 20v-2a4 4 0 0 0-3-3.87M16 2.13a4 4 0 0 1 0 7.75", bus: "M5 17h14V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2zm0-7h14M7 21h.01M17 21h.01", route: "M5 4h.01M19 20h.01M5 4a3 3 0 1 0 0 6c5 0 2 7 9 7h5M19 20a3 3 0 1 0 0-6", pin: "M12 21s7-5.4 7-12a7 7 0 1 0-14 0c0 6.6 7 12 7 12zm0-9h.01", tool: "m14.7 6.3 3 3M4 20l7.5-7.5a4.2 4.2 0 0 0 5.5-5.5l-3 3-3-3 3-3a4.2 4.2 0 0 0-5.5 5.5L1 17z", chart: "M4 20V10M10 20V4M16 20v-7M22 20H2", money: "M12 3v18M16 7.5c-.7-1.1-2-1.7-4-1.7-2.2 0-3.8 1.1-3.8 2.8 0 4.2 7.6 1.8 7.6 5.7 0 1.8-1.7 3-4 3-1.8 0-3.2-.6-4-1.8", trash: "M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3", chat: "M20 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4z", shield: "M12 3 20 6v5c0 5-3.4 8.7-8 10-4.6-1.3-8-5-8-10V6z M9 12l2 2 4-4", gear: "M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 2-.1-.1a1.7 1.7 0 0 0-1.9-.3l-.7.3a1.7 1.7 0 0 0-1 1.5v.2h-2.8v-.2a1.7 1.7 0 0 0-1-1.5l-.7-.3a1.7 1.7 0 0 0-1.9.3l-.1.1-2-2 .1-.1A1.7 1.7 0 0 0 6 15l-.3-.7a1.7 1.7 0 0 0-1.5-1H4v-2.8h.2a1.7 1.7 0 0 0 1.5-1L6 8.8a1.7 1.7 0 0 0-.3-1.9l-.1-.1 2-2 .1.1a1.7 1.7 0 0 0 1.9.3l.7-.3a1.7 1.7 0 0 0 1-1.5V3h2.8v.4a1.7 1.7 0 0 0 1 1.5l.7.3a1.7 1.7 0 0 0 1.9-.3l.1-.1 2 2-.1.1a1.7 1.7 0 0 0-.3 1.9l.3.7a1.7 1.7 0 0 0 1.5 1h.2v2.8h-.2a1.7 1.7 0 0 0-1.5 1z" };
@@ -108,10 +122,11 @@ export default function Sidebar({ isOpen = false, onNavigate = () => {} }) {
   const isSuperAdmin = user?.role === ROLES.SUPER_ADMIN;
   const [lang, setLang] = useState(getLanguage());
   const [theme, setTheme] = useState(() => localStorage.getItem("lsp_theme") || "light");
-  const [navOrder, setNavOrder] = useState([]);
+  const [navOrder, setNavOrder] = useState(() => isSuperAdmin ? readStoredSidebarOrder() : []);
   const [draggedPath, setDraggedPath] = useState("");
   const [dropTarget, setDropTarget] = useState({ path: "", position: "" });
   const [savingOrder, setSavingOrder] = useState(false);
+  const [orderStatus, setOrderStatus] = useState("");
 
   useEffect(() => {
     const handler = () => setLang(getLanguage());
@@ -126,12 +141,10 @@ export default function Sidebar({ isOpen = false, onNavigate = () => {} }) {
 
   useEffect(() => {
     if (!isSuperAdmin) return;
-    api.get("/settings").then((settings) => {
-      try {
-        const parsed = JSON.parse(settings.sidebar_nav_order || "[]");
-        if (Array.isArray(parsed)) setNavOrder(parsed);
-      } catch {
-        setNavOrder([]);
+    api.get("/settings/sidebar-order").then((result) => {
+      if (Array.isArray(result.order)) {
+        setNavOrder(result.order);
+        storeSidebarOrder(result.order);
       }
     }).catch(() => {});
   }, [isSuperAdmin]);
@@ -177,15 +190,24 @@ export default function Sidebar({ isOpen = false, onNavigate = () => {} }) {
     if (dropTarget.position === "after") targetIndex += 1;
     nextOrder.splice(targetIndex, 0, sourcePath);
     setNavOrder(nextOrder);
+    storeSidebarOrder(nextOrder);
     setDraggedPath("");
     setDropTarget({ path: "", position: "" });
     setSavingOrder(true);
+    setOrderStatus("");
     try {
-      await api.put("/settings/sidebar-order", { order: nextOrder });
+      const result = await api.put("/settings/sidebar-order", { order: nextOrder });
+      const savedOrder = Array.isArray(result.order) ? result.order : nextOrder;
+      setNavOrder(savedOrder);
+      storeSidebarOrder(savedOrder);
+      setOrderStatus("Menu order saved");
     } catch {
       setNavOrder(currentOrder);
+      storeSidebarOrder(currentOrder);
+      setOrderStatus("Could not save menu order");
     } finally {
       setSavingOrder(false);
+      setTimeout(() => setOrderStatus(""), 2400);
     }
   }
 
@@ -210,7 +232,7 @@ export default function Sidebar({ isOpen = false, onNavigate = () => {} }) {
         </div>
       </div>
       <nav>
-        {isSuperAdmin && <div className="sidebar-order-hint">{savingOrder ? "Saving menu order…" : "Drag menu items to reorder"}</div>}
+        {isSuperAdmin && <div className={`sidebar-order-hint${orderStatus.startsWith("Could") ? " error" : orderStatus ? " saved" : ""}`}>{savingOrder ? "Saving menu order…" : orderStatus || "Drag menu items to reorder"}</div>}
         {links.map((l) => (
           <NavLink
             key={l.to}
