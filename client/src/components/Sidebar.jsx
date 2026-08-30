@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { api, getUser, setToken, setUser } from "../api.js";
 import { ROLES, ROLE_LABELS, isFullAccess } from "../roles.js";
 import { t, getLanguage, setLanguage } from "../i18n.js";
+import { APP_REVISION, APP_VERSION } from "../version.js";
 import BusIcon from "./BusIcon.jsx";
 
 const MODULE_ROUTES = {
@@ -238,6 +239,7 @@ export default function Sidebar({ isOpen = false, onNavigate = () => {} }) {
       <div className="sidebar-footer">
         <div>{user?.full_name}</div>
         <div style={{ opacity: 0.7, fontSize: "0.78rem" }}>{ROLE_LABELS[user?.role] || user?.role}</div>
+        <div className="sidebar-version" title={`Build ${APP_REVISION}`}>Version {APP_VERSION}<span>{APP_REVISION}</span></div>
         <button className="logout-btn" style={{ background: "rgba(255,255,255,0.15)", marginTop: 10 }} onClick={toggleLanguage}>
           {lang === "en" ? "বাংলা" : "English"}
         </button>

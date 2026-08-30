@@ -57,6 +57,10 @@ Open http://localhost:5173 and log in with the seeded admin account.
 Vite is configured to proxy `/api` requests to the backend automatically.
 A language toggle (English/বাংলা) is in the sidebar footer.
 
+## Release identification
+
+The current release is shown in the sidebar and under **Settings → System & Updates**. It combines the semantic version from `client/package.json` with the exact Git build ID. Every production change must also be recorded in `CHANGELOG.md`; see `AGENTS.md` for the release rules.
+
 ## Roles & permissions
 
 | Role | Can do |

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getUser } from "../api.js";
 import { ROLES } from "../roles.js";
+import { APP_RELEASE, APP_REVISION, APP_VERSION, clearAppCacheAndRefresh } from "../version.js";
 
 const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
 
@@ -34,6 +35,7 @@ export default function Settings() {
   const [locations, setLocations] = useState([]);
   const [newLocation, setNewLocation] = useState("");
   const [editingItem, setEditingItem] = useState(null);
+  const [clearingCache, setClearingCache] = useState(false);
 
   function loadSettings() {
     api.get("/settings").then((s) => {
@@ -235,6 +237,25 @@ export default function Settings() {
     flashMessage(result.updated_tickets ? `Repair place renamed in ${result.updated_tickets} maintenance ticket(s).` : "Repair place renamed.");
   }
 
+  async function copyVersion() {
+    try {
+      await navigator.clipboard.writeText(APP_RELEASE);
+      flashMessage("Version copied.");
+    } catch {
+      flashMessage(APP_RELEASE);
+    }
+  }
+
+  async function clearCache() {
+    setClearingCache(true);
+    try {
+      await clearAppCacheAndRefresh();
+    } catch {
+      setClearingCache(false);
+      flashMessage("Cache could not be cleared. Please refresh the page manually.");
+    }
+  }
+
   if (!settings) return null;
   const unassignedCounters = counters.filter((counter) => !counter.place_id);
   const assignedCounterCount = counters.length - unassignedCounters.length;
@@ -253,6 +274,19 @@ export default function Settings() {
         <span aria-hidden="true">◆</span>
         <div><strong>Super Admin editing enabled</strong><p>You can rename every Settings list item. Linked records are updated automatically so reports keep their data.</p></div>
       </div>}
+
+      <section className="card system-maintenance-card" aria-labelledby="system-maintenance-title">
+        <div className="system-version-info">
+          <span className="settings-eyebrow">SYSTEM &amp; UPDATES</span>
+          <h3 id="system-maintenance-title">Version {APP_VERSION}</h3>
+          <p>Build <strong>{APP_REVISION}</strong> identifies the exact update currently running.</p>
+        </div>
+        <div className="system-maintenance-actions">
+          <button type="button" className="place-secondary-action" onClick={copyVersion}>Copy version</button>
+          <button type="button" className="primary" disabled={clearingCache} onClick={clearCache}>{clearingCache ? "Clearing…" : "Clear cache & refresh"}</button>
+        </div>
+        <p className="system-cache-note">This refreshes website files only. Database records, uploaded settings, and your login stay safe.</p>
+      </section>
 
       <div className="grid grid-2" style={{ marginBottom: 20 }}>
         <div className="card">
