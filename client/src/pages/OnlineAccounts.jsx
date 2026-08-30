@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, getUser } from "../api.js";
+import OnlineAccountsImporter from "../components/OnlineAccountsImporter.jsx";
 import { ROLES, isFullAccess } from "../roles.js";
 
 const today = () => {
@@ -372,6 +373,12 @@ export default function OnlineAccounts() {
     finally { setCategoryAction(""); }
   }
 
+  async function handleImported(result) {
+    setReport(null);
+    await Promise.all([loadDaily(selectedDate), loadCategories()]);
+    flash(`${result.imported} ${result.imported === 1 ? "entry" : "entries"} imported into Online Accounts.`);
+  }
+
   function reportText() {
     if (!report) return "";
     return [
@@ -492,6 +499,8 @@ export default function OnlineAccounts() {
         <div className="expense"><span>Cash expenses</span><strong>{money(dailyExpense)}</strong></div>
         <div className={dailyCashSale - dailyExpense < 0 ? "negative" : ""}><span>Final cash</span><strong>{money(dailyCashSale - dailyExpense)}</strong></div>
       </div>
+
+      {canWrite && <OnlineAccountsImporter selectedDate={selectedDate} categories={categories} onImported={handleImported} />}
 
       <div className="online-entry-grid">
         <section className="card online-entry-panel">

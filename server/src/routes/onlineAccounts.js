@@ -201,6 +201,47 @@ function parseExpense(body) {
   };
 }
 
+router.post("/import", guardWrite, (req, res) => {
+  try {
+    const destination = String(req.body.destination || "").trim();
+    const rows = req.body.rows;
+    if (!["digital", "cash", "expense"].includes(destination)) throw new Error("Choose Digital Sales, Cash Sales, or Daily Cash Costs");
+    if (!Array.isArray(rows) || rows.length === 0) throw new Error("Choose at least one row to import");
+    if (rows.length > 500) throw new Error("Import no more than 500 rows at a time");
+
+    const parsed = rows.map((row, index) => {
+      try {
+        if (destination === "expense") return parseExpense(row);
+        const entry = parseEntry(destination === "cash" ? { ...row, channel: "cash" } : row);
+        if (destination === "digital" && entry.channel === "cash") throw new Error("Choose Website, Android App, or iOS App");
+        return entry;
+      } catch (error) {
+        throw new Error(`Row ${index + 1}: ${error.message}`);
+      }
+    });
+
+    const insertEntry = db.prepare(
+      `INSERT INTO online_sales_entries
+       (entry_date, channel, coach_number, bus_number, normal_passengers, long_passengers, passenger_count, amount, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    const insertExpense = db.prepare(
+      `INSERT INTO online_cash_expenses (expense_date, category_id, description, amount, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    );
+    const importRows = db.transaction(() => parsed.map((row) => {
+      if (destination === "expense") {
+        return insertExpense.run(row.expenseDate, row.categoryId, row.description, row.amount, req.user.id, req.user.id).lastInsertRowid;
+      }
+      return insertEntry.run(row.entryDate, row.channel, row.coachNumber, row.busNumber, row.normalPassengers, row.longPassengers, row.passengerCount, row.amount, req.user.id, req.user.id).lastInsertRowid;
+    }));
+    const ids = importRows();
+    res.status(201).json({ imported: ids.length, destination });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 router.get("/expenses", guardRead, (req, res) => {
   try {
     const { from, to } = parseRange(req);

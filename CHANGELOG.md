@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.3.0 — 2026-08-30
+
+- Added a configurable document importer to Online Accounts for searchable PDF tables, Excel (.xlsx), CSV, TSV, and text tables.
+- Added automatic column suggestions, destination selection for Digital Sales, Cash Sales, or Daily Cash Costs, and per-column field mapping.
+- Added an editable row-by-row preview with skip controls, validation, and confirmation before saving anything.
+- Added a validated bulk-import endpoint that prevents partial imports when any selected row is invalid.
+
 ## 1.2.5 — 2026-08-30
 
 - Added animated loading indicators and progress text to Online Accounts sale, cash, expense, and expense-category action buttons.
