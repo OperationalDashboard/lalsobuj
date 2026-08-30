@@ -2,6 +2,12 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.9.3 — 2026-08-30
+
+- Fixed newly granted modules, including Buses, not appearing for an already-signed-in Control Counter user.
+- Added automatic permission refresh every 30 seconds and whenever a user returns to the website tab, without requiring sign-out.
+- Updated the permission-save confirmation to explain when signed-in users receive their changed menu.
+
 ## 1.9.2 — 2026-08-30
 
 - Fixed the Turso server error when saving Buses or other module permissions for a role.

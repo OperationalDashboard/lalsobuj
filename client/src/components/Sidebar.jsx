@@ -129,9 +129,9 @@ function linksFor(role, permissions) {
   return withGrantedLinks(links, permissions);
 }
 
-export default function Sidebar({ isOpen = false, onNavigate = () => {} }) {
+export default function Sidebar({ user: sessionUser, isOpen = false, onNavigate = () => {} }) {
   const navigate = useNavigate();
-  const user = getUser();
+  const user = sessionUser || getUser();
   const isSuperAdmin = user?.role === ROLES.SUPER_ADMIN;
   const [lang, setLang] = useState(getLanguage());
   const [theme, setTheme] = useState(() => localStorage.getItem("lsp_theme") || "light");

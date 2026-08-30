@@ -196,7 +196,7 @@ export default function Users() {
     try {
       await api.put(`/roles/${permsRole}/permissions`, perms);
       setPermsRole("");
-      setPermissionMessage("Permissions saved. Users with this role should sign out and sign in again to refresh their menu.");
+      setPermissionMessage("Permissions saved. Signed-in users will refresh automatically within 30 seconds or when they return to the website tab.");
       window.setTimeout(() => setPermissionMessage(""), 6000);
     } catch (err) {
       setError(err.message);
