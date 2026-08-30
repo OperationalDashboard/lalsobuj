@@ -12,6 +12,7 @@ export default function Login() {
   const [portal, setPortal] = useState("admin");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem("lsp_theme") || "light");
@@ -51,7 +52,20 @@ export default function Login() {
       <form className={`portal-card ${admin ? "admin" : "staff"}`} onSubmit={handleSubmit}>
         <div className="portal-emblem"><PortalGlyph admin={admin} /></div><span className="portal-kicker">{admin ? "ADMIN & SUPER ADMIN" : "TEAM MEMBER ACCESS"}</span>
         <h2>{admin ? "Command center" : "Welcome back"}</h2><p>{admin ? "Secure access to financial controls, users and company settings." : "Sign in to continue with your assigned operational work."}</p>
-        <label>Username<input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus /></label><label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+        <label>Username<input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus /></label>
+        <label htmlFor="login-password">Password</label>
+        <div className="portal-password-field">
+          <input id="login-password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} />
+          <button
+            type="button"
+            className="portal-password-toggle"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
+            onClick={() => setShowPassword((visible) => !visible)}
+          >
+            {showPassword ? "Hide" : "Show"}
+          </button>
+        </div>
         <button className="primary portal-submit" type="submit" disabled={loading}>{loading ? "Authenticating…" : "Secure sign in"}</button>{error && <p className="error-text">{error}</p>}
       </form>
     </section>

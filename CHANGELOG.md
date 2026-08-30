@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.10.0 — 2026-08-31
+
+- Added an accessible Show / Hide control to the login password field for both Admin and Staff portals.
+- Styled the password control for desktop, mobile, light mode, dark mode, mouse, and keyboard use.
+
 ## 1.9.3 — 2026-08-30
 
 - Fixed newly granted modules, including Buses, not appearing for an already-signed-in Control Counter user.
