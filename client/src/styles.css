@@ -1073,6 +1073,37 @@ table button { white-space: nowrap; }
 .online-sales-point { stroke: var(--card); stroke-width: 2; }
 .online-sales-point { fill: var(--chart-accent); }
 .online-passenger-point { fill: #9b77e5; stroke: var(--card); stroke-width: 2; }
+.online-sales-point-group { cursor: pointer; outline: none; }
+.online-sales-hit-area { fill: transparent; stroke: transparent; stroke-width: 1; }
+.online-sales-point-group:hover .online-sales-hit-area, .online-sales-point-group:focus .online-sales-hit-area { fill: rgba(var(--chart-accent-rgb), .045); stroke: rgba(var(--chart-accent-rgb), .22); }
+.online-sales-point-group:hover .online-sales-point, .online-sales-point-group:focus .online-sales-point { transform: scale(1.35); }
+.online-sales-point-group:hover .online-passenger-point, .online-sales-point-group:focus .online-passenger-point { transform: scale(1.25); }
+.online-sales-point, .online-passenger-point { transform-box: fill-box; transform-origin: center; transition: transform .16s ease; }
+.online-sales-selected-guide { stroke: var(--chart-accent); stroke-width: 1.5; stroke-dasharray: 3 6; opacity: .5; }
+.online-sales-selected-halo { fill: rgba(var(--chart-accent-rgb), .16); stroke: var(--chart-accent); stroke-width: 1.5; }
+.online-sales-chart-hint { margin: 3px 0 0; padding: 8px 10px; display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--muted); background: color-mix(in srgb, var(--bg-soft) 70%, transparent); border: 1px dashed var(--border); border-radius: 8px; font-size: .68rem; font-weight: 700; }
+.online-sales-chart-hint span { width: 19px; height: 19px; display: grid; place-items: center; color: #fff; background: var(--chart-accent); border-radius: 50%; font-size: .65rem; }
+.online-sales-chart-hint.selected { color: var(--text); border-style: solid; border-color: rgba(var(--chart-accent-rgb), .28); }
+.online-sales-date-report { margin-top: 12px; padding: 15px; background: linear-gradient(145deg, rgba(var(--chart-accent-rgb), .075), color-mix(in srgb, var(--bg-soft) 82%, transparent)); border: 1px solid rgba(var(--chart-accent-rgb), .28); border-radius: 12px; animation: online-date-report-in .2s ease both; }
+@keyframes online-date-report-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+.online-sales-date-report-heading { margin-bottom: 12px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.online-sales-date-report-heading h4 { margin: 3px 0 2px; font: 800 1rem "Manrope", sans-serif; }
+.online-sales-date-report-heading p { margin: 0; color: var(--muted); font-size: .68rem; }
+.online-sales-date-report-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.online-sales-date-report-grid article { min-width: 0; min-height: 110px; padding: 12px; display: flex; flex-direction: column; justify-content: center; background: color-mix(in srgb, var(--card) 82%, transparent); border: 1px solid var(--border); border-radius: 10px; }
+.online-sales-date-report-grid article > span, .online-sales-date-report-grid article > div > span { color: var(--muted); font-size: .59rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.online-sales-date-report-grid article > strong { margin: 6px 0 4px; overflow: hidden; font: 800 .95rem "Manrope", sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.online-sales-date-report-grid article > small { margin-top: 4px; color: var(--muted); font-size: .62rem; }
+.online-sales-date-report-grid .selected-sale { border-color: rgba(var(--chart-accent-rgb), .42); box-shadow: inset 3px 0 var(--chart-accent); }
+.online-sales-date-report-grid .selected-sale > strong { color: var(--chart-accent); }
+.online-sales-date-report-grid .digital-breakdown { justify-content: flex-start; }
+.online-sales-date-report-grid .digital-breakdown > div { margin: 7px 0 2px; display: grid; gap: 3px; }
+.online-sales-date-report-grid .digital-breakdown b { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: .61rem; font-weight: 700; }
+.online-sales-date-report-grid .digital-breakdown em { color: var(--text); font-style: normal; }
+.online-sales-date-report-grid .cash-position { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 8px; }
+.online-sales-date-report-grid .cash-position > div { min-width: 0; }
+.online-sales-date-report-grid .cash-position strong { margin-top: 5px; display: block; overflow: hidden; font: 800 .8rem "Manrope", sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.online-sales-date-report-grid .cash-position small { grid-column: 1 / -1; }
 .online-sales-chart-empty { min-height: 180px; display: grid; place-items: center; color: var(--muted); background: color-mix(in srgb, var(--bg-soft) 75%, transparent); border: 1px dashed var(--border); border-radius: 10px; font-size: .8rem; }
 .online-report-grid { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr); gap: 16px; align-items: start; }
 .online-report-grid .card { min-width: 0; }
@@ -1087,6 +1118,7 @@ table button { white-space: nowrap; }
   .online-import-history-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .online-import-history-file, .online-import-history-actions { grid-column: 1 / -1; }
   .online-import-history-actions { justify-content: flex-start; }
+  .online-sales-date-report-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {
@@ -1103,6 +1135,8 @@ table button { white-space: nowrap; }
   .online-sales-view-toggle button { flex: 1; }
   .online-sales-chart-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .online-sales-chart-key { grid-column: 1 / -1; justify-content: flex-start; }
+  .online-sales-date-report-heading { align-items: stretch; flex-direction: column; }
+  .online-sales-date-report-heading button { align-self: flex-start; }
   .online-final-report { padding: 14px; border-radius: 13px; }
   .online-import-history-summary { grid-template-columns: minmax(0, 1fr); }
   .online-import-history-file, .online-import-history-actions { grid-column: auto; }
@@ -1126,6 +1160,7 @@ table button { white-space: nowrap; }
   .online-report-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .online-sales-chart-summary { grid-template-columns: minmax(0, 1fr); }
   .online-sales-chart-key { grid-column: auto; align-items: flex-start; flex-direction: column; }
+  .online-sales-date-report-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media print {

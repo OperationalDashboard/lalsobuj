@@ -2,6 +2,12 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.7.0 — 2026-08-30
+
+- Made every date point on the Online Accounts sales and passenger graph clickable and keyboard accessible.
+- Added an Exact Date Report below the graph with selected sales, passenger counts, Website/Android/iOS breakdown, cash collection, expenses, and final cash.
+- Added a selected-date guide, clearer click instruction, close control, and responsive detail cards for mobile screens.
+
 ## 1.6.0 — 2026-08-30
 
 - Redesigned the Online Accounts daily sales graph with a cleaner focused layout and improved visual hierarchy.

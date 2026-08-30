@@ -86,6 +86,12 @@ function formatChartDate(date) {
   return parsed.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
+function formatChartDateLong(date) {
+  const parsed = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return parsed.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+}
+
 function compactAmount(value) {
   return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
@@ -100,12 +106,19 @@ function chartMaximum(value) {
 
 function DailySalesChart({ days }) {
   const [activeSeries, setActiveSeries] = useState("digital");
+  const [selectedDate, setSelectedDate] = useState("");
   const series = days.map((day) => ({
     date: day.date,
+    website: Number(day.website_sales || 0),
+    android: Number(day.android_sales || 0),
+    ios: Number(day.ios_sales || 0),
+    legacy: Number(day.website_android_sales || 0),
     digital: Number(day.website_sales || 0) + Number(day.android_sales || 0) + Number(day.ios_sales || 0) + Number(day.website_android_sales || 0),
     cash: Number(day.cash_sales || 0),
     digitalPassengers: Number(day.online_passengers || 0),
     cashPassengers: Number(day.cash_passengers || 0),
+    expenses: Number(day.expenses || 0),
+    finalCash: Number(day.final_cash || 0),
   }));
 
   if (series.length === 0) {
@@ -132,6 +145,8 @@ function DailySalesChart({ days }) {
   };
   const saleTotal = series.reduce((sum, day) => sum + day[selected.amountKey], 0);
   const passengerTotal = series.reduce((sum, day) => sum + day[selected.passengerKey], 0);
+  const selectedDay = series.find((day) => day.date === selectedDate) || null;
+  const selectedIndex = selectedDay ? series.findIndex((day) => day.date === selectedDate) : -1;
   const amountMaximum = chartMaximum(Math.max(...series.map((day) => day[selected.amountKey])));
   const passengerMaximum = Math.max(4, Math.ceil(Math.max(...series.map((day) => day[selected.passengerKey])) / 4) * 4);
   const x = (index) => series.length === 1 ? plot.left + (plotWidth / 2) : plot.left + (index / (series.length - 1)) * plotWidth;
@@ -144,6 +159,15 @@ function DailySalesChart({ days }) {
   const amountTicks = Array.from({ length: 5 }, (_, index) => amountMaximum * (4 - index) / 4);
   const passengerTicks = Array.from({ length: 5 }, (_, index) => passengerMaximum * (4 - index) / 4);
   const labelStep = Math.max(1, Math.ceil(series.length / 7));
+  const pointBand = series.length === 1 ? plotWidth : plotWidth / (series.length - 1);
+  const hitWidth = Math.min(100, Math.max(46, pointBand * .72));
+  const chooseDay = (date) => setSelectedDate(date);
+  const chooseDayWithKeyboard = (event, date) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      chooseDay(date);
+    }
+  };
 
   return <section className={`card online-sales-trend ${activeSeries}`}>
     <div className="online-sales-trend-heading">
@@ -174,15 +198,31 @@ function DailySalesChart({ days }) {
           <text className="online-sales-axis-label passenger" x={width - plot.right + 12} y={amountY(tick) + 4}>{compactAmount(passengerTicks[index])}</text>
         </g>)}
         {series.map((day, index) => ((index % labelStep === 0) || index === series.length - 1) && <text className="online-sales-axis-label online-sales-date-label" key={day.date} x={x(index)} y={height - 20} textAnchor="middle">{formatChartDate(day.date)}</text>)}
+        {selectedDay && <line className="online-sales-selected-guide" x1={x(selectedIndex)} x2={x(selectedIndex)} y1={plot.top} y2={plot.top + plotHeight} />}
         <path className="online-sales-area" d={areaPath} />
         <path className="online-sales-line" d={salePath} />
         <path className="online-passenger-line" d={passengerPath} />
-        {series.map((day, index) => <g key={day.date}>
+        {series.map((day, index) => <g className={`online-sales-point-group ${selectedDate === day.date ? "selected" : ""}`} key={day.date} role="button" tabIndex="0" aria-label={`Open exact report for ${day.date}`} onClick={() => chooseDay(day.date)} onKeyDown={(event) => chooseDayWithKeyboard(event, day.date)}>
+          <rect className="online-sales-hit-area" x={x(index) - (hitWidth / 2)} y={plot.top} width={hitWidth} height={plotHeight} rx="8" />
+          {selectedDate === day.date && <circle className="online-sales-selected-halo" cx={x(index)} cy={amountY(day[selected.amountKey])} r="10" />}
           <circle className="online-sales-point" cx={x(index)} cy={amountY(day[selected.amountKey])} r={series.length > 60 ? 2.5 : 4.5}><title>{`${day.date} — ${selected.shortLabel} sale: ${money(day[selected.amountKey])} · Passengers: ${day[selected.passengerKey]}`}</title></circle>
           <circle className="online-passenger-point" cx={x(index)} cy={passengerY(day[selected.passengerKey])} r={series.length > 60 ? 2 : 3.5}><title>{`${day.date} — Passengers: ${day[selected.passengerKey]} · ${selected.shortLabel} sale: ${money(day[selected.amountKey])}`}</title></circle>
         </g>)}
       </svg>
     </div>
+    <div className={`online-sales-chart-hint ${selectedDay ? "selected" : ""}`}><span aria-hidden="true">{selectedDay ? "✓" : "↗"}</span>{selectedDay ? `${selectedDay.date} report selected` : "Click any point to open its exact date report"}</div>
+    {selectedDay && <div className="online-sales-date-report" aria-live="polite">
+      <div className="online-sales-date-report-heading">
+        <div><span className="settings-eyebrow">EXACT DATE REPORT</span><h4>{formatChartDateLong(selectedDay.date)}</h4><p>{selectedDay.date} · {selected.label} graph</p></div>
+        <button type="button" className="settings-edit-button" onClick={() => setSelectedDate("")} aria-label="Close exact date report">Close</button>
+      </div>
+      <div className="online-sales-date-report-grid">
+        <article className="selected-sale"><span>{selected.label}</span><strong>{money(selectedDay[selected.amountKey])}</strong><small>{selectedDay[selected.passengerKey].toLocaleString()} passengers</small></article>
+        <article className="digital-breakdown"><span>Digital breakdown</span><div><b>Website <em>{money(selectedDay.website)}</em></b><b>Android <em>{money(selectedDay.android)}</em></b><b>iOS <em>{money(selectedDay.ios)}</em></b>{selectedDay.legacy > 0 && <b>Legacy <em>{money(selectedDay.legacy)}</em></b>}</div><small>{selectedDay.digitalPassengers.toLocaleString()} digital passengers</small></article>
+        <article><span>{activeSeries === "digital" ? "Cash collection" : "Total digital sale"}</span><strong>{money(activeSeries === "digital" ? selectedDay.cash : selectedDay.digital)}</strong><small>{(activeSeries === "digital" ? selectedDay.cashPassengers : selectedDay.digitalPassengers).toLocaleString()} passengers</small></article>
+        <article className="cash-position"><div><span>Daily expense</span><strong>{money(selectedDay.expenses)}</strong></div><div><span>Final cash</span><strong className={selectedDay.finalCash < 0 ? "online-negative-text" : "online-positive-text"}>{money(selectedDay.finalCash)}</strong></div><small>Cash sale − daily expense</small></article>
+      </div>
+    </div>}
   </section>;
 }
 
