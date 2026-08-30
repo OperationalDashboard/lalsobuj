@@ -7,7 +7,7 @@ const router = express.Router();
 
 const NAV_ROUTES = [
   "/", "/live-activity", "/accounts", "/rotation", "/attendance", "/staff",
-  "/buses", "/routes", "/counters", "/maintenance", "/reports", "/salary",
+  "/online-accounts", "/buses", "/routes", "/counters", "/maintenance", "/reports", "/salary",
   "/trash", "/chat", "/users", "/settings",
 ];
 
@@ -47,6 +47,21 @@ function isValidNavOrder(order) {
     && NAV_ROUTES.every((route) => order.includes(route));
 }
 
+function normalizeNavOrder(order) {
+  const normalized = [];
+  const seen = new Set();
+  for (const route of Array.isArray(order) ? order : []) {
+    if (NAV_ROUTES.includes(route) && !seen.has(route)) {
+      normalized.push(route);
+      seen.add(route);
+    }
+  }
+  for (const route of NAV_ROUTES) {
+    if (!seen.has(route)) normalized.push(route);
+  }
+  return normalized;
+}
+
 function preventCaching(res) {
   res.set("Cache-Control", "private, no-store, no-cache, must-revalidate");
   res.set("Pragma", "no-cache");
@@ -81,10 +96,11 @@ router.get("/sidebar-order", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
   let order = NAV_ROUTES;
   try {
     const parsed = JSON.parse(row?.value || DEFAULTS.sidebar_nav_order);
-    if (isValidNavOrder(parsed)) order = parsed;
+    order = normalizeNavOrder(parsed);
   } catch {
     order = NAV_ROUTES;
   }
+  if (row && row.value !== JSON.stringify(order)) saveSetting("sidebar_nav_order", JSON.stringify(order));
   res.json({ order, updated_at: row?.updated_at || null });
 });
 

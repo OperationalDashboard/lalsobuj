@@ -4,12 +4,12 @@ A database-backed internal management system, separate from the public
 ticket-selling website. Covers Live Activity, Accounts (organized by bus,
 with a Done/close workflow), Rotation, Time Management, Staff Details,
 Buses, Routes, Counters, Maintenance (with parts tracking), Reports, a
-Chat Box, and Settings (appearance, language, favourite hotels, deduction
-types).
+Chat Box, Online Accounts, and Settings (appearance, language, favourite
+hotels, deduction types).
 
 ## Stack
 
-- **Backend:** Node.js + Express + SQLite (via `better-sqlite3`) + JWT auth
+- **Backend:** Node.js + Express + libSQL/Turso + JWT auth
 - **Frontend:** React + Vite, React Router
 - SQLite was chosen so you can run this immediately with zero external
   database setup. It's a single file (`server/data/lsp.db`) — easy to swap
@@ -73,6 +73,7 @@ The current release is shown in the sidebar and under **Settings → System & Up
 | **Accounts** | Full read/write on Accounts (income/expense, ticket pricing, the Done/close workflow, deciding whether a maintenance ticket counts as an expense). Changing an already-saved amount requires a note explaining why. |
 | **Maintenance** | Logs repair tickets and parts for any bus, and can change a bus's active/maintenance/retired status. Cannot post a ticket's cost as an expense — that's Admin/Accounts. |
 | **Monitor** | Read-only. Lands on a Reports page — no create/edit/delete anywhere, including chat. |
+| **Online Manager** | Full add/edit/delete access only inside the standalone Online Accounts module. Its sales and expenses never post to the main Accounts or Reports modules. |
 | **Custom roles** (Admin-created) | Start with no access; Admin grants view/edit per module (Buses, Staff, Rotation, Time Management, Accounts, Maintenance) from Users & Permissions. Live Activity's checkpoint rules stay fixed regardless. |
 
 Every write endpoint enforces this server-side — the frontend just hides
@@ -90,6 +91,7 @@ name gets attached to their checkpoint entries automatically.
 | Dashboard | Fleet + staff + income/expense summary cards |
 | Live Activity | Checkpoints per trip: left counter, hotel break, arrived/left a stop, fuel, passenger count. A Counter user's "place" is always their own assigned counter, filled in automatically. Control Counter sets the route (from the Routes list) and per-seat price when starting a trip |
 | Accounts | Organized by bus, not by entry date — pick a bus to see its running total and record entries against it. Ticket-sales income = passengers × price-per-seat, minus an optional deduction (Online/VIP/...). Select which rotation(s) an entry covers, then **Mark Done** to close that rotation's accounting — a closed rotation can't be reused or edited without Admin. Maintenance tickets for the bus show up here so Accounts/Admin can choose whether to post their cost as an expense |
+| Online Accounts | Separate daily Website/Android App, iOS, and Cash sales; Normal/Long online passenger counts; editable cash-expense categories; clustered and day-by-day final reporting; Print, PDF, Share, and Excel-compatible exports. Visible only to Super Admin, Admin, and Online Manager |
 | Rotation | Duty roster — driver/helper per bus per date, using the shared Routes list. Optionally link a duty entry to a live trip and its shift-end time and status follow that trip automatically, so it doesn't stay stuck on "scheduled" |
 | Time Management | Check-in/out are always the current server time, captured with a single click — never typed. Only Admin can correct a record afterward |
 | Staff Details | Bus staff (driver, supervisor, bus staff, helper, conductor, mechanic) and counter staff (counter manager, assistant counter manager, caller man, office) — counter staff are assigned to a specific Counter. Status changes are timestamped automatically |
@@ -125,6 +127,10 @@ All routes except `/api/auth/login` and `/api/health` require
   for totals. Ticket-sales sends `passengers_count` + `price_per_seat` (+ optional
   `deduction_type`/`deduction_amount`) instead of `amount`. Changing a saved
   amount as the Accounts role requires `edit_note`
+- `GET/POST/PUT/DELETE /api/online-accounts/entries` and `/expenses`;
+  `GET/POST/PUT/DELETE /api/online-accounts/expense-categories`;
+  `GET /api/online-accounts/report?from=&to=` — Super Admin, Admin, and
+  Online Manager only; completely separate from the main Accounts tables
 - `GET /api/trips/live`, `POST /api/trips` (Control Counter, accepts
   `price_per_seat`), `PUT /api/trips/:id/complete`, `GET /api/trips/for-accounts?bus_id=`,
   `POST /api/trips/close-accounts { trip_ids }` (Accounts/Admin — the Done workflow),

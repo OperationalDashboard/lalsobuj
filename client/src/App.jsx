@@ -19,6 +19,7 @@ import Reports from "./pages/Reports.jsx";
 import Settings from "./pages/Settings.jsx";
 import Salary from "./pages/Salary.jsx";
 import Trash from "./pages/Trash.jsx";
+import OnlineAccounts from "./pages/OnlineAccounts.jsx";
 
 function Protected({ children }) {
   if (!getToken()) return <Navigate to="/login" replace />;
@@ -50,6 +51,7 @@ const canSeeReports = (r) => isFullAccess(r) || r === ROLES.MONITOR;
 const canSeeBuses = (r) => isFullAccess(r) || r === ROLES.MAINTENANCE;
 const canSeeRoutes = (r) => isFullAccess(r) || r === ROLES.CONTROL_COUNTER;
 const canSeeRotation = (r) => isFullAccess(r) || r === ROLES.CONTROL_COUNTER;
+const canSeeOnlineAccounts = (r) => isFullAccess(r) || r === ROLES.ONLINE_MANAGER;
 
 export default function App() {
   return (
@@ -67,6 +69,7 @@ export default function App() {
         <Route path="live-activity" element={<LiveActivity />} />
         <Route path="chat" element={<Chat />} />
         <Route path="accounts" element={<RoleGate allow={canSeeAccounts} moduleName="accounts"><Accounts /></RoleGate>} />
+        <Route path="online-accounts" element={<RoleGate allow={canSeeOnlineAccounts}><OnlineAccounts /></RoleGate>} />
         <Route path="rotation" element={<RoleGate allow={canSeeRotation} moduleName="rotations"><Rotation /></RoleGate>} />
         <Route path="attendance" element={<RoleGate allow={isFullAccess} moduleName="attendance"><Attendance /></RoleGate>} />
         <Route path="staff" element={<RoleGate allow={isFullAccess} moduleName="staff"><Staff /></RoleGate>} />

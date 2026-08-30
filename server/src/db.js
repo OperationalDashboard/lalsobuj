@@ -369,6 +369,45 @@ CREATE TABLE IF NOT EXISTS role_permissions (
   UNIQUE(role, module)
 );
 
+-- Standalone Online Accounts. These tables deliberately have no link to the
+-- regular transactions/accounts workflow or its reports.
+CREATE TABLE IF NOT EXISTS online_sales_entries (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  entry_date        TEXT NOT NULL,
+  channel           TEXT NOT NULL CHECK(channel IN ('website_android', 'ios', 'cash')),
+  coach_number      TEXT NOT NULL,
+  bus_number        TEXT NOT NULL,
+  normal_passengers INTEGER NOT NULL DEFAULT 0 CHECK(normal_passengers >= 0),
+  long_passengers   INTEGER NOT NULL DEFAULT 0 CHECK(long_passengers >= 0),
+  passenger_count   INTEGER NOT NULL DEFAULT 0 CHECK(passenger_count >= 0),
+  amount            REAL NOT NULL DEFAULT 0 CHECK(amount >= 0),
+  created_by        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  updated_by        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS online_expense_categories (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT UNIQUE NOT NULL,
+  active     INTEGER NOT NULL DEFAULT 1,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS online_cash_expenses (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  expense_date TEXT NOT NULL,
+  category_id INTEGER NOT NULL REFERENCES online_expense_categories(id),
+  description TEXT,
+  amount      REAL NOT NULL DEFAULT 0 CHECK(amount >= 0),
+  created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  updated_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_rotations_date ON rotations(duty_date);
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(work_date);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(txn_date);
@@ -378,7 +417,11 @@ CREATE INDEX IF NOT EXISTS idx_trips_date ON trips(trip_date, bus_id);
 CREATE INDEX IF NOT EXISTS idx_activity_trip ON activity_logs(trip_id, recorded_at);
 CREATE INDEX IF NOT EXISTS idx_maintenance_parts ON maintenance_parts(maintenance_id);
 CREATE INDEX IF NOT EXISTS idx_maintenance_bus ON maintenance(bus_id);
+CREATE INDEX IF NOT EXISTS idx_online_sales_date ON online_sales_entries(entry_date, channel);
+CREATE INDEX IF NOT EXISTS idx_online_expenses_date ON online_cash_expenses(expense_date, category_id);
 `);
+
+db.prepare("INSERT OR IGNORE INTO online_expense_categories (name) VALUES ('Transport Cost')").run();
 
 // ---------------------------------------------------------------------------
 // Lightweight migration helper: adds a column to a table that already

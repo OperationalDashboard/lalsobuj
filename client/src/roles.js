@@ -6,6 +6,7 @@ export const ROLES = {
   PASSENGER_CHECKER: "passenger_checker",
   MONITOR: "monitor",
   ACCOUNTS: "accounts",
+  ONLINE_MANAGER: "online_manager",
   MAINTENANCE: "maintenance",
   HOTEL: "hotel",
   PUMP_MANAGER: "pump_manager",
@@ -20,6 +21,7 @@ export const ASSIGNABLE_ROLES = [
   ROLES.PASSENGER_CHECKER,
   ROLES.MONITOR,
   ROLES.ACCOUNTS,
+  ROLES.ONLINE_MANAGER,
   ROLES.MAINTENANCE,
   ROLES.HOTEL,
   ROLES.PUMP_MANAGER,
@@ -38,6 +40,7 @@ export const ROLE_LABELS = {
   [ROLES.PASSENGER_CHECKER]: "Passenger Checker",
   [ROLES.MONITOR]: "Monitor",
   [ROLES.ACCOUNTS]: "Accounts",
+  [ROLES.ONLINE_MANAGER]: "Online Manager",
   [ROLES.MAINTENANCE]: "Maintenance",
   [ROLES.HOTEL]: "Hotel",
   [ROLES.PUMP_MANAGER]: "Pump Manager",
@@ -54,6 +57,7 @@ export function isFullAccess(role) {
 export function homeRouteFor(role) {
   if (role === ROLES.MONITOR) return "/reports";
   if (role === ROLES.ACCOUNTS) return "/accounts";
+  if (role === ROLES.ONLINE_MANAGER) return "/online-accounts";
   if (role === ROLES.MAINTENANCE) return "/maintenance";
   if (isFullAccess(role)) return "/";
   return "/live-activity";

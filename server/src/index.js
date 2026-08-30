@@ -21,6 +21,7 @@ const countersRoutes = require("./routes/counters");
 const permissionsRoutes = require("./routes/permissions");
 const discountTypesRoutes = require("./routes/discountTypes");
 const salaryRoutes = require("./routes/salary");
+const onlineAccountsRoutes = require("./routes/onlineAccounts");
 
 const app = express();
 const allowedOrigin = process.env.CLIENT_ORIGIN || "http://localhost:5173";
@@ -68,6 +69,7 @@ app.use("/api/counters", countersRoutes);
 app.use("/api/roles", permissionsRoutes);
 app.use("/api/discount-types", discountTypesRoutes);
 app.use("/api/salary", salaryRoutes);
+app.use("/api/online-accounts", onlineAccountsRoutes);
 
 app.use("/api", (req, res) => res.status(404).json({ error: "Not found" }));
 
