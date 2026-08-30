@@ -58,6 +58,7 @@ export default function Accounts() {
   const [openPlace, setOpenPlace] = useState("");
   const [selectedCounterDetail, setSelectedCounterDetail] = useState("");
   const [placeMessage, setPlaceMessage] = useState("");
+  const [postingCounterSalary, setPostingCounterSalary] = useState(false);
   const [placePeriod, setPlacePeriod] = useState({ mode: "day", day: today(), from: today(), to: today() });
   const [placeTransactionsLoading, setPlaceTransactionsLoading] = useState(false);
   const [placePeriodError, setPlacePeriodError] = useState("");
@@ -115,12 +116,16 @@ export default function Accounts() {
   }
   async function postCounterSalary() {
     if (!placeForm.counter_id) { setPlaceMessage("Select the counter first"); return; }
+    if (!placeForm.txn_date) { setPlaceMessage("Choose the salary posting date first"); return; }
+    setPostingCounterSalary(true);
+    setPlaceMessage("");
     try {
-      const result = await api.post("/salary/post-place-expenses", { counter_id: placeForm.counter_id });
+      const result = await api.post("/salary/post-place-expenses", { counter_id: placeForm.counter_id, month: placeForm.txn_date.slice(0, 7), txn_date: placeForm.txn_date });
       setOpenPlace(placeForm.place_name); setSelectedCounterDetail(placeForm.counter_id);
       setPlaceMessage(result.total ? `Posted staff salary for this counter: ৳${Number(result.total).toLocaleString()}` : "No active salary plan found for this counter.");
       loadOverview();
     } catch (err) { setPlaceMessage(err.message); }
+    finally { setPostingCounterSalary(false); }
   }
 
   function loadBusDetail(busId) {
@@ -376,7 +381,7 @@ export default function Accounts() {
           <input type="number" placeholder="Amount" value={placeForm.amount} onChange={(e) => setPlaceForm({ ...placeForm, amount: e.target.value })} />
           <input type="date" value={placeForm.txn_date} onInput={(e) => { const txnDate = e.currentTarget.value; setPlaceForm({ ...placeForm, txn_date: txnDate }); if (placePeriod.mode === "day") setPlacePeriod((period) => ({ ...period, day: txnDate })); }} />
           <input placeholder="Note (optional)" value={placeForm.note} onChange={(e) => setPlaceForm({ ...placeForm, note: e.target.value })} />
-          {placeForm.type === "expense" && placeForm.finance_type === "Counter Staff Salary" && <button className="primary" type="button" onClick={postCounterSalary} disabled={!placeForm.counter_id}>Post staff salary for this counter</button>}
+          {placeForm.type === "expense" && placeForm.finance_type === "Counter Staff Salary" && <button className="primary" type="button" onClick={postCounterSalary} disabled={!placeForm.counter_id || !placeForm.txn_date || postingCounterSalary}>{postingCounterSalary ? "Posting salary…" : "Post staff salary for this counter"}</button>}
           <button className="primary" type="submit">Add place {placeForm.type}</button>
         </form>
         {placeMessage && <p className={placeMessage.startsWith("Saved") || placeMessage.startsWith("Posted") ? "success-text" : "error-text"}>{placeMessage}</p>}

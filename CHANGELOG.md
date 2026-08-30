@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.8.3 — 2026-08-30
+
+- Fixed the Turso server error that prevented counter staff salary amounts from posting to Place-wise Accounts.
+- Kept salary posting idempotent so retrying updates the same staff/month entries without creating duplicates.
+- Made the Accounts-page salary button use the selected entry date so the posted amount appears in that day's Place-wise totals.
+- Added a visible “Posting salary…” state and disabled repeated clicks while the request is being processed.
+
 ## 1.8.2 — 2026-08-30
 
 - Made route selection mandatory when scheduling a rotation, with validation in both the page and server.

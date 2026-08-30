@@ -150,6 +150,12 @@ router.get("/payroll", requireRole(...FULL_ACCESS), (req, res) => {
 // most once, so it cannot duplicate a place expense on repeated clicks.
 router.post("/post-place-expenses", requireRole(...FULL_ACCESS), (req, res) => {
   const month = req.body.month || new Date().toISOString().slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: "Choose a valid salary month" });
+  const requestedPostingDate = String(req.body.txn_date || "");
+  if (requestedPostingDate && (!/^\d{4}-\d{2}-\d{2}$/.test(requestedPostingDate) || !requestedPostingDate.startsWith(`${month}-`))) {
+    return res.status(400).json({ error: "The posting date must be inside the selected salary month" });
+  }
+  const postingDate = requestedPostingDate || `${month}-01`;
   const counterId = req.body.counter_id || null;
   const staffRows = db.prepare(
     `SELECT s.id, s.name, s.counter_id, sa.salary_type, sa.amount, c.name AS counter_name, p.name AS place_name
@@ -162,15 +168,19 @@ router.post("/post-place-expenses", requireRole(...FULL_ACCESS), (req, res) => {
   const insert = db.prepare("INSERT INTO transactions (type, category, amount, description, txn_date, place_name, counter_id, created_by) VALUES ('expense','place_expense',?,?,?,?,?,?)");
   const update = db.prepare("UPDATE transactions SET amount = ?, txn_date = ?, place_name = ?, counter_id = ? WHERE id = ?");
   let posted = 0;
-  const work = db.transaction(() => staffRows.forEach((staff) => {
+  // Do not wrap this loop with db.transaction(). The production database is
+  // a Turso-backed embedded replica, whose synchronous transaction wrapper
+  // can fail with InvalidParserState("Init") before any row is written.
+  // These writes are already idempotent by their staff/month description,
+  // so sequential upserts are safe and a retry cannot create duplicates.
+  for (const staff of staffRows) {
     const amount = staff.salary_type === 'monthly' ? staff.amount : staff.amount * countDays.get(staff.id, `${month}%`).days;
     const description = `Counter Staff Salary — ${staff.name} — ${month}`;
     const old = exists.get(description);
-    if (!amount) { if (old) db.prepare("DELETE FROM transactions WHERE id = ?").run(old.id); return; }
-    if (old) update.run(amount, `${month}-01`, staff.place_name, staff.counter_id, old.id);
-    else { insert.run(amount, description, `${month}-01`, staff.place_name, staff.counter_id, req.user.id); posted += 1; }
-  }));
-  work();
+    if (!amount) { if (old) db.prepare("DELETE FROM transactions WHERE id = ?").run(old.id); continue; }
+    if (old) update.run(amount, postingDate, staff.place_name, staff.counter_id, old.id);
+    else { insert.run(amount, description, postingDate, staff.place_name, staff.counter_id, req.user.id); posted += 1; }
+  }
 
   // Cover-duty overtime is paid to the person who actually covered the
   // shift, at the represented staff member's configured rate. Post it to
@@ -214,12 +224,12 @@ router.post("/post-place-expenses", requireRole(...FULL_ACCESS), (req, res) => {
     overtimeTotal += amount;
     const description = `Overtime (Covering Others) — ${staff.name} — ${month}`;
     const old = exists.get(description);
-    if (old) update.run(amount, `${month}-01`, staff.place_name, staff.counter_id, old.id);
-    else { insert.run(amount, description, `${month}-01`, staff.place_name, staff.counter_id, req.user.id); posted += 1; }
+    if (old) update.run(amount, postingDate, staff.place_name, staff.counter_id, old.id);
+    else { insert.run(amount, description, postingDate, staff.place_name, staff.counter_id, req.user.id); posted += 1; }
   });
 
   const baseTotal = staffRows.reduce((sum, staff) => sum + (staff.salary_type === "monthly" ? staff.amount : staff.amount * countDays.get(staff.id, `${month}%`).days), 0);
-  res.json({ posted, month, counter_id: counterId, total: baseTotal + overtimeTotal, overtime_total: overtimeTotal });
+  res.json({ posted, month, posting_date: postingDate, counter_id: counterId, total: baseTotal + overtimeTotal, overtime_total: overtimeTotal });
 });
 
 module.exports = router;
