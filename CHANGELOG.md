@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.8.2 — 2026-08-30
+
+- Made route selection mandatory when scheduling a rotation, with validation in both the page and server.
+- Prevented route-less legacy rotations from starting a live trip until a valid active route is selected on a new rotation.
+
 ## 1.8.1 — 2026-08-30
 
 - Changed the Place-wise Accounts totals and counter details to show the selected day instead of combining every available date.

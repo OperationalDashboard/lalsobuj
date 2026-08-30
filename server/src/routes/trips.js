@@ -265,6 +265,10 @@ router.post("/", requireRole(ROLES.CONTROL_COUNTER, ROLES.DRIVER, ROLES.HELPER, 
   trip_date = selectedRotation.duty_date;
   departure_time = departure_time || selectedRotation.shift_start;
 
+  if (!route?.trim()) {
+    return res.status(400).json({ error: "This rotation has no route. Create the rotation again and select a route before starting the trip." });
+  }
+
   if (OWN_BUS_ROLES.includes(req.user.role)) {
     if (!req.user.staff_id) return res.status(403).json({ error: "Your account isn't linked to a staff record" });
     const staff = db.prepare("SELECT assigned_bus_id FROM staff WHERE id = ?").get(req.user.staff_id);

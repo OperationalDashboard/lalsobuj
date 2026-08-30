@@ -26,7 +26,7 @@ export default function Rotation() {
   async function handleAdd(e) {
     e.preventDefault();
     setError("");
-    if (!form.bus_id || !form.duty_date) { setError("Bus and duty date are required"); return; }
+    if (!form.bus_id || !form.route || !form.duty_date) { setError("Bus, route, and duty date are required"); return; }
     try {
       await api.post("/rotations", {
         ...form,
@@ -114,7 +114,7 @@ export default function Rotation() {
           </select>
           <input placeholder="Coach" value={form.coach_name}
             onChange={(e) => setForm({ ...form, coach_name: e.target.value })} />
-          <select value={form.route} onChange={(e) => setForm({ ...form, route: e.target.value })}>
+          <select value={form.route} required aria-label={t("select_route")} onChange={(e) => setForm({ ...form, route: e.target.value })}>
             <option value="">{t("select_route")}</option>
             {routesList.map((r) => <option key={r.id} value={r.name}>{r.name}</option>)}
           </select>

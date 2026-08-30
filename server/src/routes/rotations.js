@@ -44,6 +44,21 @@ function requireActiveBus(busId, res) {
   return true;
 }
 
+function requireActiveRoute(req, res) {
+  const routeName = String(req.body.route || "").trim();
+  if (!routeName) {
+    res.status(400).json({ error: "Route selection is required" });
+    return false;
+  }
+  const route = db.prepare("SELECT name FROM routes WHERE lower(name) = lower(?) AND is_active = 1").get(routeName);
+  if (!route) {
+    res.status(400).json({ error: "Choose an active route from the route list" });
+    return false;
+  }
+  req.body.route = route.name;
+  return true;
+}
+
 // Duty roster, with the linked Trip's live status/times folded in when
 // present — that's what keeps this page from getting stuck on "scheduled"
 // after the bus has actually completed its run. A row with a trip_id was
@@ -80,6 +95,7 @@ router.get("/", (req, res) => {
 
 router.post("/", guardWrite, (req, res) => {
   if (!requireActiveBus(req.body.bus_id, res)) return;
+  if (!requireActiveRoute(req, res)) return;
   const present = WRITABLE.filter((c) => req.body[c] !== undefined);
   if (!present.length) return res.status(400).json({ error: "No valid fields provided" });
   const placeholders = present.map(() => "?").join(",");
@@ -90,6 +106,7 @@ router.post("/", guardWrite, (req, res) => {
 
 router.put("/:id", guardWrite, (req, res) => {
   if (req.body.bus_id !== undefined && !requireActiveBus(req.body.bus_id, res)) return;
+  if (req.body.route !== undefined && !requireActiveRoute(req, res)) return;
   const present = WRITABLE.filter((c) => req.body[c] !== undefined);
   if (!present.length) return res.status(400).json({ error: "No valid fields provided" });
   const setClause = present.map((c) => `${c} = ?`).join(", ");
