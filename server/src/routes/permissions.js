@@ -64,16 +64,18 @@ router.put("/:role/permissions", requireRole(...FULL_ACCESS), (req, res) => {
     `INSERT INTO role_permissions (role, module, can_read, can_write) VALUES (?,?,?,?)
      ON CONFLICT(role, module) DO UPDATE SET can_read = excluded.can_read, can_write = excluded.can_write`
   );
-  const tx = db.transaction((grants) => {
-    for (const module of PERMISSION_MODULES) {
-      const grant = grants[module];
-      if (!grant) continue;
-      const canWrite = Boolean(grant.can_write);
-      const canRead = Boolean(grant.can_read) || canWrite;
-      upsert.run(req.params.role, module, canRead ? 1 : 0, canWrite ? 1 : 0);
-    }
-  });
-  tx(req.body || {});
+  // Turso's embedded-replica driver can reject the synchronous
+  // db.transaction() wrapper before any statement runs. Each upsert is
+  // independently idempotent, so saving the grants sequentially is safe to
+  // retry and works for both local SQLite and the production Turso database.
+  const grants = req.body || {};
+  for (const module of PERMISSION_MODULES) {
+    const grant = grants[module];
+    if (!grant) continue;
+    const canWrite = Boolean(grant.can_write);
+    const canRead = Boolean(grant.can_read) || canWrite;
+    upsert.run(req.params.role, module, canRead ? 1 : 0, canWrite ? 1 : 0);
+  }
   res.json({ updated: true });
 });
 

@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.9.2 — 2026-08-30
+
+- Fixed the Turso server error when saving Buses or other module permissions for a role.
+- Removed the same incompatible database transaction wrapper from editable Settings lists, two-leg Accounts entries, trip pairing and account closing, permanent rotation deletion, and Online Accounts record/history deletion.
+- Made document imports Turso-compatible with validated sequential inserts and automatic cleanup if an import fails partway through.
+- Verified page reads and write workflows across Permissions, Buses, Staff, Attendance, Salary, Settings, Routes, Rotations, Accounts, Maintenance, Online Accounts, and Chat without server errors.
+
 ## 1.9.1 — 2026-08-30
 
 - Simplified rotation rows to a single compact crew line instead of four large staff badges.

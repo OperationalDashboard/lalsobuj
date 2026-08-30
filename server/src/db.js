@@ -24,6 +24,11 @@ const db = new Database(dbPath, tursoUrl ? {
   syncPeriod: 60,
 } : undefined);
 
+// IMPORTANT: do not use libsql's synchronous db.transaction() wrapper in
+// request handlers. With a Turso-backed embedded replica it can fail with
+// InvalidParserState("Init") before executing the first statement. Production
+// write flows use validated, idempotent sequential statements instead.
+
 if (tursoUrl) {
   db.sync();
   console.log("Database connected to Turso using an embedded replica.");

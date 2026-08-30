@@ -132,11 +132,8 @@ router.put("/entries/:id", guardWrite, (req, res) => {
 });
 
 router.delete("/entries/:id", guardWrite, (req, res) => {
-  const removeEntry = db.transaction(() => {
-    db.prepare("DELETE FROM online_import_items WHERE record_type = 'sale' AND record_id = ?").run(req.params.id);
-    return db.prepare("DELETE FROM online_sales_entries WHERE id = ?").run(req.params.id);
-  });
-  const info = removeEntry();
+  db.prepare("DELETE FROM online_import_items WHERE record_type = 'sale' AND record_id = ?").run(req.params.id);
+  const info = db.prepare("DELETE FROM online_sales_entries WHERE id = ?").run(req.params.id);
   if (!info.changes) return res.status(404).json({ error: "Entry not found" });
   res.status(204).end();
 });
@@ -279,15 +276,12 @@ router.get("/imports/:id", guardRead, (req, res) => {
 router.delete("/imports/:id", guardWrite, (req, res) => {
   const batch = importBatchById(req.params.id);
   if (!batch) return res.status(404).json({ error: "Import not found" });
-  const removeImport = db.transaction(() => {
-    const removed = batch.destination === "expense"
-      ? db.prepare("DELETE FROM online_cash_expenses WHERE id IN (SELECT record_id FROM online_import_items WHERE batch_id = ? AND record_type = 'expense')").run(batch.id).changes
-      : db.prepare("DELETE FROM online_sales_entries WHERE id IN (SELECT record_id FROM online_import_items WHERE batch_id = ? AND record_type = 'sale')").run(batch.id).changes;
-    db.prepare("DELETE FROM online_import_items WHERE batch_id = ?").run(batch.id);
-    db.prepare("DELETE FROM online_import_batches WHERE id = ?").run(batch.id);
-    return removed;
-  });
-  res.json({ deleted: removeImport() });
+  const removed = batch.destination === "expense"
+    ? db.prepare("DELETE FROM online_cash_expenses WHERE id IN (SELECT record_id FROM online_import_items WHERE batch_id = ? AND record_type = 'expense')").run(batch.id).changes
+    : db.prepare("DELETE FROM online_sales_entries WHERE id IN (SELECT record_id FROM online_import_items WHERE batch_id = ? AND record_type = 'sale')").run(batch.id).changes;
+  db.prepare("DELETE FROM online_import_items WHERE batch_id = ?").run(batch.id);
+  db.prepare("DELETE FROM online_import_batches WHERE id = ?").run(batch.id);
+  res.json({ deleted: removed });
 });
 
 router.post("/import", guardWrite, (req, res) => {
@@ -327,22 +321,39 @@ router.post("/import", guardWrite, (req, res) => {
     const insertImportItem = db.prepare(
       "INSERT INTO online_import_items (batch_id, record_type, record_id) VALUES (?, ?, ?)"
     );
-    const importRows = db.transaction(() => {
-      const batchId = insertBatch.run(fileName, sourceName, destination, parsed.length, req.user.id).lastInsertRowid;
-      const ids = parsed.map((row) => {
+    let batchId = null;
+    const ids = [];
+    try {
+      batchId = insertBatch.run(fileName, sourceName, destination, parsed.length, req.user.id).lastInsertRowid;
+      for (const row of parsed) {
+        let recordId;
         if (destination === "expense") {
-          const recordId = insertExpense.run(row.expenseDate, row.categoryId, row.description, row.amount, req.user.id, req.user.id).lastInsertRowid;
+          recordId = insertExpense.run(row.expenseDate, row.categoryId, row.description, row.amount, req.user.id, req.user.id).lastInsertRowid;
+          ids.push(recordId);
           insertImportItem.run(batchId, "expense", recordId);
-          return recordId;
+        } else {
+          recordId = insertEntry.run(row.entryDate, row.channel, row.coachNumber, row.busNumber, row.normalPassengers, row.longPassengers, row.passengerCount, row.amount, req.user.id, req.user.id).lastInsertRowid;
+          ids.push(recordId);
+          insertImportItem.run(batchId, "sale", recordId);
         }
-        const recordId = insertEntry.run(row.entryDate, row.channel, row.coachNumber, row.busNumber, row.normalPassengers, row.longPassengers, row.passengerCount, row.amount, req.user.id, req.user.id).lastInsertRowid;
-        insertImportItem.run(batchId, "sale", recordId);
-        return recordId;
-      });
-      return { batchId, ids };
-    });
-    const result = importRows();
-    res.status(201).json({ imported: result.ids.length, destination, import_batch_id: result.batchId });
+      }
+    } catch (error) {
+      // Best-effort cleanup keeps a failed multi-row import retryable without
+      // using the Turso-incompatible synchronous transaction wrapper.
+      if (batchId) {
+        try {
+          db.prepare("DELETE FROM online_import_items WHERE batch_id = ?").run(batchId);
+          if (ids.length) {
+            const marks = ids.map(() => "?").join(",");
+            if (destination === "expense") db.prepare(`DELETE FROM online_cash_expenses WHERE id IN (${marks})`).run(...ids);
+            else db.prepare(`DELETE FROM online_sales_entries WHERE id IN (${marks})`).run(...ids);
+          }
+          db.prepare("DELETE FROM online_import_batches WHERE id = ?").run(batchId);
+        } catch { /* preserve the original import error */ }
+      }
+      throw error;
+    }
+    res.status(201).json({ imported: ids.length, destination, import_batch_id: batchId });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -394,11 +405,8 @@ router.put("/expenses/:id", guardWrite, (req, res) => {
 });
 
 router.delete("/expenses/:id", guardWrite, (req, res) => {
-  const removeExpense = db.transaction(() => {
-    db.prepare("DELETE FROM online_import_items WHERE record_type = 'expense' AND record_id = ?").run(req.params.id);
-    return db.prepare("DELETE FROM online_cash_expenses WHERE id = ?").run(req.params.id);
-  });
-  const info = removeExpense();
+  db.prepare("DELETE FROM online_import_items WHERE record_type = 'expense' AND record_id = ?").run(req.params.id);
+  const info = db.prepare("DELETE FROM online_cash_expenses WHERE id = ?").run(req.params.id);
   if (!info.changes) return res.status(404).json({ error: "Expense not found" });
   res.status(204).end();
 });

@@ -73,11 +73,8 @@ router.put("/locations/:id", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
   const current = db.prepare("SELECT * FROM maintenance_locations WHERE id = ?").get(req.params.id);
   if (!current) return res.status(404).json({ error: "Not found" });
   try {
-    let updatedTickets = 0;
-    db.transaction(() => {
-      db.prepare("UPDATE maintenance_locations SET name = ? WHERE id = ?").run(name, req.params.id);
-      updatedTickets = db.prepare("UPDATE maintenance SET location = ? WHERE lower(location) = lower(?)").run(name, current.name).changes;
-    })();
+    db.prepare("UPDATE maintenance_locations SET name = ? WHERE id = ?").run(name, req.params.id);
+    const updatedTickets = db.prepare("UPDATE maintenance SET location = ? WHERE lower(location) = lower(?)").run(name, current.name).changes;
     res.json({ ...db.prepare("SELECT * FROM maintenance_locations WHERE id = ?").get(req.params.id), updated_tickets: updatedTickets });
   } catch {
     res.status(400).json({ error: "That place is already on the list" });
@@ -111,11 +108,8 @@ router.put("/parts-catalog/:id", requireRole(...FULL_ACCESS), (req, res) => {
   const current = db.prepare("SELECT * FROM parts_catalog WHERE id = ?").get(req.params.id);
   if (!current) return res.status(404).json({ error: "Not found" });
   try {
-    let updatedRecords = 0;
-    db.transaction(() => {
-      db.prepare("UPDATE parts_catalog SET part_name = ?, description = ? WHERE id = ?").run(part_name.trim(), description?.trim() || null, req.params.id);
-      updatedRecords = db.prepare("UPDATE maintenance_parts SET part_name = ? WHERE lower(part_name) = lower(?)").run(part_name.trim(), current.part_name).changes;
-    })();
+    db.prepare("UPDATE parts_catalog SET part_name = ?, description = ? WHERE id = ?").run(part_name.trim(), description?.trim() || null, req.params.id);
+    const updatedRecords = db.prepare("UPDATE maintenance_parts SET part_name = ? WHERE lower(part_name) = lower(?)").run(part_name.trim(), current.part_name).changes;
     res.json({ ...db.prepare("SELECT * FROM parts_catalog WHERE id = ?").get(req.params.id), updated_records: updatedRecords });
   } catch { res.status(400).json({ error: "That part already exists" }); }
 });

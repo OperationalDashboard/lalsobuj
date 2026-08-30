@@ -386,12 +386,9 @@ router.put("/:id/pair", requireRole(...FULL_ACCESS, ROLES.ACCOUNTS), (req, res) 
   }
   const groupId = Math.min(a.id, b.id);
   const rotationNo = Math.min(a.rotation_no, b.rotation_no);
-  const tx = db.transaction(() => {
-    db.prepare("UPDATE trips SET group_id = ?, rotation_no = ?, leg_no = 1 WHERE id = ?").run(groupId, rotationNo, groupId);
-    const otherId = groupId === a.id ? b.id : a.id;
-    db.prepare("UPDATE trips SET group_id = ?, rotation_no = ?, leg_no = 2 WHERE id = ?").run(groupId, rotationNo, otherId);
-  });
-  tx();
+  db.prepare("UPDATE trips SET group_id = ?, rotation_no = ?, leg_no = 1 WHERE id = ?").run(groupId, rotationNo, groupId);
+  const otherId = groupId === a.id ? b.id : a.id;
+  db.prepare("UPDATE trips SET group_id = ?, rotation_no = ?, leg_no = 2 WHERE id = ?").run(groupId, rotationNo, otherId);
   res.json({ paired: true, group_id: groupId });
 });
 
@@ -456,8 +453,7 @@ router.post(
     const update = db.prepare(
       "UPDATE trips SET accounts_status = 'done', accounts_closed_by = ?, accounts_closed_at = datetime('now') WHERE group_id = (SELECT group_id FROM trips WHERE id = ?) AND accounts_status = 'open'"
     );
-    const tx = db.transaction((ids) => ids.map((id) => update.run(req.user.id, id).changes));
-    const results = tx(trip_ids);
+    const results = trip_ids.map((id) => update.run(req.user.id, id).changes);
     res.json({ closed: results.reduce((s, c) => s + c, 0) });
   }
 );
@@ -486,12 +482,9 @@ router.delete("/:id/permanent", requireRole(...FULL_ACCESS), (req, res) => {
   if (!trip) return res.status(404).json({ error: "Not found" });
   const ids = db.prepare("SELECT id FROM trips WHERE group_id = ?").all(trip.group_id).map((r) => r.id);
   const marks = ids.map(() => "?").join(",");
-  const remove = db.transaction(() => {
-    db.prepare(`DELETE FROM rotations WHERE trip_id IN (${marks})`).run(...ids);
-    db.prepare(`DELETE FROM transactions WHERE trip_id IN (${marks})`).run(...ids);
-    db.prepare("DELETE FROM trips WHERE group_id = ?").run(trip.group_id);
-  });
-  remove();
+  db.prepare(`DELETE FROM rotations WHERE trip_id IN (${marks})`).run(...ids);
+  db.prepare(`DELETE FROM transactions WHERE trip_id IN (${marks})`).run(...ids);
+  db.prepare("DELETE FROM trips WHERE group_id = ?").run(trip.group_id);
   res.status(204).end();
 });
 

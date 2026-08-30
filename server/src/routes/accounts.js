@@ -32,10 +32,8 @@ router.put("/expense-places/:id", guardWrite, (req, res) => {
   const current = db.prepare("SELECT * FROM expense_places WHERE id = ?").get(req.params.id);
   if (!current) return res.status(404).json({ error: "Not found" });
   try {
-    db.transaction(() => {
-      db.prepare("UPDATE expense_places SET name = ? WHERE id = ?").run(name, req.params.id);
-      db.prepare("UPDATE transactions SET place_name = ? WHERE lower(place_name) = lower(?)").run(name, current.name);
-    })();
+    db.prepare("UPDATE expense_places SET name = ? WHERE id = ?").run(name, req.params.id);
+    db.prepare("UPDATE transactions SET place_name = ? WHERE lower(place_name) = lower(?)").run(name, current.name);
     res.json(db.prepare("SELECT * FROM expense_places WHERE id = ?").get(req.params.id));
   } catch { res.status(400).json({ error: "That place already exists" }); }
 });
@@ -46,7 +44,10 @@ router.delete("/expense-places/:id", guardWrite, (req, res) => {
 });
 router.get("/expense-types", (req, res) => {
   const existing = db.prepare("SELECT COUNT(*) AS c FROM expense_types").get();
-  if (!existing.c) db.transaction(() => ["Counter Rent", "Counter Staff Salary", "Counter Electricity Bill"].forEach((name) => db.prepare("INSERT OR IGNORE INTO expense_types (name) VALUES (?)").run(name)))();
+  if (!existing.c) {
+    const insertDefault = db.prepare("INSERT OR IGNORE INTO expense_types (name) VALUES (?)");
+    ["Counter Rent", "Counter Staff Salary", "Counter Electricity Bill"].forEach((name) => insertDefault.run(name));
+  }
   res.json(db.prepare("SELECT * FROM expense_types ORDER BY name").all());
 });
 router.post("/expense-types", guardWrite, (req, res) => {
@@ -209,7 +210,7 @@ router.post("/", guardWrite, (req, res) => {
   if (apply_to_both && trip_id) {
     const legs = db.prepare("SELECT id FROM trips WHERE group_id = (SELECT group_id FROM trips WHERE id = ?)").all(trip_id);
     if (legs.length !== 2) return res.status(400).json({ error: "Both legs are not available for this rotation" });
-    const results = db.transaction(() => legs.map((leg) => add(leg.id, both_leg_amounts?.[leg.id] ?? amount)))();
+    const results = legs.map((leg) => add(leg.id, both_leg_amounts?.[leg.id] ?? amount));
     info = results[0];
   } else info = add(trip_id);
   res.status(201).json(db.prepare("SELECT * FROM transactions WHERE id = ?").get(info.lastInsertRowid));

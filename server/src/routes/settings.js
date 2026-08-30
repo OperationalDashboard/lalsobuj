@@ -134,11 +134,8 @@ router.put("/bus-classes", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
     const oldName = classes[index];
     const next = [...classes];
     next[index] = newName;
-    let updatedBuses = 0;
-    db.transaction(() => {
-      saveSetting("bus_class_types", JSON.stringify(next));
-      updatedBuses = db.prepare("UPDATE buses SET class_type = ? WHERE lower(class_type) = lower(?)").run(newName, oldName).changes;
-    })();
+    saveSetting("bus_class_types", JSON.stringify(next));
+    const updatedBuses = db.prepare("UPDATE buses SET class_type = ? WHERE lower(class_type) = lower(?)").run(newName, oldName).changes;
     return res.json({ bus_classes: next, updated_buses: updatedBuses });
   }
 
