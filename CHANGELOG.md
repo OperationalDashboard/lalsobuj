@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.2.1 — 2026-08-30
+
+- Added Online Accounts to the Users & Permissions module checklist so it can be granted to any built-in or custom role.
+- Added separate View and Edit enforcement in both the interface and server API.
+- Fixed granted modules not appearing in the sidebar for several built-in roles.
+- Changed unsaved permission rows to correctly default to no access; enabling Edit now automatically enables View.
+
 ## 1.2.0 — 2026-08-30
 
 - Added a standalone Online Accounts module for Super Admin, Admin, and the new Online Manager role.

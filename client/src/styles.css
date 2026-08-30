@@ -887,6 +887,7 @@ table button { white-space: nowrap; }
 .online-module-tabs button:hover { color: var(--ink); background: var(--bg-soft); }
 .online-module-tabs button.active { color: #fff; background: linear-gradient(135deg, #078147, var(--green)); box-shadow: 0 5px 13px rgba(4,106,56,.2); }
 .online-notice { margin: -5px 0 16px; }
+.online-read-only-note { margin: -5px 0 16px; padding: 10px 12px; color: var(--muted); background: color-mix(in srgb, var(--green) 6%, var(--card)); border: 1px solid color-mix(in srgb, var(--green) 20%, var(--border)); border-radius: 9px; font-size: .78rem; font-weight: 650; }
 
 .online-day-toolbar, .online-report-toolbar { margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 22px; }
 .online-day-toolbar h3, .online-report-toolbar h3 { margin: 0; font: 800 1.2rem "Manrope", sans-serif; letter-spacing: -.035em; }

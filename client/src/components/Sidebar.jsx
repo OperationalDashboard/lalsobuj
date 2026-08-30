@@ -12,6 +12,7 @@ const MODULE_ROUTES = {
   rotations: { to: "/rotation", key: "rotation" },
   attendance: { to: "/attendance", key: "time_management" },
   accounts: { to: "/accounts", key: "accounts" },
+  online_accounts: { to: "/online-accounts", label: "Online Accounts" },
   maintenance: { to: "/maintenance", key: "maintenance" },
 };
 const NAV_ICONS = { "/": "home", "/live-activity": "pulse", "/accounts": "wallet", "/online-accounts": "cloud", "/rotation": "rotate", "/attendance": "clock", "/staff": "people", "/buses": "bus", "/routes": "route", "/counters": "pin", "/maintenance": "tool", "/reports": "chart", "/salary": "money", "/trash": "trash", "/chat": "chat", "/users": "shield", "/settings": "gear" };
@@ -39,6 +40,18 @@ function NavIcon({ name }) {
 // get everything; other built-in roles get just what their job needs.
 // Custom roles are built dynamically from their granted permissions
 // (passed in as `permissions`, fetched from /auth/me).
+function withGrantedLinks(links, permissions) {
+  if (!permissions) return links;
+  const next = [...links];
+  Object.entries(permissions).forEach(([module, grant]) => {
+    const route = MODULE_ROUTES[module];
+    if (grant.can_read && route && !next.some((link) => link.to === route.to)) {
+      next.push({ to: route.to, label: route.label || t(route.key) });
+    }
+  });
+  return next;
+}
+
 function linksFor(role, permissions) {
   if (isFullAccess(role)) {
     return [
@@ -62,49 +75,49 @@ function linksFor(role, permissions) {
     ];
   }
   if (role === ROLES.MONITOR) {
-    return [
+    return withGrantedLinks([
       { to: "/reports", label: t("reports"), end: true },
       { to: "/chat", label: t("chat_box") },
-    ];
+    ], permissions);
   }
   if (role === ROLES.ACCOUNTS) {
-    return [
+    return withGrantedLinks([
       { to: "/accounts", label: t("accounts"), end: true },
       { to: "/chat", label: t("chat_box") },
-    ];
+    ], permissions);
   }
   if (role === ROLES.ONLINE_MANAGER) {
-    return [
+    return withGrantedLinks([
       { to: "/online-accounts", label: "Online Accounts", end: true },
       { to: "/chat", label: t("chat_box") },
-    ];
+    ], permissions);
   }
   if (role === ROLES.MAINTENANCE) {
-    return [
+    return withGrantedLinks([
       { to: "/maintenance", label: t("maintenance"), end: true },
       { to: "/buses", label: t("buses") },
       { to: "/chat", label: t("chat_box") },
-    ];
+    ], permissions);
   }
   if (role === ROLES.CONTROL_COUNTER) {
-    return [
+    return withGrantedLinks([
       { to: "/live-activity", label: t("live_activity"), end: true },
       { to: "/rotation", label: t("rotation") },
       { to: "/routes", label: t("routes") },
       { to: "/chat", label: t("chat_box") },
-    ];
+    ], permissions);
   }
   if (role === ROLES.COUNTER || role === ROLES.PASSENGER_CHECKER) {
-    return [
+    return withGrantedLinks([
       { to: "/live-activity", label: t("live_activity"), end: true },
       { to: "/chat", label: t("chat_box") },
-    ];
+    ], permissions);
   }
   if (role === ROLES.HOTEL || role === ROLES.PUMP_MANAGER || role === ROLES.DRIVER || role === ROLES.HELPER) {
-    return [
+    return withGrantedLinks([
       { to: "/live-activity", label: t("live_activity"), end: true },
       { to: "/chat", label: t("chat_box") },
-    ];
+    ], permissions);
   }
 
   // Custom role: build links from whatever modules Admin granted read
@@ -113,14 +126,7 @@ function linksFor(role, permissions) {
     { to: "/live-activity", label: t("live_activity"), end: true },
     { to: "/chat", label: t("chat_box") },
   ];
-  if (permissions) {
-    Object.entries(permissions).forEach(([module, grant]) => {
-      if (grant.can_read && MODULE_ROUTES[module]) {
-        links.push({ to: MODULE_ROUTES[module].to, label: t(MODULE_ROUTES[module].key) });
-      }
-    });
-  }
-  return links;
+  return withGrantedLinks(links, permissions);
 }
 
 export default function Sidebar({ isOpen = false, onNavigate = () => {} }) {

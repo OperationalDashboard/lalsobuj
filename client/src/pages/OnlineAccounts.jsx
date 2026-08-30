@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "../api.js";
+import { api, getUser } from "../api.js";
+import { ROLES, isFullAccess } from "../roles.js";
 
 const today = () => {
   const now = new Date();
@@ -44,7 +45,7 @@ function Field({ label, children, className = "" }) {
   return <label className={`online-field ${className}`}><span>{label}</span>{children}</label>;
 }
 
-function EntryTable({ rows, type, onEdit, onDelete }) {
+function EntryTable({ rows, type, onEdit, onDelete, canWrite }) {
   const isOnline = type === "online";
   return (
     <div className="online-table-scroll">
@@ -53,7 +54,7 @@ function EntryTable({ rows, type, onEdit, onDelete }) {
           {isOnline && <th>Platform</th>}
           <th>Coach</th><th>Bus</th>
           {isOnline ? <><th>Normal</th><th>Long</th><th>Total</th></> : <th>Passengers</th>}
-          <th>Sale</th><th>Actions</th>
+          <th>Sale</th>{canWrite && <th>Actions</th>}
         </tr></thead>
         <tbody>
           {rows.map((row) => <tr key={row.id}>
@@ -62,9 +63,9 @@ function EntryTable({ rows, type, onEdit, onDelete }) {
             <td>{row.bus_number}</td>
             {isOnline ? <><td>{row.normal_passengers}</td><td>{row.long_passengers}</td><td><strong>{row.passenger_count}</strong></td></> : <td>{row.passenger_count}</td>}
             <td><strong>{money(row.amount)}</strong></td>
-            <td><div className="online-row-actions"><button type="button" className="settings-edit-button" onClick={() => onEdit(row)}>Edit</button><button type="button" className="link-danger" onClick={() => onDelete(row.id)}>Delete</button></div></td>
+            {canWrite && <td><div className="online-row-actions"><button type="button" className="settings-edit-button" onClick={() => onEdit(row)}>Edit</button><button type="button" className="link-danger" onClick={() => onDelete(row.id)}>Delete</button></div></td>}
           </tr>)}
-          {rows.length === 0 && <tr><td colSpan={isOnline ? 8 : 5}>No {isOnline ? "online" : "cash"} entries for this date.</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={isOnline ? (canWrite ? 8 : 7) : (canWrite ? 5 : 4)}>No {isOnline ? "online" : "cash"} entries for this date.</td></tr>}
         </tbody>
       </table>
     </div>
@@ -72,6 +73,8 @@ function EntryTable({ rows, type, onEdit, onDelete }) {
 }
 
 export default function OnlineAccounts() {
+  const user = getUser();
+  const canWrite = isFullAccess(user?.role) || user?.role === ROLES.ONLINE_MANAGER || Boolean(user?.permissions?.online_accounts?.can_write);
   const [view, setView] = useState("daily");
   const [selectedDate, setSelectedDate] = useState(today());
   const [entries, setEntries] = useState([]);
@@ -407,6 +410,7 @@ export default function OnlineAccounts() {
     </div>
     {error && <p className="error-text online-notice">{error}</p>}
     {message && <p className="success-text online-notice">{message}</p>}
+    {!canWrite && <p className="online-read-only-note">View-only access: an Admin can enable Edit permission from Users & Permissions.</p>}
 
     {view === "daily" && <>
       <div className="online-day-toolbar card">
@@ -424,7 +428,7 @@ export default function OnlineAccounts() {
       <div className="online-entry-grid">
         <section className="card online-entry-panel">
           <div className="online-panel-title"><div><span className="settings-eyebrow">DIGITAL SALES</span><h3>Website / Android App & iOS</h3><p>Normal and Long passengers are counted separately.</p></div><span className="online-panel-number">01</span></div>
-          <form className="online-form-grid" onSubmit={(event) => saveEntry(event, "online")}>
+          {canWrite && <form className="online-form-grid" onSubmit={(event) => saveEntry(event, "online")}>
             <Field label="Platform"><select value={onlineForm.channel} onChange={(event) => setOnlineForm({ ...onlineForm, channel: event.target.value })}><option value="website_android">Website / Android App</option><option value="ios">iOS</option></select></Field>
             <Field label="Entry date"><input type="date" value={onlineForm.entry_date} onChange={(event) => setOnlineForm({ ...onlineForm, entry_date: event.target.value })} required /></Field>
             <Field label="Coach number"><input value={onlineForm.coach_number} onChange={(event) => setOnlineForm({ ...onlineForm, coach_number: event.target.value })} placeholder="Coach number" required /></Field>
@@ -433,27 +437,27 @@ export default function OnlineAccounts() {
             <Field label="Long passengers"><input type="number" min="0" step="1" value={onlineForm.long_passengers} onChange={(event) => setOnlineForm({ ...onlineForm, long_passengers: event.target.value })} placeholder="0" required /></Field>
             <Field label="Sale amount (BDT)" className="wide"><input type="number" min="0" step="0.01" value={onlineForm.amount} onChange={(event) => setOnlineForm({ ...onlineForm, amount: event.target.value })} placeholder="0.00" required /></Field>
             <div className="online-form-actions wide"><button className="primary" type="submit">{editingOnlineId ? "Update online entry" : "Add online entry"}</button>{editingOnlineId && <button type="button" className="settings-edit-button" onClick={() => { setEditingOnlineId(null); setOnlineForm(onlineBlank(selectedDate)); }}>Cancel edit</button>}</div>
-          </form>
-          <EntryTable rows={onlineEntries} type="online" onEdit={editEntry} onDelete={deleteEntry} />
+          </form>}
+          <EntryTable rows={onlineEntries} type="online" onEdit={editEntry} onDelete={deleteEntry} canWrite={canWrite} />
         </section>
 
         <section className="card online-entry-panel cash-panel">
           <div className="online-panel-title"><div><span className="settings-eyebrow">CASH SALES</span><h3>Manual cash collection</h3><p>Enter the total passenger count exactly as received.</p></div><span className="online-panel-number">02</span></div>
-          <form className="online-form-grid" onSubmit={(event) => saveEntry(event, "cash")}>
+          {canWrite && <form className="online-form-grid" onSubmit={(event) => saveEntry(event, "cash")}>
             <Field label="Entry date" className="wide"><input type="date" value={cashForm.entry_date} onChange={(event) => setCashForm({ ...cashForm, entry_date: event.target.value })} required /></Field>
             <Field label="Coach number"><input value={cashForm.coach_number} onChange={(event) => setCashForm({ ...cashForm, coach_number: event.target.value })} placeholder="Coach number" required /></Field>
             <Field label="Bus number"><input value={cashForm.bus_number} onChange={(event) => setCashForm({ ...cashForm, bus_number: event.target.value })} placeholder="Bus number" required /></Field>
             <Field label="Total passengers"><input type="number" min="0" step="1" value={cashForm.passenger_count} onChange={(event) => setCashForm({ ...cashForm, passenger_count: event.target.value })} placeholder="0" required /></Field>
             <Field label="Cash sale (BDT)"><input type="number" min="0" step="0.01" value={cashForm.amount} onChange={(event) => setCashForm({ ...cashForm, amount: event.target.value })} placeholder="0.00" required /></Field>
             <div className="online-form-actions wide"><button className="primary" type="submit">{editingCashId ? "Update cash entry" : "Add cash entry"}</button>{editingCashId && <button type="button" className="settings-edit-button" onClick={() => { setEditingCashId(null); setCashForm(cashBlank(selectedDate)); }}>Cancel edit</button>}</div>
-          </form>
-          <EntryTable rows={cashEntries} type="cash" onEdit={editEntry} onDelete={deleteEntry} />
+          </form>}
+          <EntryTable rows={cashEntries} type="cash" onEdit={editEntry} onDelete={deleteEntry} canWrite={canWrite} />
         </section>
       </div>
 
       <section className="card online-expense-panel">
         <div className="online-panel-title"><div><span className="settings-eyebrow">DAILY CASH COSTS</span><h3>Expenses</h3><p>Every entry is grouped by category in the final report.</p></div><span className="online-panel-number">03</span></div>
-        <div className="online-expense-layout">
+        {canWrite && <div className="online-expense-layout">
           <form className="online-form-grid online-expense-form" onSubmit={saveExpense}>
             <Field label="Expense category" className="wide"><select value={expenseForm.category_id} onChange={(event) => setExpenseForm({ ...expenseForm, category_id: event.target.value })} required><option value="">Choose category</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}{Number(category.active) ? "" : " (archived)"}</option>)}</select></Field>
             <Field label="Expense date" className="wide"><input type="date" value={expenseForm.expense_date} onChange={(event) => setExpenseForm({ ...expenseForm, expense_date: event.target.value })} required /></Field>
@@ -474,11 +478,11 @@ export default function OnlineAccounts() {
               </div>)}
             </div>
           </div>
-        </div>
+        </div>}
         <div className="online-table-scroll">
-          <table><thead><tr><th>Category</th><th>Note</th><th>Amount</th><th>Actions</th></tr></thead><tbody>
-            {expenses.map((expense) => <tr key={expense.id}><td><strong>{expense.category_name}</strong></td><td>{expense.description || "—"}</td><td><strong>{money(expense.amount)}</strong></td><td><div className="online-row-actions"><button type="button" className="settings-edit-button" onClick={() => editExpense(expense)}>Edit</button><button type="button" className="link-danger" onClick={() => deleteExpense(expense.id)}>Delete</button></div></td></tr>)}
-            {expenses.length === 0 && <tr><td colSpan="4">No expenses for this date.</td></tr>}
+          <table><thead><tr><th>Category</th><th>Note</th><th>Amount</th>{canWrite && <th>Actions</th>}</tr></thead><tbody>
+            {expenses.map((expense) => <tr key={expense.id}><td><strong>{expense.category_name}</strong></td><td>{expense.description || "—"}</td><td><strong>{money(expense.amount)}</strong></td>{canWrite && <td><div className="online-row-actions"><button type="button" className="settings-edit-button" onClick={() => editExpense(expense)}>Edit</button><button type="button" className="link-danger" onClick={() => deleteExpense(expense.id)}>Delete</button></div></td>}</tr>)}
+            {expenses.length === 0 && <tr><td colSpan={canWrite ? 4 : 3}>No expenses for this date.</td></tr>}
           </tbody></table>
         </div>
       </section>

@@ -1,13 +1,24 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireRole } = require("../middleware/auth");
-const { FULL_ACCESS, ROLES } = require("../roles");
+const { requireAuth, requireModulePermission } = require("../middleware/auth");
+const { ROLES } = require("../roles");
 
 const router = express.Router();
 const CHANNELS = ["website_android", "ios", "cash"];
-const ACCESS_ROLES = [...FULL_ACCESS, ROLES.ONLINE_MANAGER];
 
-router.use(requireAuth, requireRole(...ACCESS_ROLES));
+router.use(requireAuth);
+
+function requireOnlineAccounts(mode) {
+  return (req, res, next) => {
+    // Online Manager keeps its built-in full access. Every other non-admin
+    // role is governed by the same role-permission matrix as other modules.
+    if (req.user?.role === ROLES.ONLINE_MANAGER) return next();
+    return requireModulePermission("online_accounts", mode)(req, res, next);
+  };
+}
+
+const guardRead = requireOnlineAccounts("read");
+const guardWrite = requireOnlineAccounts("write");
 
 function cleanDate(value, field = "date") {
   const date = String(value || "").trim();
@@ -71,7 +82,7 @@ function entryById(id) {
   ).get(id);
 }
 
-router.get("/entries", (req, res) => {
+router.get("/entries", guardRead, (req, res) => {
   try {
     const { from, to } = parseRange(req);
     const channel = req.query.channel ? String(req.query.channel) : "";
@@ -90,7 +101,7 @@ router.get("/entries", (req, res) => {
   }
 });
 
-router.post("/entries", (req, res) => {
+router.post("/entries", guardWrite, (req, res) => {
   try {
     const entry = parseEntry(req.body);
     const info = db.prepare(
@@ -104,7 +115,7 @@ router.post("/entries", (req, res) => {
   }
 });
 
-router.put("/entries/:id", (req, res) => {
+router.put("/entries/:id", guardWrite, (req, res) => {
   try {
     if (!entryById(req.params.id)) return res.status(404).json({ error: "Entry not found" });
     const entry = parseEntry(req.body);
@@ -119,13 +130,13 @@ router.put("/entries/:id", (req, res) => {
   }
 });
 
-router.delete("/entries/:id", (req, res) => {
+router.delete("/entries/:id", guardWrite, (req, res) => {
   const info = db.prepare("DELETE FROM online_sales_entries WHERE id = ?").run(req.params.id);
   if (!info.changes) return res.status(404).json({ error: "Entry not found" });
   res.status(204).end();
 });
 
-router.get("/expense-categories", (req, res) => {
+router.get("/expense-categories", guardRead, (req, res) => {
   const rows = db.prepare(
     `SELECT c.*, COUNT(e.id) AS expense_count, COALESCE(SUM(e.amount), 0) AS lifetime_total
      FROM online_expense_categories c
@@ -135,7 +146,7 @@ router.get("/expense-categories", (req, res) => {
   res.json(rows);
 });
 
-router.post("/expense-categories", (req, res) => {
+router.post("/expense-categories", guardWrite, (req, res) => {
   const name = String(req.body.name || "").trim();
   if (!name) return res.status(400).json({ error: "Category name required" });
   try {
@@ -146,7 +157,7 @@ router.post("/expense-categories", (req, res) => {
   }
 });
 
-router.put("/expense-categories/:id", (req, res) => {
+router.put("/expense-categories/:id", guardWrite, (req, res) => {
   const current = db.prepare("SELECT * FROM online_expense_categories WHERE id = ?").get(req.params.id);
   if (!current) return res.status(404).json({ error: "Category not found" });
   const name = req.body.name === undefined ? current.name : String(req.body.name || "").trim();
@@ -160,7 +171,7 @@ router.put("/expense-categories/:id", (req, res) => {
   }
 });
 
-router.delete("/expense-categories/:id", (req, res) => {
+router.delete("/expense-categories/:id", guardWrite, (req, res) => {
   const info = db.prepare("UPDATE online_expense_categories SET active = 0, updated_at = datetime('now') WHERE id = ?").run(req.params.id);
   if (!info.changes) return res.status(404).json({ error: "Category not found" });
   res.status(204).end();
@@ -189,7 +200,7 @@ function parseExpense(body) {
   };
 }
 
-router.get("/expenses", (req, res) => {
+router.get("/expenses", guardRead, (req, res) => {
   try {
     const { from, to } = parseRange(req);
     const rows = db.prepare(
@@ -207,7 +218,7 @@ router.get("/expenses", (req, res) => {
   }
 });
 
-router.post("/expenses", (req, res) => {
+router.post("/expenses", guardWrite, (req, res) => {
   try {
     const expense = parseExpense(req.body);
     const info = db.prepare(
@@ -220,7 +231,7 @@ router.post("/expenses", (req, res) => {
   }
 });
 
-router.put("/expenses/:id", (req, res) => {
+router.put("/expenses/:id", guardWrite, (req, res) => {
   try {
     if (!expenseById(req.params.id)) return res.status(404).json({ error: "Expense not found" });
     const expense = parseExpense(req.body);
@@ -234,13 +245,13 @@ router.put("/expenses/:id", (req, res) => {
   }
 });
 
-router.delete("/expenses/:id", (req, res) => {
+router.delete("/expenses/:id", guardWrite, (req, res) => {
   const info = db.prepare("DELETE FROM online_cash_expenses WHERE id = ?").run(req.params.id);
   if (!info.changes) return res.status(404).json({ error: "Expense not found" });
   res.status(204).end();
 });
 
-router.get("/report", (req, res) => {
+router.get("/report", guardRead, (req, res) => {
   try {
     const { from, to } = parseRange(req);
     const entries = db.prepare("SELECT * FROM online_sales_entries WHERE entry_date BETWEEN ? AND ? ORDER BY entry_date, id").all(from, to);

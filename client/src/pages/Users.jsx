@@ -6,7 +6,7 @@ const empty = { username: "", password: "", full_name: "", role: ROLES.CONTROL_C
 const newRoleEmpty = { slug: "", label: "" };
 const MODULE_LABELS = {
   buses: "Buses", staff: "Staff", rotations: "Rotation",
-  attendance: "Time Management", accounts: "Accounts", maintenance: "Maintenance",
+  attendance: "Time Management", accounts: "Accounts", online_accounts: "Online Accounts", maintenance: "Maintenance",
 };
 
 export default function Users() {
@@ -31,6 +31,7 @@ export default function Users() {
   const [newRole, setNewRole] = useState(newRoleEmpty);
   const [permsRole, setPermsRole] = useState("");
   const [perms, setPerms] = useState({});
+  const [permissionMessage, setPermissionMessage] = useState("");
 
   function load() {
     api.get("/auth/users").then(setUsers).catch(() => {});
@@ -128,17 +129,31 @@ export default function Users() {
   }
 
   function openPermissions(slug) {
+    setPermissionMessage("");
     setPermsRole(slug);
     api.get(`/roles/${slug}/permissions`).then(setPerms).catch(() => {});
   }
 
   function togglePerm(moduleName, field) {
-    setPerms((prev) => ({ ...prev, [moduleName]: { ...prev[moduleName], [field]: !prev[moduleName]?.[field] } }));
+    setPerms((prev) => {
+      const current = prev[moduleName] || { can_read: false, can_write: false };
+      const enabled = !current[field];
+      if (field === "can_write" && enabled) return { ...prev, [moduleName]: { can_read: true, can_write: true } };
+      if (field === "can_read" && !enabled) return { ...prev, [moduleName]: { can_read: false, can_write: false } };
+      return { ...prev, [moduleName]: { ...current, [field]: enabled } };
+    });
   }
 
   async function savePermissions() {
-    await api.put(`/roles/${permsRole}/permissions`, perms);
-    setPermsRole("");
+    setError("");
+    try {
+      await api.put(`/roles/${permsRole}/permissions`, perms);
+      setPermsRole("");
+      setPermissionMessage("Permissions saved. Users with this role should sign out and sign in again to refresh their menu.");
+      window.setTimeout(() => setPermissionMessage(""), 6000);
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   return (
@@ -149,6 +164,7 @@ export default function Users() {
           <p>Create staff logins, add new roles, and control what each role can do</p>
         </div>
       </div>
+      {permissionMessage && <p className="success-text" style={{ marginBottom: 16 }}>{permissionMessage}</p>}
 
       {currentUser?.role === ROLES.SUPER_ADMIN && (
         <div className="card" style={{ marginBottom: 20 }}>
@@ -253,7 +269,7 @@ export default function Users() {
       <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ marginTop: 0 }}>Custom roles</h3>
         <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 }}>
-          Create a role beyond the built-in ones, then set which modules it can view or edit below. Live Activity's checkpoint permissions (Control Counter / Counter / Passenger Checker) stay fixed and aren't affected here.
+          Create a role beyond the built-in ones, then set which modules it can view or edit below. Permissions apply to every user with that role; create a custom role when access should be limited to one person. Live Activity's checkpoint permissions stay fixed.
         </p>
         <form className="form-row" onSubmit={handleCreateRole}>
           <input placeholder="Internal name (e.g. regional_manager)" value={newRole.slug}
@@ -300,9 +316,9 @@ export default function Users() {
                   ))}
                 </tbody>
               </table>
-              {(permsRole === ROLES.ACCOUNTS || permsRole === ROLES.MAINTENANCE) && (
+              {(permsRole === ROLES.ACCOUNTS || permsRole === ROLES.MAINTENANCE || permsRole === ROLES.ONLINE_MANAGER) && (
                 <p style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
-                  Note: {roleLabel(permsRole)} already has full Accounts/Maintenance access built in — these checkboxes only add extra modules on top of that.
+                  Note: {roleLabel(permsRole)} already has full access to its own built-in work module — these checkboxes can add other modules on top of that.
                 </p>
               )}
               <button className="primary" style={{ marginTop: 10 }} onClick={savePermissions}>Save permissions</button>

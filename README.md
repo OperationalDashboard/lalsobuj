@@ -74,7 +74,7 @@ The current release is shown in the sidebar and under **Settings → System & Up
 | **Maintenance** | Logs repair tickets and parts for any bus, and can change a bus's active/maintenance/retired status. Cannot post a ticket's cost as an expense — that's Admin/Accounts. |
 | **Monitor** | Read-only. Lands on a Reports page — no create/edit/delete anywhere, including chat. |
 | **Online Manager** | Full add/edit/delete access only inside the standalone Online Accounts module. Its sales and expenses never post to the main Accounts or Reports modules. |
-| **Custom roles** (Admin-created) | Start with no access; Admin grants view/edit per module (Buses, Staff, Rotation, Time Management, Accounts, Maintenance) from Users & Permissions. Live Activity's checkpoint rules stay fixed regardless. |
+| **Custom roles** (Admin-created) | Start with no access; Admin grants view/edit per module (Buses, Staff, Rotation, Time Management, Accounts, Online Accounts, Maintenance) from Users & Permissions. Live Activity's checkpoint rules stay fixed regardless. |
 
 Every write endpoint enforces this server-side — the frontend just hides
 buttons a role can't use; it isn't the actual security boundary.
@@ -150,7 +150,7 @@ All routes except `/api/auth/login` and `/api/health` require
 
 - **Custom role permissions are module-level**, not field-level — a role
   either can or can't write to Buses/Staff/Rotation/Time Management/Accounts/
-  Maintenance as a whole. Live Activity's checkpoint rules (who can log what)
+  Online Accounts/Maintenance as a whole. Live Activity's checkpoint rules (who can log what)
   stay fixed in code since they're tied to the physical workflow.
 - **Language coverage**: the Bengali toggle currently translates navigation,
   page headers, and common buttons. Form field labels and table content are

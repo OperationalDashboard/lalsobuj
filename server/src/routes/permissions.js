@@ -8,7 +8,7 @@ router.use(requireAuth);
 
 // Modules whose write access can be granted via role_permissions.
 // (Live Activity's per-checkpoint rules stay fixed in activityLogs.js.)
-const PERMISSION_MODULES = ["buses", "staff", "rotations", "attendance", "accounts", "maintenance"];
+const PERMISSION_MODULES = ["buses", "staff", "rotations", "attendance", "accounts", "online_accounts", "maintenance"];
 
 // GET /api/roles — every role the system knows about (built-in + custom),
 // for populating role dropdowns.
@@ -50,8 +50,11 @@ router.delete("/:slug", requireRole(...FULL_ACCESS), (req, res) => {
 router.get("/:role/permissions", requireRole(...FULL_ACCESS), (req, res) => {
   const rows = db.prepare("SELECT module, can_read, can_write FROM role_permissions WHERE role = ?").all(req.params.role);
   const byModule = {};
-  PERMISSION_MODULES.forEach((m) => { byModule[m] = { can_read: true, can_write: false }; });
+  // No saved row means no access. This keeps the permission screen aligned
+  // with the server and with the documented "custom roles start empty" rule.
+  PERMISSION_MODULES.forEach((m) => { byModule[m] = { can_read: false, can_write: false }; });
   rows.forEach((r) => { byModule[r.module] = { can_read: !!r.can_read, can_write: !!r.can_write }; });
+  if (req.params.role === ROLES.ONLINE_MANAGER) byModule.online_accounts = { can_read: true, can_write: true };
   res.json(byModule);
 });
 
@@ -65,7 +68,9 @@ router.put("/:role/permissions", requireRole(...FULL_ACCESS), (req, res) => {
     for (const module of PERMISSION_MODULES) {
       const grant = grants[module];
       if (!grant) continue;
-      upsert.run(req.params.role, module, grant.can_read ? 1 : 0, grant.can_write ? 1 : 0);
+      const canWrite = Boolean(grant.can_write);
+      const canRead = Boolean(grant.can_read) || canWrite;
+      upsert.run(req.params.role, module, canRead ? 1 : 0, canWrite ? 1 : 0);
     }
   });
   tx(req.body || {});

@@ -69,7 +69,7 @@ export default function App() {
         <Route path="live-activity" element={<LiveActivity />} />
         <Route path="chat" element={<Chat />} />
         <Route path="accounts" element={<RoleGate allow={canSeeAccounts} moduleName="accounts"><Accounts /></RoleGate>} />
-        <Route path="online-accounts" element={<RoleGate allow={canSeeOnlineAccounts}><OnlineAccounts /></RoleGate>} />
+        <Route path="online-accounts" element={<RoleGate allow={canSeeOnlineAccounts} moduleName="online_accounts"><OnlineAccounts /></RoleGate>} />
         <Route path="rotation" element={<RoleGate allow={canSeeRotation} moduleName="rotations"><Rotation /></RoleGate>} />
         <Route path="attendance" element={<RoleGate allow={isFullAccess} moduleName="attendance"><Attendance /></RoleGate>} />
         <Route path="staff" element={<RoleGate allow={isFullAccess} moduleName="staff"><Staff /></RoleGate>} />
