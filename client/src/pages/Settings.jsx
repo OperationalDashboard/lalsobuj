@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api.js";
 
 const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
@@ -140,6 +141,17 @@ export default function Settings() {
     setExistingCounterIds([]);
     loadPlaceSettings();
   }
+  function toggleNewPlaceCounter(counterId) {
+    const id = String(counterId);
+    setExistingCounterIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  }
+  function toggleEditedPlaceCounter(counterId) {
+    const id = String(counterId);
+    setPlaceEdit((current) => ({
+      ...current,
+      counterIds: current.counterIds.includes(id) ? current.counterIds.filter((item) => item !== id) : [...current.counterIds, id],
+    }));
+  }
   async function removeExpensePlace(place) {
     if (!confirm(`Remove place '${place.name}'? Its counters will remain but no longer belong to this place. Existing account history is kept.`)) return;
     await api.del(`/accounts/expense-places/${place.id}`);
@@ -169,6 +181,8 @@ export default function Settings() {
   async function removeLocation(id) { await api.del(`/maintenance/locations/${id}`); loadLocations(); }
 
   if (!settings) return null;
+  const unassignedCounters = counters.filter((counter) => !counter.place_id);
+  const assignedCounterCount = counters.length - unassignedCounters.length;
 
   return (
     <div>
@@ -303,24 +317,120 @@ export default function Settings() {
         </table>
       </div>
 
-      <div className="card" style={{ marginTop: 20 }}>
-        <h3 style={{ marginTop: 0 }}>Place and counter setup</h3>
-        <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 }}>Create parent places for Place-wise Accounts, then optionally group existing counters under the correct place. Income and expenses are entered later from Accounts.</p>
-        <form className="form-row" onSubmit={addExpensePlace}>
-          <input placeholder="Parent place name (e.g. Dhaka)" value={newPlace} onChange={(e) => setNewPlace(e.target.value)} />
-          <select multiple value={existingCounterIds} onChange={(e) => setExistingCounterIds([...e.target.selectedOptions].map((option) => option.value))} title="Optional: assign existing counters under this place">
-            {counters.filter((counter) => !counter.place_id).map((counter) => <option key={counter.id} value={counter.id}>{counter.name}</option>)}
-          </select>
-          <button className="primary" type="submit">Add parent place</button>
-        </form>
-        <p style={{ color: "var(--muted)", fontSize: "0.78rem", marginTop: 0 }}>Use Ctrl (or Cmd) to select more than one existing counter. Counters can also be created from the Counters page.</p>
-        <table>
-          <thead><tr><th>Parent place</th><th>Counters</th><th></th></tr></thead>
-          <tbody>
-            {expensePlaces.map((place) => editingPlaceId === place.id ? <tr key={place.id}><td><input value={placeEdit.name} onChange={(e) => setPlaceEdit({ ...placeEdit, name: e.target.value })} /></td><td><select multiple value={placeEdit.counterIds} onChange={(e) => setPlaceEdit({ ...placeEdit, counterIds: [...e.target.selectedOptions].map((option) => option.value) })}>{counters.map((counter) => <option key={counter.id} value={counter.id}>{counter.name}</option>)}</select></td><td style={{ textAlign: "right" }}><button className="primary" onClick={() => savePlaceEdit(place)}>Save</button> <button className="link-danger" onClick={() => setEditingPlaceId(null)}>Cancel</button></td></tr> : <tr key={place.id}><td>{place.name}</td><td>{counters.filter((counter) => counter.place_id === place.id).map((counter) => counter.name).join(", ") || "No counter assigned"}</td><td style={{ textAlign: "right" }}><button className="link-danger" onClick={() => startPlaceEdit(place)}>Edit</button> <button className="link-danger" onClick={() => removeExpensePlace(place)}>Remove place</button></td></tr>)}
-            {expensePlaces.length === 0 && <tr><td colSpan={3}>No parent places added yet.</td></tr>}
-          </tbody>
-        </table>
+      <div className="card place-setup-card" style={{ marginTop: 20 }}>
+        <div className="place-setup-header">
+          <div>
+            <span className="settings-eyebrow">ACCOUNTS STRUCTURE</span>
+            <h3>Place &amp; counter setup</h3>
+            <p>Create a parent place, then choose which counters operate under it. These groups are used in Place-wise Accounts and staff cover rules.</p>
+          </div>
+          <div className="place-setup-stats" aria-label="Place and counter summary">
+            <span><strong>{expensePlaces.length}</strong> Places</span>
+            <span><strong>{assignedCounterCount}</strong> Assigned</span>
+            <span className={unassignedCounters.length ? "needs-attention" : ""}><strong>{unassignedCounters.length}</strong> Unassigned</span>
+          </div>
+        </div>
+
+        <section className="place-create-panel">
+          <div className="place-section-title">
+            <span className="place-step">1</span>
+            <div><strong>Create a parent place</strong><small>For example: Dhaka, Cumilla, or Chattogram</small></div>
+          </div>
+          <form className="place-create-form" onSubmit={addExpensePlace}>
+            <label className="place-name-field">
+              <span>Place name</span>
+              <input placeholder="Enter place name" value={newPlace} onChange={(e) => setNewPlace(e.target.value)} />
+            </label>
+            <div className="counter-picker">
+              <div className="counter-picker-heading">
+                <div><strong>Assign available counters</strong><small>Optional — tap any counter to select it</small></div>
+                <span>{existingCounterIds.length} selected</span>
+              </div>
+              <div className="counter-option-grid">
+                {unassignedCounters.map((counter) => {
+                  const selected = existingCounterIds.includes(String(counter.id));
+                  return <label key={counter.id} className={`counter-option${selected ? " selected" : ""}`}>
+                    <input type="checkbox" checked={selected} onChange={() => toggleNewPlaceCounter(counter.id)} />
+                    <span className="counter-check" aria-hidden="true">✓</span>
+                    <span><strong>{counter.name}</strong><small>{counter.location || "No location added"}</small></span>
+                  </label>;
+                })}
+                {unassignedCounters.length === 0 && <div className="counter-picker-empty">All existing counters are already assigned. You can move them by editing a place below.</div>}
+              </div>
+            </div>
+            <div className="place-create-actions">
+              <button className="primary" type="submit" disabled={!newPlace.trim()}>Create place</button>
+              <Link className="place-secondary-action" to="/counters">Manage counters</Link>
+            </div>
+          </form>
+        </section>
+
+        <div className="place-list-heading">
+          <div className="place-section-title">
+            <span className="place-step">2</span>
+            <div><strong>Review existing places</strong><small>Edit a place to move, add, or remove counters</small></div>
+          </div>
+        </div>
+
+        <div className="place-card-grid">
+          {expensePlaces.map((place) => {
+            const placeCounters = counters.filter((counter) => counter.place_id === place.id);
+            if (editingPlaceId === place.id) return <article key={place.id} className="place-card editing">
+              <div className="place-card-edit-heading">
+                <div><span className="place-card-icon" aria-hidden="true">⌖</span><strong>Edit place</strong></div>
+                <button type="button" className="place-close-button" aria-label="Cancel editing" onClick={() => setEditingPlaceId(null)}>×</button>
+              </div>
+              <label className="place-name-field">
+                <span>Place name</span>
+                <input value={placeEdit.name} onChange={(e) => setPlaceEdit({ ...placeEdit, name: e.target.value })} />
+              </label>
+              <div className="counter-picker compact">
+                <div className="counter-picker-heading">
+                  <div><strong>Counters in this place</strong><small>Selecting a counter from another place will move it here</small></div>
+                  <span>{placeEdit.counterIds.length} selected</span>
+                </div>
+                <div className="counter-option-grid">
+                  {counters.map((counter) => {
+                    const selected = placeEdit.counterIds.includes(String(counter.id));
+                    return <label key={counter.id} className={`counter-option${selected ? " selected" : ""}`}>
+                      <input type="checkbox" checked={selected} onChange={() => toggleEditedPlaceCounter(counter.id)} />
+                      <span className="counter-check" aria-hidden="true">✓</span>
+                      <span><strong>{counter.name}</strong><small>{counter.place_id === place.id ? "Currently here" : counter.place_name ? `Currently in ${counter.place_name}` : "Unassigned"}</small></span>
+                    </label>;
+                  })}
+                  {counters.length === 0 && <div className="counter-picker-empty">No counters have been created yet.</div>}
+                </div>
+              </div>
+              <div className="place-card-actions">
+                <button type="button" className="primary" disabled={!placeEdit.name.trim()} onClick={() => savePlaceEdit(place)}>Save changes</button>
+                <button type="button" className="place-secondary-action" onClick={() => setEditingPlaceId(null)}>Cancel</button>
+              </div>
+            </article>;
+
+            return <article key={place.id} className="place-card">
+              <div className="place-card-header">
+                <div className="place-card-title">
+                  <span className="place-card-icon" aria-hidden="true">⌖</span>
+                  <div><h4>{place.name}</h4><span>{placeCounters.length} counter{placeCounters.length === 1 ? "" : "s"}</span></div>
+                </div>
+                <div className="place-card-menu">
+                  <button type="button" onClick={() => startPlaceEdit(place)}>Edit</button>
+                  <button type="button" className="danger" onClick={() => removeExpensePlace(place)}>Remove</button>
+                </div>
+              </div>
+              <div className="place-counter-list">
+                {placeCounters.map((counter) => <span key={counter.id} className="place-counter-chip"><span aria-hidden="true">●</span>{counter.name}</span>)}
+                {placeCounters.length === 0 && <div className="place-empty-state"><strong>No counters assigned</strong><span>Use Edit to add an existing counter.</span></div>}
+              </div>
+            </article>;
+          })}
+          {expensePlaces.length === 0 && <div className="place-list-empty"><span aria-hidden="true">⌖</span><strong>No places yet</strong><p>Create your first parent place above to organize counters and accounts.</p></div>}
+        </div>
+
+        {unassignedCounters.length > 0 && <div className="unassigned-counter-note">
+          <div><strong>{unassignedCounters.length} counter{unassignedCounters.length === 1 ? " is" : "s are"} still unassigned</strong><span>{unassignedCounters.map((counter) => counter.name).join(", ")}</span></div>
+          <span>Assign them when creating or editing a place.</span>
+        </div>}
       </div>
 
       <div className="card" style={{ marginTop: 20 }}>
