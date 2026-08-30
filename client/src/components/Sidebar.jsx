@@ -101,7 +101,7 @@ function linksFor(role, permissions) {
   return links;
 }
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen = false, onNavigate = () => {} }) {
   const navigate = useNavigate();
   const user = getUser();
   const [lang, setLang] = useState(getLanguage());
@@ -123,6 +123,7 @@ export default function Sidebar() {
   function handleLogout() {
     setToken(null);
     setUser(null);
+    onNavigate();
     navigate("/login");
   }
 
@@ -131,7 +132,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="sidebar">
+    <aside id="app-sidebar" className={`sidebar${isOpen ? " mobile-open" : ""}`}>
       <div className="sidebar-brand" style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <BusIcon size={30} />
         <div>
@@ -145,6 +146,7 @@ export default function Sidebar() {
             key={l.to}
             to={l.to}
             end={l.end}
+            onClick={onNavigate}
             className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
           >
             <span className="nav-icon"><NavIcon name={NAV_ICONS[l.to]} /></span>{l.label}

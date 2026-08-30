@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar.jsx";
+import BusIcon from "./BusIcon.jsx";
 import { api } from "../api.js";
 import { getLanguage } from "../i18n.js";
 
@@ -12,6 +13,7 @@ import { getLanguage } from "../i18n.js";
 // so every page's text is recomputed under the new language too.
 export default function Layout() {
   const [lang, setLang] = useState(getLanguage());
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     const handler = () => setLang(getLanguage());
@@ -31,10 +33,47 @@ export default function Layout() {
     }).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (!navOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setNavOpen(false);
+    };
+    document.body.classList.add("mobile-nav-open");
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.classList.remove("mobile-nav-open");
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [navOpen]);
+
   return (
     <div className="app-shell">
-      <Sidebar />
-      <main className="main">
+      <header className="mobile-header">
+        <button
+          type="button"
+          className="mobile-menu-button"
+          aria-label="Open navigation menu"
+          aria-controls="app-sidebar"
+          aria-expanded={navOpen}
+          onClick={() => setNavOpen(true)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        <div className="mobile-brand">
+          <BusIcon size={28} />
+          <span>Lal Sabuj Paribahan</span>
+        </div>
+      </header>
+      <Sidebar isOpen={navOpen} onNavigate={() => setNavOpen(false)} />
+      <button
+        type="button"
+        className={`mobile-backdrop${navOpen ? " visible" : ""}`}
+        aria-label="Close navigation menu"
+        onClick={() => setNavOpen(false)}
+      />
+      <main className="main" id="main-content">
         <Outlet key={lang} />
       </main>
     </div>
