@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.9.0 — 2026-08-30
+
+- Added Driver, Helper, Supervisor, and Coach details to each rotation shown in Reports.
+- Added each leg's assigned crew to the expanded rotation view, including staff changes between outbound and return trips.
+- Gave the rotation and attendance report tables full-width rows so the added staff details remain clear and do not overlap financial columns.
+- Added a clear note for historical rotations that do not have bus staff recorded.
+
 ## 1.8.3 — 2026-08-30
 
 - Fixed the Turso server error that prevented counter staff salary amounts from posting to Place-wise Accounts.

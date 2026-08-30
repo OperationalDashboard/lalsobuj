@@ -111,8 +111,18 @@ router.get("/rotations", (req, res) => {
 
   const legs = db
     .prepare(
-      `SELECT t.*, b.reg_number
+      `SELECT t.*, b.reg_number,
+              duty.driver_id, driver.name AS driver_name,
+              duty.helper_id, helper.name AS helper_name,
+              duty.supervisor_id, supervisor.name AS supervisor_name,
+              duty.coach_id,
+              COALESCE(NULLIF(duty.coach_name, ''), coach.name) AS coach_name
        FROM trips t JOIN buses b ON b.id = t.bus_id
+       LEFT JOIN rotations duty ON duty.id = (SELECT MIN(r.id) FROM rotations r WHERE r.trip_id = t.id)
+       LEFT JOIN staff driver ON driver.id = duty.driver_id
+       LEFT JOIN staff helper ON helper.id = duty.helper_id
+       LEFT JOIN staff supervisor ON supervisor.id = duty.supervisor_id
+       LEFT JOIN staff coach ON coach.id = duty.coach_id
        WHERE ${clauses.join(" AND ")}
        ORDER BY t.bus_id ASC, t.group_id ASC, t.leg_no ASC`
     )

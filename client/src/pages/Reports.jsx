@@ -1,9 +1,27 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api } from "../api.js";
 import { t } from "../i18n.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const BUS_DESIGNATIONS = ["Driver", "Supervisor", "Bus Staff", "Helper", "Conductor", "Mechanic"];
+const ROTATION_STAFF_FIELDS = [
+  ["Driver", "driver_name"],
+  ["Helper", "helper_name"],
+  ["Supervisor", "supervisor_name"],
+  ["Coach", "coach_name"],
+];
+
+function RotationStaffDetails({ legs, compact = false }) {
+  const crew = ROTATION_STAFF_FIELDS.map(([label, field]) => {
+    const names = [...new Set(legs.map((leg) => leg[field]).filter(Boolean))];
+    return names.length ? { label, names: names.join(", ") } : null;
+  }).filter(Boolean);
+
+  if (!crew.length) return <span className="rotation-staff-empty">No bus staff recorded</span>;
+  return <div className={`rotation-staff-list${compact ? " compact" : ""}`}>
+    {crew.map((member) => <span key={member.label}><small>{member.label}</small><strong>{member.names}</strong></span>)}
+  </div>;
+}
 
 export default function Reports() {
   const [fromDate, setFromDate] = useState(today());
@@ -104,17 +122,17 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="grid grid-2" style={{ marginBottom: 20 }}>
+      <div className="grid reports-rotation-attendance-grid" style={{ marginBottom: 20 }}>
         <div className="card">
           <h3 style={{ marginTop: 0 }}>{t("buses_ran_rotation")} — {rangeLabel}</h3>
           <table>
             <thead><tr><th>{t("bus")}</th><th>{t("rotation_details")}</th><th>Passengers</th><th>{t("income")}</th><th>{t("expense")}</th><th>{t("net")}</th><th>{t("running_now")}</th></tr></thead>
             <tbody>
               {rotations.map((g) => (
-                <>
-                  <tr key={g.group_id} style={{ cursor: "pointer" }} onClick={() => setOpenGroupId(openGroupId === g.group_id ? null : g.group_id)}>
+                <Fragment key={g.group_id}>
+                  <tr style={{ cursor: "pointer" }} onClick={() => setOpenGroupId(openGroupId === g.group_id ? null : g.group_id)}>
                     <td><strong>{g.reg_number}</strong></td>
-                    <td>Rotation #{g.rotation_no} — {g.legs.length === 2 ? "2 legs" : "1 leg"} {openGroupId === g.group_id ? "▲" : "▼"}</td>
+                    <td><div className="rotation-report-details"><strong>Rotation #{g.rotation_no} — {g.legs.length === 2 ? "2 legs" : "1 leg"} {openGroupId === g.group_id ? "▲" : "▼"}</strong><RotationStaffDetails legs={g.legs} compact /></div></td>
                     <td>{g.passengers || 0}</td>
                     <td style={{ color: "var(--green)" }}>৳{g.income.toLocaleString()}</td>
                     <td style={{ color: "var(--red)" }}>৳{g.expense.toLocaleString()}</td>
@@ -125,12 +143,13 @@ export default function Reports() {
                     <tr>
                       <td colSpan={7} style={{ background: "var(--bg-soft, #f7f7f7)" }}>
                         <table>
-                          <thead><tr><th>Leg</th><th>{t("route")}</th><th>{t("departure_time")}</th><th>Arrival</th><th>Passengers</th><th>{t("income")}</th></tr></thead>
+                          <thead><tr><th>Leg</th><th>{t("route")}</th><th>Bus staff</th><th>{t("departure_time")}</th><th>Arrival</th><th>Passengers</th><th>{t("income")}</th></tr></thead>
                           <tbody>
                             {g.legs.map((leg) => (
                               <tr key={leg.id}>
                                 <td>{leg.leg_no === 1 ? t("leg1") : t("leg2")}</td>
                                 <td>{leg.route || "—"}</td>
+                                <td><RotationStaffDetails legs={[leg]} /></td>
                                 <td>{leg.departure_time || "—"}</td>
                                 <td>{leg.arrival_time || "—"}</td>
                                 <td>{leg.passengers || 0}</td>
@@ -157,7 +176,7 @@ export default function Reports() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
               {rotations.length === 0 && <tr><td colSpan={7}>{t("no_rotation_today")}</td></tr>}
             </tbody>
@@ -216,7 +235,7 @@ export default function Reports() {
         <h3 style={{ marginTop: 0 }}>Place-wise Accounts — {rangeLabel}</h3>
         <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 }}>Each parent place is summarized below. Open Details to see the separate counter-wise income, expenses, and posted staff salaries. These figures are included in the overall Report totals above.</p>
         <table><thead><tr><th>Place</th><th>Income</th><th>Expense</th><th>Net</th><th></th></tr></thead><tbody>
-          {[...new Set(placeFinance.map((row) => row.place_name))].map((place) => { const rows = placeFinance.filter((row) => row.place_name === place); const income = rows.filter((row) => row.type === "income").reduce((sum, row) => sum + row.amount, 0); const expense = rows.filter((row) => row.type === "expense").reduce((sum, row) => sum + row.amount, 0); return <><tr key={place}><td>{place}</td><td>৳{income.toLocaleString()}</td><td>৳{expense.toLocaleString()}</td><td>৳{(income - expense).toLocaleString()}</td><td><button className="link-danger" onClick={() => setOpenPlaceFinance(openPlaceFinance === place ? "" : place)}>Details</button></td></tr>{openPlaceFinance === place && <tr><td colSpan={5}><table><thead><tr><th>Date</th><th>Counter</th><th>Type</th><th>Amount</th><th>Details</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td>{row.txn_date}</td><td>{row.counter_name || "Whole place"}</td><td>{row.type}</td><td>৳{row.amount.toLocaleString()}</td><td>{row.description}</td></tr>)}</tbody></table></td></tr>}</>; })}
+          {[...new Set(placeFinance.map((row) => row.place_name))].map((place) => { const rows = placeFinance.filter((row) => row.place_name === place); const income = rows.filter((row) => row.type === "income").reduce((sum, row) => sum + row.amount, 0); const expense = rows.filter((row) => row.type === "expense").reduce((sum, row) => sum + row.amount, 0); return <Fragment key={place}><tr><td>{place}</td><td>৳{income.toLocaleString()}</td><td>৳{expense.toLocaleString()}</td><td>৳{(income - expense).toLocaleString()}</td><td><button className="link-danger" onClick={() => setOpenPlaceFinance(openPlaceFinance === place ? "" : place)}>Details</button></td></tr>{openPlaceFinance === place && <tr><td colSpan={5}><table><thead><tr><th>Date</th><th>Counter</th><th>Type</th><th>Amount</th><th>Details</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td>{row.txn_date}</td><td>{row.counter_name || "Whole place"}</td><td>{row.type}</td><td>৳{row.amount.toLocaleString()}</td><td>{row.description}</td></tr>)}</tbody></table></td></tr>}</Fragment>; })}
           {placeFinance.length === 0 && <tr><td colSpan={5}>No place-wise income or expense for this date range.</td></tr>}
         </tbody></table>
       </div>
