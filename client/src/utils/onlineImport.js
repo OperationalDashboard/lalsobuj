@@ -1,5 +1,5 @@
 const HEADER_PATTERNS = {
-  entry_date: /(^|\b)(date|day)(\b|$)/i,
+  entry_date: /(^|\b)(date|day|schedule|journey)(\b|$)/i,
   channel: /(^|\b)(platform|channel|source|medium)(\b|$)/i,
   coach_number: /(^|\b)(coach|coach\s*(number|no|#)?)(\b|$)/i,
   bus_number: /(^|\b)(bus|bus\s*(number|no|#)?|registration|reg\s*(number|no)?)(\b|$)/i,
@@ -18,7 +18,7 @@ export const IMPORT_DESTINATIONS = {
       ["entry_date", "Entry date"],
       ["channel", "Platform"],
       ["coach_number", "Coach number"],
-      ["bus_number", "Bus number"],
+      ["bus_number", "Bus number (optional)"],
       ["normal_passengers", "Normal passengers"],
       ["long_passengers", "Long passengers"],
       ["passenger_count", "Total passengers"],
@@ -30,7 +30,7 @@ export const IMPORT_DESTINATIONS = {
     fields: [
       ["entry_date", "Entry date"],
       ["coach_number", "Coach number"],
-      ["bus_number", "Bus number"],
+      ["bus_number", "Bus number (optional)"],
       ["passenger_count", "Total passengers"],
       ["amount", "Cash sale amount"],
     ],
@@ -251,13 +251,27 @@ function parseNumber(value) {
   return Number.isFinite(number) ? String(number) : cleanText(value);
 }
 
-function parseDate(value, fallback) {
-  const text = cleanText(value);
+export function parseImportDate(value, fallback) {
+  const bengaliDigits = "০১২৩৪৫৬৭৮৯";
+  const text = cleanText(value)
+    .replace(/[০-৯]/g, (digit) => String(bengaliDigits.indexOf(digit)))
+    .replace(/[‐‑‒–—−]/g, "-")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "");
   if (!text) return fallback;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
-  const match = text.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})$/);
+  const isoMatch = text.match(/(?:^|\D)(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})(?:\D|$)/);
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    const day = Number(isoMatch[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day) {
+      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+  const match = text.match(/(?:^|\D)(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})(?:\D|$)/);
   if (match) {
-    const year = match[3].length === 2 ? Number(`20${match[3]}`) : Number(match[3]);
+    const shortYear = Number(match[3]);
+    const year = match[3].length === 2 ? (shortYear >= 70 ? 1900 + shortYear : 2000 + shortYear) : shortYear;
     const month = Number(match[2]);
     const day = Number(match[1]);
     const date = new Date(Date.UTC(year, month - 1, day));
@@ -289,7 +303,7 @@ export function buildPreviewRows(table, mapping, destination, defaults, categori
       return {
         selected: true,
         sourceRow: (table.sourceStart || 2) + rowIndex,
-        entry_date: parseDate(values.entry_date, defaults.date),
+        entry_date: parseImportDate(values.entry_date, defaults.date),
         channel: parseChannel(values.channel, defaults.channel),
         coach_number: values.coach_number || "",
         bus_number: values.bus_number || "",
@@ -302,7 +316,7 @@ export function buildPreviewRows(table, mapping, destination, defaults, categori
       return {
         selected: true,
         sourceRow: (table.sourceStart || 2) + rowIndex,
-        entry_date: parseDate(values.entry_date, defaults.date),
+        entry_date: parseImportDate(values.entry_date, defaults.date),
         channel: "cash",
         coach_number: values.coach_number || "",
         bus_number: values.bus_number || "",
@@ -315,7 +329,7 @@ export function buildPreviewRows(table, mapping, destination, defaults, categori
     return {
       selected: true,
       sourceRow: (table.sourceStart || 2) + rowIndex,
-      expense_date: parseDate(values.expense_date, defaults.date),
+      expense_date: parseImportDate(values.expense_date, defaults.date),
       category_id: String(matchedCategory?.id || (suppliedCategory ? "" : defaults.categoryId) || ""),
       description: values.description || "",
       amount: parseNumber(values.amount),
@@ -329,7 +343,6 @@ export function validateImportRow(row, destination) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "")) errors.push("Enter a valid date");
   if (destination !== "expense") {
     if (!cleanText(row.coach_number)) errors.push("Coach number is required");
-    if (!cleanText(row.bus_number)) errors.push("Bus number is required");
     if (destination === "digital") {
       if (!["website", "android", "ios"].includes(row.channel)) errors.push("Choose a platform");
       if (![row.normal_passengers, row.long_passengers].every((value) => Number.isInteger(Number(value)) && Number(value) >= 0)) errors.push("Passenger counts must be whole numbers");

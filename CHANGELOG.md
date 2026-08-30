@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.3.1 — 2026-08-30
+
+- Fixed document-import dates so schedule headings and values such as `27-08-26` are recognized, converted to `2026-08-27`, and opened automatically after import.
+- Made Bus Number optional for Digital Sales, Cash Sales, editable import previews, and bulk imports.
+
 ## 1.3.0 — 2026-08-30
 
 - Added a configurable document importer to Online Accounts for searchable PDF tables, Excel (.xlsx), CSV, TSV, and text tables.

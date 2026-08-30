@@ -40,7 +40,7 @@ function parseEntry(body) {
   if (!ENTRY_CHANNELS.includes(channel)) throw new Error("Choose Website, Android App, iOS App, or Cash");
   const coachNumber = String(body.coach_number || "").trim();
   const busNumber = String(body.bus_number || "").trim();
-  if (!coachNumber || !busNumber) throw new Error("Coach number and bus number are required");
+  if (!coachNumber) throw new Error("Coach number is required");
 
   let normalPassengers = 0;
   let longPassengers = 0;

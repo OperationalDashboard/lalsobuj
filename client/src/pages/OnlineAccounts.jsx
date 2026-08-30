@@ -67,7 +67,7 @@ function EntryTable({ rows, type, onEdit, onDelete, canWrite }) {
           {rows.map((row) => <tr key={row.id}>
             {isOnline && <td><span className={`online-channel-badge ${row.channel}`}>{channelLabels[row.channel]}</span></td>}
             <td>{row.coach_number}</td>
-            <td>{row.bus_number}</td>
+            <td>{row.bus_number || "—"}</td>
             {isOnline ? <><td>{row.normal_passengers}</td><td>{row.long_passengers}</td><td><strong>{row.passenger_count}</strong></td></> : <td>{row.passenger_count}</td>}
             <td><strong>{money(row.amount)}</strong></td>
             {canWrite && <td><div className="online-row-actions"><button type="button" className="settings-edit-button" onClick={() => onEdit(row)}>Edit</button><button type="button" className="link-danger" onClick={() => onDelete(row.id)}>Delete</button></div></td>}
@@ -218,8 +218,8 @@ export default function OnlineAccounts() {
       setError("Choose Website or Android App for this older combined entry before saving.");
       return;
     }
-    if (!form.coach_number.trim() || !form.bus_number.trim() || form.amount === "") {
-      setError("Coach number, bus number, and amount are required.");
+    if (!form.coach_number.trim() || form.amount === "") {
+      setError("Coach number and amount are required.");
       return;
     }
     const payload = {
@@ -375,8 +375,13 @@ export default function OnlineAccounts() {
 
   async function handleImported(result) {
     setReport(null);
-    await Promise.all([loadDaily(selectedDate), loadCategories()]);
-    flash(`${result.imported} ${result.imported === 1 ? "entry" : "entries"} imported into Online Accounts.`);
+    if (result.imported_date && result.imported_date !== selectedDate) {
+      await loadCategories();
+      setSelectedDate(result.imported_date);
+    } else {
+      await Promise.all([loadDaily(selectedDate), loadCategories()]);
+    }
+    flash(`${result.imported} ${result.imported === 1 ? "entry" : "entries"} imported. Showing ${result.imported_date || selectedDate}.`);
   }
 
   function reportText() {
@@ -509,7 +514,7 @@ export default function OnlineAccounts() {
             <Field label="Platform"><select value={onlineForm.channel} onChange={(event) => setOnlineForm({ ...onlineForm, channel: event.target.value })}><option value="website">Website</option><option value="android">Android App</option><option value="ios">iOS App</option>{onlineForm.channel === "website_android" && <option value="website_android" disabled>Legacy combined — choose Website or Android</option>}</select></Field>
             <Field label="Entry date"><input type="date" value={onlineForm.entry_date} onChange={(event) => changeSectionDate("online", event.target.value)} required /></Field>
             <Field label="Coach number"><input value={onlineForm.coach_number} onChange={(event) => setOnlineForm({ ...onlineForm, coach_number: event.target.value })} placeholder="Coach number" required /></Field>
-            <Field label="Bus number"><input value={onlineForm.bus_number} onChange={(event) => setOnlineForm({ ...onlineForm, bus_number: event.target.value })} placeholder="Bus number" required /></Field>
+            <Field label="Bus number (optional)"><input value={onlineForm.bus_number} onChange={(event) => setOnlineForm({ ...onlineForm, bus_number: event.target.value })} placeholder="Optional bus number" /></Field>
             <Field label="Normal passengers"><input type="number" min="0" step="1" value={onlineForm.normal_passengers} onChange={(event) => setOnlineForm({ ...onlineForm, normal_passengers: event.target.value })} placeholder="0" required /></Field>
             <Field label="Long passengers"><input type="number" min="0" step="1" value={onlineForm.long_passengers} onChange={(event) => setOnlineForm({ ...onlineForm, long_passengers: event.target.value })} placeholder="0" required /></Field>
             <Field label="Sale amount (BDT)" className="wide"><input type="number" min="0" step="0.01" value={onlineForm.amount} onChange={(event) => setOnlineForm({ ...onlineForm, amount: event.target.value })} placeholder="0.00" required /></Field>
@@ -523,7 +528,7 @@ export default function OnlineAccounts() {
           {canWrite && <form className="online-form-grid" onSubmit={(event) => saveEntry(event, "cash")}>
             <Field label="Entry date" className="wide"><input type="date" value={cashForm.entry_date} onChange={(event) => changeSectionDate("cash", event.target.value)} required /></Field>
             <Field label="Coach number"><input value={cashForm.coach_number} onChange={(event) => setCashForm({ ...cashForm, coach_number: event.target.value })} placeholder="Coach number" required /></Field>
-            <Field label="Bus number"><input value={cashForm.bus_number} onChange={(event) => setCashForm({ ...cashForm, bus_number: event.target.value })} placeholder="Bus number" required /></Field>
+            <Field label="Bus number (optional)"><input value={cashForm.bus_number} onChange={(event) => setCashForm({ ...cashForm, bus_number: event.target.value })} placeholder="Optional bus number" /></Field>
             <Field label="Total passengers"><input type="number" min="0" step="1" value={cashForm.passenger_count} onChange={(event) => setCashForm({ ...cashForm, passenger_count: event.target.value })} placeholder="0" required /></Field>
             <Field label="Cash sale (BDT)"><input type="number" min="0" step="0.01" value={cashForm.amount} onChange={(event) => setCashForm({ ...cashForm, amount: event.target.value })} placeholder="0.00" required /></Field>
             <div className="online-form-actions wide"><button className="primary" type="submit" disabled={Boolean(savingEntry)} aria-busy={savingEntry === "cash"}><BusyButtonContent busy={savingEntry === "cash"} busyText={editingCashId ? "Updating cash entry…" : "Adding cash entry…"}>{editingCashId ? "Update cash entry" : "Add cash entry"}</BusyButtonContent></button>{editingCashId && <button type="button" className="settings-edit-button" disabled={Boolean(savingEntry)} onClick={() => { setEditingCashId(null); setCashForm(cashBlank(selectedDate)); }}>Cancel edit</button>}</div>

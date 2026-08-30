@@ -36,7 +36,7 @@ function ImportPreviewTable({ destination, rows, setRows, categories }) {
         <thead><tr>
           <th>Use</th><th>Source row</th><th>Date</th>
           {destination === "digital" && <th>Platform</th>}
-          {destination !== "expense" && <><th>Coach</th><th>Bus</th></>}
+          {destination !== "expense" && <><th>Coach</th><th>Bus (optional)</th></>}
           {destination === "digital" && <><th>Normal</th><th>Long</th></>}
           {destination === "cash" && <th>Passengers</th>}
           {destination === "expense" && <><th>Category</th><th>Note</th></>}
@@ -164,7 +164,10 @@ export default function OnlineAccountsImporter({ selectedDate, categories, onImp
       const result = await api.post("/online-accounts/import", { destination, rows });
       setNotice(`${result.imported} ${result.imported === 1 ? "entry" : "entries"} imported successfully.`);
       setPreviewRows([]);
-      await onImported?.(result);
+      await onImported?.({
+        ...result,
+        imported_date: destination === "expense" ? rows[0].expense_date : rows[0].entry_date,
+      });
     } catch (err) {
       setError(err.message);
     } finally {
