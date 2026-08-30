@@ -132,7 +132,11 @@ router.put("/entries/:id", guardWrite, (req, res) => {
 });
 
 router.delete("/entries/:id", guardWrite, (req, res) => {
-  const info = db.prepare("DELETE FROM online_sales_entries WHERE id = ?").run(req.params.id);
+  const removeEntry = db.transaction(() => {
+    db.prepare("DELETE FROM online_import_items WHERE record_type = 'sale' AND record_id = ?").run(req.params.id);
+    return db.prepare("DELETE FROM online_sales_entries WHERE id = ?").run(req.params.id);
+  });
+  const info = removeEntry();
   if (!info.changes) return res.status(404).json({ error: "Entry not found" });
   res.status(204).end();
 });
@@ -208,9 +212,12 @@ function cleanImportLabel(value, fallback, maximum = 180) {
 function importBatchById(id) {
   return db.prepare(
     `SELECT b.*, u.full_name AS created_by_name,
-       CASE WHEN b.destination = 'expense'
-         THEN (SELECT COUNT(*) FROM online_cash_expenses x WHERE x.import_batch_id = b.id)
-         ELSE (SELECT COUNT(*) FROM online_sales_entries e WHERE e.import_batch_id = b.id)
+       CASE WHEN b.destination = 'expense' THEN
+         (SELECT COUNT(*) FROM online_import_items i JOIN online_cash_expenses x ON x.id = i.record_id
+          WHERE i.batch_id = b.id AND i.record_type = 'expense')
+       ELSE
+         (SELECT COUNT(*) FROM online_import_items i JOIN online_sales_entries e ON e.id = i.record_id
+          WHERE i.batch_id = b.id AND i.record_type = 'sale')
        END AS current_count
      FROM online_import_batches b
      LEFT JOIN users u ON u.id = b.created_by
@@ -221,17 +228,26 @@ function importBatchById(id) {
 router.get("/imports", guardRead, (req, res) => {
   const rows = db.prepare(
     `SELECT b.*, u.full_name AS created_by_name,
-       CASE WHEN b.destination = 'expense'
-         THEN (SELECT COUNT(*) FROM online_cash_expenses x WHERE x.import_batch_id = b.id)
-         ELSE (SELECT COUNT(*) FROM online_sales_entries e WHERE e.import_batch_id = b.id)
+       CASE WHEN b.destination = 'expense' THEN
+         (SELECT COUNT(*) FROM online_import_items i JOIN online_cash_expenses x ON x.id = i.record_id
+          WHERE i.batch_id = b.id AND i.record_type = 'expense')
+       ELSE
+         (SELECT COUNT(*) FROM online_import_items i JOIN online_sales_entries e ON e.id = i.record_id
+          WHERE i.batch_id = b.id AND i.record_type = 'sale')
        END AS current_count,
-       CASE WHEN b.destination = 'expense'
-         THEN (SELECT MIN(x.expense_date) FROM online_cash_expenses x WHERE x.import_batch_id = b.id)
-         ELSE (SELECT MIN(e.entry_date) FROM online_sales_entries e WHERE e.import_batch_id = b.id)
+       CASE WHEN b.destination = 'expense' THEN
+         (SELECT MIN(x.expense_date) FROM online_import_items i JOIN online_cash_expenses x ON x.id = i.record_id
+          WHERE i.batch_id = b.id AND i.record_type = 'expense')
+       ELSE
+         (SELECT MIN(e.entry_date) FROM online_import_items i JOIN online_sales_entries e ON e.id = i.record_id
+          WHERE i.batch_id = b.id AND i.record_type = 'sale')
        END AS first_date,
-       CASE WHEN b.destination = 'expense'
-         THEN (SELECT MAX(x.expense_date) FROM online_cash_expenses x WHERE x.import_batch_id = b.id)
-         ELSE (SELECT MAX(e.entry_date) FROM online_sales_entries e WHERE e.import_batch_id = b.id)
+       CASE WHEN b.destination = 'expense' THEN
+         (SELECT MAX(x.expense_date) FROM online_import_items i JOIN online_cash_expenses x ON x.id = i.record_id
+          WHERE i.batch_id = b.id AND i.record_type = 'expense')
+       ELSE
+         (SELECT MAX(e.entry_date) FROM online_import_items i JOIN online_sales_entries e ON e.id = i.record_id
+          WHERE i.batch_id = b.id AND i.record_type = 'sale')
        END AS last_date
      FROM online_import_batches b
      LEFT JOIN users u ON u.id = b.created_by
@@ -247,13 +263,15 @@ router.get("/imports/:id", guardRead, (req, res) => {
   const rows = batch.destination === "expense"
     ? db.prepare(
       `SELECT e.*, c.name AS category_name
-       FROM online_cash_expenses e
+       FROM online_import_items i
+       JOIN online_cash_expenses e ON e.id = i.record_id
        JOIN online_expense_categories c ON c.id = e.category_id
-       WHERE e.import_batch_id = ? ORDER BY e.expense_date, e.id`
+       WHERE i.batch_id = ? AND i.record_type = 'expense' ORDER BY e.expense_date, e.id`
     ).all(batch.id)
     : db.prepare(
-      `SELECT * FROM online_sales_entries
-       WHERE import_batch_id = ? ORDER BY entry_date, id`
+      `SELECT e.* FROM online_import_items i
+       JOIN online_sales_entries e ON e.id = i.record_id
+       WHERE i.batch_id = ? AND i.record_type = 'sale' ORDER BY e.entry_date, e.id`
     ).all(batch.id);
   res.json({ batch, rows });
 });
@@ -263,8 +281,9 @@ router.delete("/imports/:id", guardWrite, (req, res) => {
   if (!batch) return res.status(404).json({ error: "Import not found" });
   const removeImport = db.transaction(() => {
     const removed = batch.destination === "expense"
-      ? db.prepare("DELETE FROM online_cash_expenses WHERE import_batch_id = ?").run(batch.id).changes
-      : db.prepare("DELETE FROM online_sales_entries WHERE import_batch_id = ?").run(batch.id).changes;
+      ? db.prepare("DELETE FROM online_cash_expenses WHERE id IN (SELECT record_id FROM online_import_items WHERE batch_id = ? AND record_type = 'expense')").run(batch.id).changes
+      : db.prepare("DELETE FROM online_sales_entries WHERE id IN (SELECT record_id FROM online_import_items WHERE batch_id = ? AND record_type = 'sale')").run(batch.id).changes;
+    db.prepare("DELETE FROM online_import_items WHERE batch_id = ?").run(batch.id);
     db.prepare("DELETE FROM online_import_batches WHERE id = ?").run(batch.id);
     return removed;
   });
@@ -298,20 +317,27 @@ router.post("/import", guardWrite, (req, res) => {
     );
     const insertEntry = db.prepare(
       `INSERT INTO online_sales_entries
-       (entry_date, channel, coach_number, bus_number, normal_passengers, long_passengers, passenger_count, amount, import_batch_id, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       (entry_date, channel, coach_number, bus_number, normal_passengers, long_passengers, passenger_count, amount, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     const insertExpense = db.prepare(
-      `INSERT INTO online_cash_expenses (expense_date, category_id, description, amount, import_batch_id, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO online_cash_expenses (expense_date, category_id, description, amount, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    );
+    const insertImportItem = db.prepare(
+      "INSERT INTO online_import_items (batch_id, record_type, record_id) VALUES (?, ?, ?)"
     );
     const importRows = db.transaction(() => {
       const batchId = insertBatch.run(fileName, sourceName, destination, parsed.length, req.user.id).lastInsertRowid;
       const ids = parsed.map((row) => {
         if (destination === "expense") {
-          return insertExpense.run(row.expenseDate, row.categoryId, row.description, row.amount, batchId, req.user.id, req.user.id).lastInsertRowid;
+          const recordId = insertExpense.run(row.expenseDate, row.categoryId, row.description, row.amount, req.user.id, req.user.id).lastInsertRowid;
+          insertImportItem.run(batchId, "expense", recordId);
+          return recordId;
         }
-        return insertEntry.run(row.entryDate, row.channel, row.coachNumber, row.busNumber, row.normalPassengers, row.longPassengers, row.passengerCount, row.amount, batchId, req.user.id, req.user.id).lastInsertRowid;
+        const recordId = insertEntry.run(row.entryDate, row.channel, row.coachNumber, row.busNumber, row.normalPassengers, row.longPassengers, row.passengerCount, row.amount, req.user.id, req.user.id).lastInsertRowid;
+        insertImportItem.run(batchId, "sale", recordId);
+        return recordId;
       });
       return { batchId, ids };
     });
@@ -368,7 +394,11 @@ router.put("/expenses/:id", guardWrite, (req, res) => {
 });
 
 router.delete("/expenses/:id", guardWrite, (req, res) => {
-  const info = db.prepare("DELETE FROM online_cash_expenses WHERE id = ?").run(req.params.id);
+  const removeExpense = db.transaction(() => {
+    db.prepare("DELETE FROM online_import_items WHERE record_type = 'expense' AND record_id = ?").run(req.params.id);
+    return db.prepare("DELETE FROM online_cash_expenses WHERE id = ?").run(req.params.id);
+  });
+  const info = removeExpense();
   if (!info.changes) return res.status(404).json({ error: "Expense not found" });
   res.status(204).end();
 });

@@ -2,6 +2,12 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.4.1 — 2026-08-30
+
+- Fixed confirmed document imports failing on the live Turso database after import history was introduced.
+- Moved import tracking into a separate link table so Digital Sales, Cash Sales, and Daily Cash Costs continue using their proven save path while retaining full history controls.
+- Preserved and automatically linked any import batches that were successfully created by v1.4.0.
+
 ## 1.4.0 — 2026-08-30
 
 - Added persistent document-import history for the 50 most recent Online Accounts uploads, including the file, detected sheet/table, destination, uploader, record dates, and remaining record count.

@@ -420,6 +420,17 @@ CREATE TABLE IF NOT EXISTS online_cash_expenses (
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Import-to-record links live separately so document history does not depend
+-- on altering the long-lived sales and expense tables in production.
+CREATE TABLE IF NOT EXISTS online_import_items (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  batch_id    INTEGER NOT NULL REFERENCES online_import_batches(id) ON DELETE CASCADE,
+  record_type TEXT NOT NULL CHECK(record_type IN ('sale', 'expense')),
+  record_id   INTEGER NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(batch_id, record_type, record_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_rotations_date ON rotations(duty_date);
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(work_date);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(txn_date);
@@ -528,7 +539,19 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_online_sales_import_batch ON online_sales_entries(import_batch_id);
   CREATE INDEX IF NOT EXISTS idx_online_expenses_import_batch ON online_cash_expenses(import_batch_id);
   CREATE INDEX IF NOT EXISTS idx_online_import_batches_created ON online_import_batches(created_at, id);
+  CREATE INDEX IF NOT EXISTS idx_online_import_items_batch ON online_import_items(batch_id, record_type);
 `);
+
+// Preserve any v1.4.0 imports that completed before the separate link table
+// was introduced. New imports use online_import_items directly.
+if (db.prepare("PRAGMA table_info(online_sales_entries)").all().some((column) => column.name === "import_batch_id")) {
+  db.exec(`INSERT OR IGNORE INTO online_import_items (batch_id, record_type, record_id)
+    SELECT import_batch_id, 'sale', id FROM online_sales_entries WHERE import_batch_id IS NOT NULL`);
+}
+if (db.prepare("PRAGMA table_info(online_cash_expenses)").all().some((column) => column.name === "import_batch_id")) {
+  db.exec(`INSERT OR IGNORE INTO online_import_items (batch_id, record_type, record_id)
+    SELECT import_batch_id, 'expense', id FROM online_cash_expenses WHERE import_batch_id IS NOT NULL`);
+}
 
 // Earlier automatic counter-salary postings used the first day of the
 // month, which could hide them from a selected daily report. Treat those
