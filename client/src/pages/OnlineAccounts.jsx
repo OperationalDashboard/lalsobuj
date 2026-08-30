@@ -100,8 +100,18 @@ export default function OnlineAccounts() {
   const activeCategories = useMemo(() => categories.filter((category) => Number(category.active)), [categories]);
   const onlineEntries = useMemo(() => entries.filter((entry) => entry.channel !== "cash"), [entries]);
   const cashEntries = useMemo(() => entries.filter((entry) => entry.channel === "cash"), [entries]);
+  const dailyChannelTotals = useMemo(() => entries.reduce((totals, entry) => {
+    if (!totals[entry.channel]) totals[entry.channel] = { sales: 0, passengers: 0, normal: 0, long: 0 };
+    totals[entry.channel].sales += Number(entry.amount || 0);
+    totals[entry.channel].passengers += Number(entry.passenger_count || 0);
+    totals[entry.channel].normal += Number(entry.normal_passengers || 0);
+    totals[entry.channel].long += Number(entry.long_passengers || 0);
+    return totals;
+  }, {}), [entries]);
   const dailyOnlineSale = onlineEntries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  const dailyOnlinePassengers = onlineEntries.reduce((sum, entry) => sum + Number(entry.passenger_count || 0), 0);
   const dailyCashSale = cashEntries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  const dailyCashPassengers = cashEntries.reduce((sum, entry) => sum + Number(entry.passenger_count || 0), 0);
   const dailyExpense = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
 
   const flash = (text) => {
@@ -160,6 +170,13 @@ export default function OnlineAccounts() {
     setEditingExpenseId(null);
     loadDaily(selectedDate);
   }, [loadDaily, selectedDate]);
+
+  useEffect(() => {
+    if (!cashForm.entry_date) return;
+    setExpenseForm((current) => current.expense_date === cashForm.entry_date
+      ? current
+      : { ...current, expense_date: cashForm.entry_date });
+  }, [cashForm.entry_date]);
 
   useEffect(() => {
     if (view === "report" && !report) loadReport();
@@ -427,8 +444,13 @@ export default function OnlineAccounts() {
       </div>
 
       <div className="online-summary-strip">
-        <div><span>Online sale</span><strong>{money(dailyOnlineSale)}</strong></div>
-        <div><span>Cash sale</span><strong>{money(dailyCashSale)}</strong></div>
+        {(["website", "android", "ios"]).map((channel) => {
+          const total = dailyChannelTotals[channel] || { sales: 0, passengers: 0, normal: 0, long: 0 };
+          return <div key={channel}><span>{channelLabels[channel]} sale</span><strong>{money(total.sales)}</strong><small>{total.passengers} passengers · {total.normal} normal · {total.long} long</small></div>;
+        })}
+        {dailyChannelTotals.website_android && <div><span>Legacy combined sale</span><strong>{money(dailyChannelTotals.website_android.sales)}</strong><small>{dailyChannelTotals.website_android.passengers} passengers · awaiting platform classification</small></div>}
+        <div><span>Online total</span><strong>{money(dailyOnlineSale)}</strong><small>{dailyOnlinePassengers} digital passengers</small></div>
+        <div><span>Cash sale</span><strong>{money(dailyCashSale)}</strong><small>{dailyCashPassengers} passengers</small></div>
         <div className="expense"><span>Cash expenses</span><strong>{money(dailyExpense)}</strong></div>
         <div className={dailyCashSale - dailyExpense < 0 ? "negative" : ""}><span>Final cash</span><strong>{money(dailyCashSale - dailyExpense)}</strong></div>
       </div>

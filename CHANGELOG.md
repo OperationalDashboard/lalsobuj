@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.2.3 — 2026-08-30
+
+- Added passenger totals to every daily sale summary in Online Accounts.
+- Added separate Website, Android App, and iOS App daily cards showing total passengers plus Normal and Long passenger counts.
+- Added passenger totals to the daily Online Total and Cash Sale cards.
+- Synchronized the Expense date with the Cash Sale entry date so both daily records stay on the same selected day.
+
 ## 1.2.2 — 2026-08-30
 
 - Split Digital Sales into separate Website, Android App, and iOS App platforms for entry, totals, daily reports, PDF/share summaries, and Excel-compatible exports.

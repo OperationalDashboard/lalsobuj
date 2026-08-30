@@ -901,6 +901,7 @@ table button { white-space: nowrap; }
 .online-summary-strip > div { min-width: 0; padding: 13px 15px; display: flex; flex-direction: column; gap: 3px; background: linear-gradient(135deg, color-mix(in srgb, var(--green) 7%, var(--card)), var(--card)); border: 1px solid color-mix(in srgb, var(--green) 18%, var(--border)); border-radius: 11px; box-shadow: var(--shadow-soft); }
 .online-summary-strip span { color: var(--muted); font-size: .67rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .online-summary-strip strong { overflow: hidden; font: 800 clamp(1rem, 1.5vw, 1.3rem) "Manrope", sans-serif; letter-spacing: -.035em; text-overflow: ellipsis; white-space: nowrap; }
+.online-summary-strip small { color: var(--muted); font-size: .68rem; font-weight: 650; line-height: 1.35; }
 .online-summary-strip .expense { border-color: color-mix(in srgb, var(--red) 30%, var(--border)); }
 .online-summary-strip .expense strong, .online-summary-strip .negative strong { color: var(--red); }
 
