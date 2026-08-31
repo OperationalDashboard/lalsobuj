@@ -11,6 +11,9 @@ export default function Counters() {
   const [error, setError] = useState("");
   const [reassigningId, setReassigningId] = useState(null);
   const [places, setPlaces] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState(empty);
+  const [savingId, setSavingId] = useState(null);
 
   function load() {
     api.get("/counters").then(setCounters).catch(() => {});
@@ -36,6 +39,42 @@ export default function Counters() {
     if (!confirm("Remove this counter? Staff assigned to it will become unassigned.")) return;
     await api.del(`/counters/${id}`);
     load();
+  }
+
+  function startEdit(counter) {
+    setError("");
+    setReassigningId(null);
+    setEditingId(counter.id);
+    setEditForm({
+      name: counter.name || "",
+      location: counter.location || "",
+      place_id: counter.place_id ? String(counter.place_id) : "",
+    });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditForm(empty);
+  }
+
+  async function handleSave(e, id) {
+    e.preventDefault();
+    setError("");
+    if (!editForm.name.trim()) return;
+    setSavingId(id);
+    try {
+      await api.put(`/counters/${id}`, {
+        name: editForm.name.trim(),
+        location: editForm.location.trim() || null,
+        place_id: editForm.place_id || null,
+      });
+      cancelEdit();
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingId(null);
+    }
   }
 
   // Move a staff member to this counter (or unassign them) — the toggle
@@ -78,14 +117,30 @@ export default function Counters() {
         {error && <p className="error-text">{error}</p>}
       </div>
 
+      <div className="counter-management-list">
       {counters.map((c) => (
-        <div key={c.id} className="card" style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <strong>{c.name}</strong>{c.place_name ? ` — ${c.place_name}` : c.location ? ` — ${c.location}` : ""}
+        <article key={c.id} className={`card counter-management-card${editingId === c.id ? " editing" : ""}`}>
+          <div className="counter-management-header">
+            <div className="counter-management-title">
+              <span className="counter-management-icon" aria-hidden="true">⌖</span>
+              <div><strong>{c.name}</strong><span>{c.place_name || "No parent place"}{c.location ? ` · ${c.location}` : " · No location"}</span></div>
             </div>
-            <button className="link-danger" onClick={() => handleDelete(c.id)}>{t("remove")}</button>
+            <div className="counter-management-actions">
+              <button type="button" className="settings-edit-button" onClick={() => startEdit(c)} disabled={savingId === c.id}>Edit details</button>
+              <button type="button" className="link-danger" onClick={() => handleDelete(c.id)} disabled={savingId === c.id}>{t("remove")}</button>
+            </div>
           </div>
+
+          {editingId === c.id && <form className="counter-edit-panel" onSubmit={(e) => handleSave(e, c.id)}>
+            <label><span>Counter name</span><input autoFocus value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
+            <label><span>Location</span><input placeholder="e.g. Dhaka" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} /></label>
+            <label><span>Parent place</span><select value={editForm.place_id} onChange={(e) => setEditForm({ ...editForm, place_id: e.target.value })}><option value="">No parent place</option>{places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}</select></label>
+            <div className="counter-edit-actions">
+              <button className="primary" type="submit" disabled={!editForm.name.trim() || savingId === c.id} aria-busy={savingId === c.id}>{savingId === c.id ? "Saving…" : "Save changes"}</button>
+              <button className="place-secondary-action" type="button" onClick={cancelEdit} disabled={savingId === c.id}>Cancel</button>
+            </div>
+          </form>}
+
           <table style={{ marginTop: 10 }}>
             <thead><tr><th>{t("staff_posted_here")}</th><th>{t("designation")}</th><th></th></tr></thead>
             <tbody>
@@ -109,8 +164,9 @@ export default function Counters() {
           ) : (
             <button className="link-danger" style={{ marginTop: 8 }} onClick={() => setReassigningId(c.id)}>+ Post staff here</button>
           )}
-        </div>
+        </article>
       ))}
+      </div>
       {counters.length === 0 && <div className="card">{t("no_counters_yet")}</div>}
     </div>
   );

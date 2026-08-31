@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.13.1 — 2026-08-31
+
+- Added full counter-detail editing for the counter name, location, and parent place without replacing the counter or losing its linked staff and account history.
+- Redesigned counter cards and edit controls with a clear responsive layout, premium edit action, save progress, and cancel controls.
+
 ## 1.13.0 — 2026-08-31
 
 - Imported fleet rows 101–200 from Fleets-2.pdf using Reg Number, Type, Seat, Makers, and ticked/unticked Status only; 14 unticked buses are unavailable.

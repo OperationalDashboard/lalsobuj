@@ -370,6 +370,20 @@ button.link-danger:hover { text-decoration: underline; }
 .counter-option strong { overflow: hidden; color: var(--ink); font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
 .counter-option small { overflow: hidden; color: var(--muted); font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
 .counter-picker-empty { grid-column: 1 / -1; padding: 14px; color: var(--muted); background: var(--bg-soft); border-radius: 8px; font-size: .78rem; text-align: center; }
+.counter-management-list { display: grid; gap: 14px; }
+.counter-management-card { margin: 0; overflow: hidden; border-color: color-mix(in srgb, var(--green) 12%, var(--border)); }
+.counter-management-card.editing { border-color: color-mix(in srgb, var(--green) 46%, var(--border)); box-shadow: 0 12px 30px color-mix(in srgb, var(--green) 10%, transparent); }
+.counter-management-header { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.counter-management-title { min-width: 0; display: flex; align-items: center; gap: 11px; }
+.counter-management-title > div { min-width: 0; display: grid; gap: 2px; }
+.counter-management-title strong { overflow: hidden; font: 800 .98rem "Manrope", sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.counter-management-title span { overflow: hidden; color: var(--muted); font-size: .73rem; text-overflow: ellipsis; white-space: nowrap; }
+.counter-management-icon { width: 36px; height: 36px; display: grid; place-items: center; flex: 0 0 auto; color: var(--green); background: color-mix(in srgb, var(--green) 10%, transparent); border: 1px solid color-mix(in srgb, var(--green) 15%, transparent); border-radius: 11px; font-size: 1.12rem; }
+.counter-management-actions { display: flex; align-items: center; gap: 7px; }
+.counter-edit-panel { margin: 15px 0 4px; padding: 14px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; align-items: end; background: linear-gradient(135deg, color-mix(in srgb, var(--green) 7%, var(--card)), var(--card)); border: 1px solid color-mix(in srgb, var(--green) 24%, var(--border)); border-radius: 12px; }
+.counter-edit-panel label { min-width: 0; display: grid; gap: 6px; color: var(--muted); font-size: .73rem; font-weight: 800; }
+.counter-edit-panel input, .counter-edit-panel select { width: 100%; }
+.counter-edit-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
 .place-create-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; }
 .place-secondary-action { min-height: 36px; padding: 8px 13px; display: inline-flex; align-items: center; justify-content: center; color: var(--green); background: transparent; border: 1px solid color-mix(in srgb, var(--green) 35%, var(--border)); border-radius: 9px; cursor: pointer; font: 700 .82rem "DM Sans", sans-serif; }
 .place-secondary-action:hover { background: color-mix(in srgb, var(--green) 7%, transparent); }
@@ -607,6 +621,10 @@ button.link-danger:hover { text-decoration: underline; }
   .place-create-actions { grid-column: auto; flex-direction: column; align-items: stretch; }
   .place-create-actions > * { width: 100%; }
   .counter-option-grid { grid-template-columns: minmax(0, 1fr); }
+  .counter-management-header { align-items: flex-start; flex-direction: column; }
+  .counter-management-actions { width: 100%; justify-content: space-between; }
+  .counter-edit-panel { grid-template-columns: minmax(0, 1fr); }
+  .counter-edit-actions { grid-column: 1; }
   .place-list-heading { padding: 2px 16px 12px; }
   .place-card-grid { padding: 0 16px 18px; grid-template-columns: minmax(0, 1fr); }
   .place-card.editing { grid-column: auto; }

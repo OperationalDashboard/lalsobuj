@@ -7,3 +7,8 @@
 - Add a dated entry to `CHANGELOG.md` describing the user-visible changes.
 - Do not manually hard-code a Git build ID. Vite injects the current Render/Git revision automatically.
 - Before deployment, run the client production build and verify that the Settings and sidebar version displays match the package version.
+
+## Editable administrator data
+
+- Every administrator-managed record or list item that can be added through the website must also have an obvious in-place Edit path.
+- Editing must preserve the record ID and linked operational/history data; never require users to delete and recreate a record just to change its details.
