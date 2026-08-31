@@ -5,6 +5,7 @@
 const path = require("path");
 const fs = require("fs");
 const Database = require("libsql");
+const book1Buses = require("./data/book1-buses.json");
 require("dotenv").config();
 
 const tursoUrl = process.env.TURSO_DATABASE_URL?.trim();
@@ -84,6 +85,15 @@ CREATE TABLE IF NOT EXISTS buses (
   capacity      INTEGER,
   route         TEXT,
   status        TEXT NOT NULL DEFAULT 'active', -- active | maintenance | retired
+  fleet_serial  INTEGER,
+  source_bus_number TEXT,
+  category      TEXT,
+  capacity_label TEXT,
+  manufacturer TEXT,
+  manufacturer_country TEXT,
+  model_year    INTEGER,
+  registration_date TEXT,
+  source_note   TEXT,
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -519,6 +529,15 @@ function addColumnIfMissing(table, columnName, columnDef) {
 addColumnIfMissing("staff", "status_changed_at", "TEXT NOT NULL DEFAULT (datetime('now'))");
 addColumnIfMissing("staff", "counter_id", "INTEGER REFERENCES counters(id) ON DELETE SET NULL");
 addColumnIfMissing("buses", "class_type", "TEXT");
+addColumnIfMissing("buses", "fleet_serial", "INTEGER");
+addColumnIfMissing("buses", "source_bus_number", "TEXT");
+addColumnIfMissing("buses", "category", "TEXT");
+addColumnIfMissing("buses", "capacity_label", "TEXT");
+addColumnIfMissing("buses", "manufacturer", "TEXT");
+addColumnIfMissing("buses", "manufacturer_country", "TEXT");
+addColumnIfMissing("buses", "model_year", "INTEGER");
+addColumnIfMissing("buses", "registration_date", "TEXT");
+addColumnIfMissing("buses", "source_note", "TEXT");
 addColumnIfMissing("users", "staff_id", "INTEGER REFERENCES staff(id) ON DELETE SET NULL");
 addColumnIfMissing("transactions", "passengers_count", "INTEGER");
 addColumnIfMissing("transactions", "price_per_seat", "REAL");
@@ -558,11 +577,63 @@ addColumnIfMissing("online_sales_entries", "import_batch_id", "INTEGER REFERENCE
 addColumnIfMissing("online_cash_expenses", "import_batch_id", "INTEGER REFERENCES online_import_batches(id) ON DELETE SET NULL");
 
 db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_buses_fleet_serial ON buses(fleet_serial) WHERE fleet_serial IS NOT NULL;
   CREATE INDEX IF NOT EXISTS idx_online_sales_import_batch ON online_sales_entries(import_batch_id);
   CREATE INDEX IF NOT EXISTS idx_online_expenses_import_batch ON online_cash_expenses(import_batch_id);
   CREATE INDEX IF NOT EXISTS idx_online_import_batches_created ON online_import_batches(created_at, id);
   CREATE INDEX IF NOT EXISTS idx_online_import_items_batch ON online_import_items(batch_id, record_type);
 `);
+
+// One-time, idempotent import of the 201 bus records supplied in Book 1.pdf.
+// The source contains repeated printed bus numbers, so the internal unique
+// registration key includes the fleet serial while source_bus_number preserves
+// the document value exactly. Cells rendered as ###### in the PDF are stored
+// as an explicit source note instead of guessing their hidden date value.
+const book1ImportKey = "book1_bus_import_20260831";
+if (!db.prepare("SELECT value FROM settings WHERE key = ?").get(book1ImportKey)) {
+  const insertBook1Bus = db.prepare(`
+    INSERT OR IGNORE INTO buses (
+      reg_number, model, class_type, capacity, route, status, fleet_serial,
+      source_bus_number, category, capacity_label, manufacturer,
+      manufacturer_country, model_year, registration_date, source_note
+    ) VALUES (?,?,?,?,?,'active',?,?,?,?,?,?,?,?,?)
+  `);
+
+  const toIsoDate = (value) => {
+    const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value || "");
+    return match ? `${match[3]}-${match[2]}-${match[1]}` : null;
+  };
+
+  for (const bus of book1Buses) {
+    const internalNumber = `${String(bus.fleet_serial).padStart(3, "0")} | ${bus.reg_number}`;
+    const model = [bus.manufacturer, bus.manufacturer_country].filter(Boolean).join(" - ");
+    const sourceNote = bus.registration_date_unreadable
+      ? "Imported from Book 1.pdf; registration date unavailable in source PDF"
+      : "Imported from Book 1.pdf";
+    insertBook1Bus.run(
+      internalNumber,
+      model,
+      bus.class_type,
+      bus.capacity,
+      "",
+      bus.fleet_serial,
+      bus.reg_number,
+      bus.category,
+      bus.capacity_label,
+      bus.manufacturer,
+      bus.manufacturer_country,
+      bus.model_year,
+      toIsoDate(bus.registration_date),
+      sourceNote
+    );
+  }
+
+  const importedCount = db.prepare("SELECT COUNT(*) AS count FROM buses WHERE source_note LIKE 'Imported from Book 1.pdf%'").get().count;
+  if (importedCount !== book1Buses.length) {
+    throw new Error(`Book 1 bus import incomplete: expected ${book1Buses.length}, found ${importedCount}`);
+  }
+  db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(book1ImportKey, String(importedCount));
+}
 
 // Preserve any v1.4.0 imports that completed before the separate link table
 // was introduced. New imports use online_import_items directly.

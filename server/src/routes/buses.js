@@ -8,7 +8,12 @@ router.use(requireAuth);
 const guardWrite = requireModulePermission("buses", "write");
 
 const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
-const WRITABLE = ["reg_number", "model", "class_type", "capacity", "route", "status"];
+const WRITABLE = [
+  "reg_number", "model", "class_type", "capacity", "route", "status",
+  "fleet_serial", "source_bus_number", "category", "capacity_label",
+  "manufacturer", "manufacturer_country", "model_year", "registration_date",
+  "source_note",
+];
 
 function busClassTypes() {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'bus_class_types'").get();

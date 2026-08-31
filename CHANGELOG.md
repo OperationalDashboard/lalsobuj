@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.11.0 — 2026-08-31
+
+- Imported all 201 bus records from Book 1.pdf with fleet serial, printed bus number, category, configured class, capacity description, manufacturer, country, model year, and every readable registration date.
+- Preserved repeated printed bus numbers as separate fleet records by using the document serial in each internal registration key.
+- Marked 176 registration dates as unavailable because the source PDF renders those cells as `######`, without inventing missing values.
+- Expanded the Buses page with detailed fields, full-record editing, search, and 25-row pagination for the larger fleet register.
+
 ## 1.10.0 — 2026-08-31
 
 - Added an accessible Show / Hide control to the login password field for both Admin and Staff portals.
