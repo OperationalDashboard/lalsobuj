@@ -5,7 +5,6 @@
 const path = require("path");
 const fs = require("fs");
 const Database = require("libsql");
-const book1Buses = require("./data/book1-buses.json");
 require("dotenv").config();
 
 const tursoUrl = process.env.TURSO_DATABASE_URL?.trim();
@@ -584,55 +583,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_online_import_items_batch ON online_import_items(batch_id, record_type);
 `);
 
-// One-time, idempotent import of the 201 bus records supplied in Book 1.pdf.
-// The source contains repeated printed bus numbers, so the internal unique
-// registration key includes the fleet serial while source_bus_number preserves
-// the document value exactly. Cells rendered as ###### in the PDF are stored
-// as an explicit source note instead of guessing their hidden date value.
-const book1ImportKey = "book1_bus_import_20260831";
-if (!db.prepare("SELECT value FROM settings WHERE key = ?").get(book1ImportKey)) {
-  const insertBook1Bus = db.prepare(`
-    INSERT OR IGNORE INTO buses (
-      reg_number, model, class_type, capacity, route, status, fleet_serial,
-      source_bus_number, category, capacity_label, manufacturer,
-      manufacturer_country, model_year, registration_date, source_note
-    ) VALUES (?,?,?,?,?,'active',?,?,?,?,?,?,?,?,?)
-  `);
-
-  const toIsoDate = (value) => {
-    const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value || "");
-    return match ? `${match[3]}-${match[2]}-${match[1]}` : null;
-  };
-
-  for (const bus of book1Buses) {
-    const internalNumber = `${String(bus.fleet_serial).padStart(3, "0")} | ${bus.reg_number}`;
-    const model = [bus.manufacturer, bus.manufacturer_country].filter(Boolean).join(" - ");
-    const sourceNote = bus.registration_date_unreadable
-      ? "Imported from Book 1.pdf; registration date unavailable in source PDF"
-      : "Imported from Book 1.pdf";
-    insertBook1Bus.run(
-      internalNumber,
-      model,
-      bus.class_type,
-      bus.capacity,
-      "",
-      bus.fleet_serial,
-      bus.reg_number,
-      bus.category,
-      bus.capacity_label,
-      bus.manufacturer,
-      bus.manufacturer_country,
-      bus.model_year,
-      toIsoDate(bus.registration_date),
-      sourceNote
-    );
-  }
-
-  const importedCount = db.prepare("SELECT COUNT(*) AS count FROM buses WHERE source_note LIKE 'Imported from Book 1.pdf%'").get().count;
-  if (importedCount !== book1Buses.length) {
-    throw new Error(`Book 1 bus import incomplete: expected ${book1Buses.length}, found ${importedCount}`);
-  }
-  db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(book1ImportKey, String(importedCount));
+// Remove only the fleet rows imported from the superseded Book 1.pdf. Existing
+// and manually created buses are not touched. The marker keeps this cleanup
+// idempotent while preserving the earlier import marker as release history.
+const book1RemovalKey = "book1_bus_import_removed_20260831";
+if (!db.prepare("SELECT value FROM settings WHERE key = ?").get(book1RemovalKey)) {
+  const removed = db.prepare("DELETE FROM buses WHERE source_note LIKE 'Imported from Book 1.pdf%'").run().changes;
+  db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(book1RemovalKey, String(removed));
 }
 
 // Preserve any v1.4.0 imports that completed before the separate link table

@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.11.1 — 2026-08-31
+
+- Removed only the 201 fleet rows imported from the superseded Book 1.pdf, leaving all pre-existing and manually created bus records untouched.
+- Kept the expanded bus-detail fields and interface ready for a corrected source document.
+
 ## 1.11.0 — 2026-08-31
 
 - Imported all 201 bus records from Book 1.pdf with fleet serial, printed bus number, category, configured class, capacity description, manufacturer, country, model year, and every readable registration date.
