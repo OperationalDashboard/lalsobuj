@@ -5,6 +5,7 @@ import { ROLES } from "../roles.js";
 import { APP_RELEASE, APP_REVISION, APP_VERSION, clearAppCacheAndRefresh } from "../version.js";
 
 const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
+const DEFAULT_BUS_CATEGORIES = ["Economy (AC)", "Economy (NON AC)", "Suite-Class AC (AC)", "Sleeper (AC)"];
 
 export default function Settings() {
   const user = getUser();
@@ -16,6 +17,8 @@ export default function Settings() {
   const [savedMsg, setSavedMsg] = useState("");
   const [busClasses, setBusClasses] = useState(DEFAULT_BUS_CLASSES);
   const [newBusClass, setNewBusClass] = useState("");
+  const [busCategories, setBusCategories] = useState(DEFAULT_BUS_CATEGORIES);
+  const [newBusCategory, setNewBusCategory] = useState("");
 
   const [hotels, setHotels] = useState([]);
   const [newHotel, setNewHotel] = useState("");
@@ -48,6 +51,12 @@ export default function Settings() {
         setBusClasses(Array.isArray(parsed) ? parsed : DEFAULT_BUS_CLASSES);
       } catch {
         setBusClasses(DEFAULT_BUS_CLASSES);
+      }
+      try {
+        const parsed = JSON.parse(s.bus_categories || "null");
+        setBusCategories(Array.isArray(parsed) ? parsed : DEFAULT_BUS_CATEGORIES);
+      } catch {
+        setBusCategories(DEFAULT_BUS_CATEGORIES);
       }
     });
   }
@@ -123,6 +132,42 @@ export default function Settings() {
     setBusClasses(result.bus_classes);
     setEditingItem(null);
     flashMessage(result.updated_buses ? `Bus class renamed on ${result.updated_buses} bus record(s).` : "Bus class renamed.");
+  }
+
+  async function addBusCategory(e) {
+    e.preventDefault();
+    const categoryName = newBusCategory.trim();
+    if (!categoryName || busCategories.some((item) => item.toLowerCase() === categoryName.toLowerCase())) return;
+    const next = [...busCategories, categoryName];
+    await api.put("/settings", { bus_categories: JSON.stringify(next) });
+    setBusCategories(next);
+    setNewBusCategory("");
+    flashMessage("Bus category added.");
+  }
+
+  async function removeBusCategory(categoryName) {
+    if (!confirm(`Remove '${categoryName}' from the bus category choices? Existing buses will keep the category as historical data.`)) return;
+    if (isSuperAdmin) {
+      const result = await api.put("/settings/bus-categories", { action: "remove", currentName: categoryName });
+      setBusCategories(result.bus_categories);
+      flashMessage(result.buses_using_removed_category
+        ? `Category removed from choices. ${result.buses_using_removed_category} existing bus record(s) kept it as legacy data.`
+        : "Bus category removed.");
+      return;
+    }
+    const next = busCategories.filter((item) => item !== categoryName);
+    await api.put("/settings", { bus_categories: JSON.stringify(next) });
+    setBusCategories(next);
+    flashMessage("Bus category removed.");
+  }
+
+  async function saveBusCategory(categoryName) {
+    const newName = editingItem?.value?.trim();
+    if (!newName) return;
+    const result = await api.put("/settings/bus-categories", { action: "rename", currentName: categoryName, newName });
+    setBusCategories(result.bus_categories);
+    setEditingItem(null);
+    flashMessage(result.updated_buses ? `Bus category renamed on ${result.updated_buses} bus record(s).` : "Bus category renamed.");
   }
 
   async function addHotel(e) {
@@ -356,6 +401,32 @@ export default function Settings() {
               </div>
             </div>)}
           {busClasses.length === 0 && <div className="settings-list-empty">No bus classes configured. Add one above.</div>}
+        </div>
+      </div>
+
+      <div className="card bus-category-settings" style={{ marginBottom: 20 }}>
+        <div className="settings-card-heading">
+          <div><span className="settings-eyebrow">FLEET ORGANISATION</span><h3>Bus categories</h3><p>Type values from fleet imports appear here. Add more categories at any time; Super Admin can rename them across every matching bus.</p></div>
+          <span className="settings-count-pill">{busCategories.length} categories</span>
+        </div>
+        <form className="settings-inline-create" onSubmit={addBusCategory}>
+          <input placeholder="New category (e.g. Economy AC)" value={newBusCategory} onChange={(e) => setNewBusCategory(e.target.value)} />
+          <button className="primary" type="submit">Add category</button>
+        </form>
+        <div className="settings-managed-list">
+          {busCategories.map((categoryName) => editingItem?.type === "busCategory" && editingItem.id === categoryName
+            ? <div key={categoryName} className="settings-managed-item editing">
+              <input aria-label="Bus category name" value={editingItem.value} onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })} />
+              <div className="settings-item-actions"><button type="button" className="primary" onClick={() => saveBusCategory(categoryName)}>Save</button><button type="button" className="place-secondary-action" onClick={() => setEditingItem(null)}>Cancel</button></div>
+            </div>
+            : <div key={categoryName} className="settings-managed-item category-item">
+              <div><span className="category-marker" aria-hidden="true"/><strong>{categoryName}</strong>{DEFAULT_BUS_CATEGORIES.includes(categoryName) && <small>Recognised fleet category</small>}</div>
+              <div className="settings-item-actions">
+                {isSuperAdmin && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "busCategory", id: categoryName, value: categoryName })}>Edit</button>}
+                {(isSuperAdmin || !DEFAULT_BUS_CATEGORIES.includes(categoryName)) && <button type="button" className="link-danger" onClick={() => removeBusCategory(categoryName)}>Remove</button>}
+              </div>
+            </div>)}
+          {busCategories.length === 0 && <div className="settings-list-empty">No bus categories configured. Add one above.</div>}
         </div>
       </div>
 

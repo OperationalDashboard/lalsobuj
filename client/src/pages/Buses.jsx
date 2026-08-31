@@ -5,6 +5,7 @@ import { t } from "../i18n.js";
 import BusIcon from "../components/BusIcon.jsx";
 
 const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
+const DEFAULT_BUS_CATEGORIES = ["Economy (AC)", "Economy (NON AC)", "Suite-Class AC (AC)", "Sleeper (AC)"];
 const empty = {
   reg_number: "", model: "", class_type: "", capacity: "", route: "", status: "active",
   fleet_serial: "", source_bus_number: "", category: "", capacity_label: "",
@@ -20,6 +21,7 @@ export default function Buses() {
   const [buses, setBuses] = useState([]);
   const [form, setForm] = useState(empty);
   const [busClasses, setBusClasses] = useState(DEFAULT_BUS_CLASSES);
+  const [busCategories, setBusCategories] = useState(DEFAULT_BUS_CATEGORIES);
   const [error, setError] = useState("");
   const [statusEditId, setStatusEditId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -35,6 +37,12 @@ export default function Buses() {
         setBusClasses(Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_BUS_CLASSES);
       } catch {
         setBusClasses(DEFAULT_BUS_CLASSES);
+      }
+      try {
+        const parsed = JSON.parse(settings.bus_categories || "null");
+        setBusCategories(Array.isArray(parsed) ? parsed : DEFAULT_BUS_CATEGORIES);
+      } catch {
+        setBusCategories(DEFAULT_BUS_CATEGORIES);
       }
     }).catch(() => {});
   }
@@ -91,9 +99,9 @@ export default function Buses() {
     }
   }
 
-  async function handleClassChange(id, classType) {
+  async function handleCategoryChange(id, category) {
     try {
-      await api.put(`/buses/${id}`, { class_type: classType || null });
+      await api.put(`/buses/${id}`, { category: category || null });
       load();
     } catch (err) {
       setError(err.message);
@@ -134,7 +142,11 @@ export default function Buses() {
             <label>Internal unique key<input placeholder="Internal unique key" value={form.reg_number} required onChange={(e) => setForm({ ...form, reg_number: e.target.value })} /></label>
             <label>Fleet serial<input type="number" placeholder="e.g. 25" value={form.fleet_serial} onChange={(e) => setForm({ ...form, fleet_serial: e.target.value })} /></label>
             <label>Bus number<input placeholder="Bus number" value={form.source_bus_number} onChange={(e) => setForm({ ...form, source_bus_number: e.target.value })} /></label>
-            <label>Category<input placeholder="e.g. Economy (AC)" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
+            <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+              <option value="">Select category</option>
+              {form.category && !busCategories.includes(form.category) && <option value={form.category}>{form.category} (legacy)</option>}
+              {busCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select></label>
             <label>Configured class<select value={form.class_type} onChange={(e) => setForm({ ...form, class_type: e.target.value })}>
               <option value="">Select bus class</option>
               {busClasses.map((classType) => <option key={classType} value={classType}>{classType}</option>)}
@@ -170,7 +182,7 @@ export default function Buses() {
               <tr key={b.id}>
                 <td><div className="bus-fleet-cell"><BusIcon size={24} muted={b.status !== "active"} /><strong>{b.fleet_serial || "—"}</strong></div></td>
                 <td><strong>{b.source_bus_number || b.reg_number}</strong></td>
-                <td><strong>{b.category || b.class_type || "—"}</strong>{canEditFull ? <select value={b.class_type || ""} onChange={(e) => handleClassChange(b.id, e.target.value)}><option value="">No configured class</option>{b.class_type && !busClasses.includes(b.class_type) && <option value={b.class_type}>{b.class_type} (legacy)</option>}{busClasses.map((classType) => <option key={classType} value={classType}>{classType}</option>)}</select> : b.class_type && <small>{b.class_type}</small>}</td>
+                <td>{canEditFull ? <select className="bus-category-select" value={b.category || ""} onChange={(e) => handleCategoryChange(b.id, e.target.value)}><option value="">No category</option>{b.category && !busCategories.includes(b.category) && <option value={b.category}>{b.category} (legacy)</option>}{busCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select> : <strong>{b.category || "—"}</strong>}</td>
                 <td><strong>{b.capacity ?? "—"}</strong>{b.capacity_label && <small>{b.capacity_label}</small>}</td>
                 <td><strong>{b.manufacturer || b.model || "—"}</strong>{b.manufacturer_country && <small>{b.manufacturer_country}</small>}</td>
                 <td><strong>{b.model_year || "—"}</strong><small>{b.registration_date || (b.source_note?.includes("unavailable") ? "Date unavailable in PDF" : "No registration date")}</small></td>
@@ -192,7 +204,7 @@ export default function Buses() {
                     </span>
                   )}
                 </td>
-                {canEditFull && <td><div className="bus-row-actions"><button className="secondary" onClick={() => startEdit(b)}>Edit</button><button className="link-danger" onClick={() => handleDelete(b.id)}>{t("remove")}</button></div></td>}
+                {canEditFull && <td><div className="bus-row-actions"><button className="bus-edit-button" onClick={() => startEdit(b)}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20h4.2L19 9.2a2 2 0 0 0 0-2.8L17.6 5a2 2 0 0 0-2.8 0L4 15.8V20Z"/><path d="m13.5 6.3 4.2 4.2M4 20l4.6-1"/></svg><span>Edit</span></button><button className="link-danger" onClick={() => handleDelete(b.id)}>{t("remove")}</button></div></td>}
               </tr>
             ))}
           </tbody>

@@ -6,6 +6,7 @@ const path = require("path");
 const fs = require("fs");
 const Database = require("libsql");
 const fleetsPdfBuses = require("./data/fleets-pdf-buses.json");
+const fleets2PdfBuses = require("./data/fleets-2-pdf-buses.json");
 require("dotenv").config();
 
 const tursoUrl = process.env.TURSO_DATABASE_URL?.trim();
@@ -624,6 +625,37 @@ if (!db.prepare("SELECT value FROM settings WHERE key = ?").get(fleetsPdfImportK
     throw new Error(`Fleets.pdf bus import incomplete: expected ${fleetsPdfBuses.length}, found ${importedCount}`);
   }
   db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(fleetsPdfImportKey, String(importedCount));
+}
+
+// Fleets-2.pdf continues the same register with source rows 101-200.
+const fleets2PdfImportKey = "fleets_2_pdf_bus_import_20260831";
+if (!db.prepare("SELECT value FROM settings WHERE key = ?").get(fleets2PdfImportKey)) {
+  const insertFleetBus = db.prepare(`
+    INSERT OR IGNORE INTO buses (
+      reg_number, source_bus_number, category, capacity, capacity_label,
+      manufacturer, status, source_note
+    ) VALUES (?,?,?,?,?,?,?,?)
+  `);
+
+  for (const bus of fleets2PdfBuses) {
+    const internalNumber = `FLEETS-${String(bus.source_row).padStart(3, "0")} | ${bus.bus_number}`;
+    insertFleetBus.run(
+      internalNumber,
+      bus.bus_number,
+      bus.category,
+      bus.capacity,
+      bus.capacity_label,
+      bus.manufacturer,
+      bus.available ? "active" : "unavailable",
+      "Imported from Fleets-2.pdf"
+    );
+  }
+
+  const importedCount = db.prepare("SELECT COUNT(*) AS count FROM buses WHERE source_note = 'Imported from Fleets-2.pdf'").get().count;
+  if (importedCount !== fleets2PdfBuses.length) {
+    throw new Error(`Fleets-2.pdf bus import incomplete: expected ${fleets2PdfBuses.length}, found ${importedCount}`);
+  }
+  db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(fleets2PdfImportKey, String(importedCount));
 }
 
 // Preserve any v1.4.0 imports that completed before the separate link table

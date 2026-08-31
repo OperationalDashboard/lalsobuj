@@ -20,6 +20,7 @@ const DEFAULTS = {
   login_logo_data: "",
   login_background_data: "",
   bus_class_types: JSON.stringify(["AC", "Non AC", "Sleeper"]),
+  bus_categories: JSON.stringify(["Economy (AC)", "Economy (NON AC)", "Suite-Class AC (AC)", "Sleeper (AC)"]),
   sidebar_nav_order: JSON.stringify(NAV_ROUTES),
 };
 
@@ -30,6 +31,16 @@ function getBusClasses() {
     return Array.isArray(parsed) ? parsed.map(String) : JSON.parse(DEFAULTS.bus_class_types);
   } catch {
     return JSON.parse(DEFAULTS.bus_class_types);
+  }
+}
+
+function getBusCategories() {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'bus_categories'").get();
+  try {
+    const parsed = JSON.parse(row?.value ?? DEFAULTS.bus_categories);
+    return Array.isArray(parsed) ? parsed.map(String) : JSON.parse(DEFAULTS.bus_categories);
+  } catch {
+    return JSON.parse(DEFAULTS.bus_categories);
   }
 }
 
@@ -145,6 +156,40 @@ router.put("/bus-classes", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
     saveSetting("bus_class_types", JSON.stringify(next));
     const busesUsingClass = db.prepare("SELECT COUNT(*) AS count FROM buses WHERE lower(class_type) = lower(?)").get(oldName).count;
     return res.json({ bus_classes: next, buses_using_removed_class: busesUsingClass });
+  }
+
+  return res.status(400).json({ error: "Choose rename or remove" });
+});
+
+// Categories are independent from the technical bus class. Type values from
+// the fleet PDFs are stored here, and renaming a category updates every bus
+// already assigned to it so the setting remains the single source of truth.
+router.put("/bus-categories", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
+  const { action, currentName } = req.body;
+  const categories = getBusCategories();
+  const index = categories.findIndex((item) => item.toLowerCase() === String(currentName || "").trim().toLowerCase());
+  if (index < 0) return res.status(404).json({ error: "Bus category not found" });
+
+  if (action === "rename") {
+    const newName = String(req.body.newName || "").trim();
+    if (!newName) return res.status(400).json({ error: "New bus category name required" });
+    if (categories.some((item, itemIndex) => itemIndex !== index && item.toLowerCase() === newName.toLowerCase())) {
+      return res.status(400).json({ error: "That bus category already exists" });
+    }
+    const oldName = categories[index];
+    const next = [...categories];
+    next[index] = newName;
+    saveSetting("bus_categories", JSON.stringify(next));
+    const updatedBuses = db.prepare("UPDATE buses SET category = ? WHERE lower(category) = lower(?)").run(newName, oldName).changes;
+    return res.json({ bus_categories: next, updated_buses: updatedBuses });
+  }
+
+  if (action === "remove") {
+    const oldName = categories[index];
+    const next = categories.filter((_, itemIndex) => itemIndex !== index);
+    saveSetting("bus_categories", JSON.stringify(next));
+    const busesUsingCategory = db.prepare("SELECT COUNT(*) AS count FROM buses WHERE lower(category) = lower(?)").get(oldName).count;
+    return res.json({ bus_categories: next, buses_using_removed_category: busesUsingCategory });
   }
 
   return res.status(400).json({ error: "Choose rename or remove" });

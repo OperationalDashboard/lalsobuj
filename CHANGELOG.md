@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.13.0 — 2026-08-31
+
+- Imported fleet rows 101–200 from Fleets-2.pdf using Reg Number, Type, Seat, Makers, and ticked/unticked Status only; 14 unticked buses are unavailable.
+- Added Settings-managed bus categories with add, rename, and remove controls; renaming updates every bus already assigned to that category.
+- Replaced the misleading class selector in the Buses Category column with the recognised category list, including Economy (AC), Economy (NON AC), Suite-Class AC (AC), and Sleeper (AC).
+- Redesigned edit actions with a polished gradient, icon, shine, hover, and keyboard-focus treatment.
+
 ## 1.12.0 — 2026-08-31
 
 - Imported the 100 visible fleet rows from Fleets.pdf using only Reg Number as Bus Number, Type as Category, Seat as Capacity, Makers as Manufacturer, and the ticked/unticked availability status.
