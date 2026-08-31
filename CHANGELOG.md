@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.14.0 — 2026-08-31
+
+- Imported the 62 route Titles from Route.pdf, treating every visible tick as active and supporting unticked source rows as inactive.
+- Prevented duplicate routes even when capitalization, apostrophes, dash style, or spacing differ.
+- Rebuilt route editing into an explicit responsive workflow for name, return route, full-trip time, and active/inactive status, with search and save progress.
+- Route renaming now updates linked buses, rotations, and trips while preserving their IDs and operational history.
+
 ## 1.13.1 — 2026-08-31
 
 - Added full counter-detail editing for the counter name, location, and parent place without replacing the counter or losing its linked staff and account history.

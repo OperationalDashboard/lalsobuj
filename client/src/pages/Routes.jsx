@@ -8,11 +8,11 @@ export default function Routes() {
   const [returnRouteId, setReturnRouteId] = useState("");
   const [fullTripMinutes, setFullTripMinutes] = useState("");
   const [error, setError] = useState("");
-  const [editingReturnId, setEditingReturnId] = useState(null);
-  const [editingNameId, setEditingNameId] = useState(null);
-  const [editingNameValue, setEditingNameValue] = useState("");
-  const [editingTimeId, setEditingTimeId] = useState(null);
-  const [editingTimeValue, setEditingTimeValue] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ name: "", return_route_id: "", full_trip_minutes: "", is_active: "1" });
+  const [savingId, setSavingId] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [query, setQuery] = useState("");
 
   function load() {
     api.get("/routes").then(setRoutes).catch(() => {});
@@ -23,6 +23,7 @@ export default function Routes() {
     e.preventDefault();
     setError("");
     if (!name.trim()) return;
+    setAdding(true);
     try {
       await api.post("/routes", {
         name: name.trim(),
@@ -35,6 +36,8 @@ export default function Routes() {
       load();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setAdding(false);
     }
   }
 
@@ -43,35 +46,39 @@ export default function Routes() {
     load();
   }
 
-  async function handleSetReturnRoute(route, value) {
-    await api.put(`/routes/${route.id}`, { return_route_id: value || null });
-    setEditingReturnId(null);
-    load();
+  function startEdit(route) {
+    setError("");
+    setEditingId(route.id);
+    setEditForm({
+      name: route.name,
+      return_route_id: route.return_route_id ? String(route.return_route_id) : "",
+      full_trip_minutes: route.full_trip_minutes || "",
+      is_active: route.is_active ? "1" : "0",
+    });
   }
 
-  function startEditName(route) {
-    setEditingNameId(route.id);
-    setEditingNameValue(route.name);
+  function cancelEdit() {
+    setEditingId(null);
+    setEditForm({ name: "", return_route_id: "", full_trip_minutes: "", is_active: "1" });
   }
-  async function saveEditName(route) {
-    if (!editingNameValue.trim()) return;
+
+  async function saveEdit(route) {
+    if (!editForm.name.trim()) return;
+    setSavingId(route.id);
     try {
-      await api.put(`/routes/${route.id}`, { name: editingNameValue.trim() });
-      setEditingNameId(null);
+      await api.put(`/routes/${route.id}`, {
+        name: editForm.name.trim(),
+        return_route_id: editForm.return_route_id || null,
+        full_trip_minutes: editForm.full_trip_minutes ? Number(editForm.full_trip_minutes) : null,
+        is_active: editForm.is_active === "1" ? 1 : 0,
+      });
+      cancelEdit();
       load();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSavingId(null);
     }
-  }
-
-  function startEditTime(route) {
-    setEditingTimeId(route.id);
-    setEditingTimeValue(route.full_trip_minutes || "");
-  }
-  async function saveEditTime(route) {
-    await api.put(`/routes/${route.id}`, { full_trip_minutes: editingTimeValue ? Number(editingTimeValue) : null });
-    setEditingTimeId(null);
-    load();
   }
 
   async function handleDelete(id) {
@@ -79,6 +86,11 @@ export default function Routes() {
     await api.del(`/routes/${id}`);
     load();
   }
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleRoutes = normalizedQuery
+    ? routes.filter((route) => route.name.toLowerCase().includes(normalizedQuery))
+    : routes;
 
   return (
     <div>
@@ -98,7 +110,7 @@ export default function Routes() {
           </select>
           <input placeholder="Full trip time (minutes)" type="number" value={fullTripMinutes}
             onChange={(e) => setFullTripMinutes(e.target.value)} />
-          <button className="primary" type="submit">{t("add_route")}</button>
+          <button className="primary" type="submit" disabled={adding} aria-busy={adding}>{adding ? "Adding…" : t("add_route")}</button>
         </form>
         <p style={{ color: "var(--muted)", fontSize: "0.8rem", margin: "6px 0 0" }}>
           Setting a return route (e.g. Dhaka-Cumilla-Noakhali → Noakhali-Cumilla-Dhaka) lets the second
@@ -109,62 +121,48 @@ export default function Routes() {
         {error && <p className="error-text">{error}</p>}
       </div>
 
-      <div className="card">
-        <table>
+      <div className="card routes-management-card">
+        <div className="routes-list-header">
+          <div><span className="settings-eyebrow">ROUTE DIRECTORY</span><strong>{routes.length} unique routes</strong><small>Use Edit route to change every saved detail without losing linked operations.</small></div>
+          <input aria-label="Search routes" placeholder="Search route…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </div>
+        <div className="table-scroll">
+        <table className="routes-table">
           <thead><tr><th>{t("route")}</th><th>{t("return_route")}</th><th>Full trip time</th><th>{t("status")}</th><th></th></tr></thead>
           <tbody>
-            {routes.map((r) => (
-              <tr key={r.id}>
+            {visibleRoutes.map((r) => (
+              <tr key={r.id} className={editingId === r.id ? "route-edit-row" : ""}>
                 <td>
-                  {editingNameId === r.id ? (
-                    <span style={{ display: "inline-flex", gap: 6 }}>
-                      <input autoFocus value={editingNameValue} onChange={(e) => setEditingNameValue(e.target.value)} style={{ width: 180 }} />
-                      <button className="primary" style={{ padding: "2px 8px" }} onClick={() => saveEditName(r)}>{t("save")}</button>
-                      <button className="link-danger" style={{ padding: "2px 8px" }} onClick={() => setEditingNameId(null)}>{t("cancel")}</button>
-                    </span>
-                  ) : (
-                    <span style={{ cursor: "pointer" }} onClick={() => startEditName(r)} title={t("click_to_change")}>
-                      {r.name} ✎
-                    </span>
-                  )}
+                  {editingId === r.id
+                    ? <input className="route-edit-control route-name-control" autoFocus value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+                    : <strong className="route-name-cell">{r.name}</strong>}
                 </td>
                 <td>
-                  {editingReturnId === r.id ? (
-                    <select autoFocus defaultValue={r.return_route_id || ""} onChange={(e) => handleSetReturnRoute(r, e.target.value)} onBlur={() => setEditingReturnId(null)}>
+                  {editingId === r.id ? (
+                    <select className="route-edit-control" value={editForm.return_route_id} onChange={(e) => setEditForm({ ...editForm, return_route_id: e.target.value })}>
                       <option value="">{t("none")}</option>
                       {routes.filter((o) => o.id !== r.id).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                     </select>
-                  ) : (
-                    <span style={{ cursor: "pointer" }} onClick={() => setEditingReturnId(r.id)} title={t("click_to_change")}>
-                      {r.return_route_name || t("none")} ✎
-                    </span>
-                  )}
+                  ) : <span>{r.return_route_name || t("none")}</span>}
                 </td>
                 <td>
-                  {editingTimeId === r.id ? (
-                    <span style={{ display: "inline-flex", gap: 6 }}>
-                      <input autoFocus type="number" value={editingTimeValue} onChange={(e) => setEditingTimeValue(e.target.value)} style={{ width: 80 }} placeholder="minutes" />
-                      <button className="primary" style={{ padding: "2px 8px" }} onClick={() => saveEditTime(r)}>{t("save")}</button>
-                      <button className="link-danger" style={{ padding: "2px 8px" }} onClick={() => setEditingTimeId(null)}>{t("cancel")}</button>
-                    </span>
-                  ) : (
-                    <span style={{ cursor: "pointer" }} onClick={() => startEditTime(r)} title={t("click_to_change")}>
-                      {r.full_trip_minutes ? `${r.full_trip_minutes} min` : t("none")} ✎
-                    </span>
-                  )}
+                  {editingId === r.id
+                    ? <input className="route-edit-control route-time-control" type="number" min="1" value={editForm.full_trip_minutes} onChange={(e) => setEditForm({ ...editForm, full_trip_minutes: e.target.value })} placeholder="minutes" />
+                    : <span>{r.full_trip_minutes ? `${r.full_trip_minutes} min` : t("none")}</span>}
                 </td>
-                <td><span className={`badge ${r.is_active ? "active" : "on_leave"}`}>{r.is_active ? t("active") : t("inactive")}</span></td>
+                <td>{editingId === r.id
+                  ? <select className="route-edit-control route-status-control" value={editForm.is_active} onChange={(e) => setEditForm({ ...editForm, is_active: e.target.value })}><option value="1">{t("active")}</option><option value="0">{t("inactive")}</option></select>
+                  : <span className={`badge ${r.is_active ? "active" : "on_leave"}`}>{r.is_active ? t("active") : t("inactive")}</span>}</td>
                 <td>
-                  <button className="link-danger" style={{ marginRight: 12 }} onClick={() => toggleActive(r)}>
-                    {r.is_active ? t("deactivate") : t("activate")}
-                  </button>
-                  <button className="link-danger" onClick={() => handleDelete(r.id)}>{t("remove")}</button>
+                  {editingId === r.id ? <div className="route-actions"><button className="primary" type="button" disabled={!editForm.name.trim() || savingId === r.id} aria-busy={savingId === r.id} onClick={() => saveEdit(r)}>{savingId === r.id ? "Saving…" : t("save")}</button><button className="place-secondary-action" type="button" disabled={savingId === r.id} onClick={cancelEdit}>{t("cancel")}</button></div>
+                    : <div className="route-actions"><button className="settings-edit-button" type="button" onClick={() => startEdit(r)}>Edit route</button><button className="link-danger" type="button" onClick={() => toggleActive(r)}>{r.is_active ? t("deactivate") : t("activate")}</button><button className="link-danger" type="button" onClick={() => handleDelete(r.id)}>{t("remove")}</button></div>}
                 </td>
               </tr>
             ))}
-            {routes.length === 0 && <tr><td colSpan={5}>{t("no_data")}</td></tr>}
+            {visibleRoutes.length === 0 && <tr><td colSpan={5}>{normalizedQuery ? "No routes match your search." : t("no_data")}</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

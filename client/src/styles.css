@@ -384,6 +384,23 @@ button.link-danger:hover { text-decoration: underline; }
 .counter-edit-panel label { min-width: 0; display: grid; gap: 6px; color: var(--muted); font-size: .73rem; font-weight: 800; }
 .counter-edit-panel input, .counter-edit-panel select { width: 100%; }
 .counter-edit-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+.routes-management-card { padding: 0; overflow: hidden; }
+.routes-list-header { padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 18px; background: linear-gradient(135deg, color-mix(in srgb, var(--green) 6%, var(--card)), var(--card)); border-bottom: 1px solid var(--border); }
+.routes-list-header > div { min-width: 0; display: grid; gap: 3px; }
+.routes-list-header strong { font: 800 1rem "Manrope", sans-serif; }
+.routes-list-header small { color: var(--muted); font-size: .75rem; }
+.routes-list-header input { width: min(100%, 320px); }
+.routes-management-card .table-scroll { width: 100%; overflow-x: auto; }
+.routes-table { min-width: 980px; }
+.routes-table td { vertical-align: middle; }
+.route-name-cell { display: block; max-width: 390px; font-size: .83rem; line-height: 1.4; }
+.route-edit-row td { background: color-mix(in srgb, var(--green) 5%, var(--card)); border-color: color-mix(in srgb, var(--green) 17%, var(--border)); }
+.route-edit-control { width: 100%; min-width: 135px; padding: 7px 8px; font-size: .78rem; }
+.route-name-control { min-width: 270px; }
+.route-time-control { min-width: 90px; }
+.route-status-control { min-width: 105px; }
+.route-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; white-space: nowrap; }
+.route-actions .primary, .route-actions .place-secondary-action { min-height: 34px; padding: 6px 10px; font-size: .75rem; }
 .place-create-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; }
 .place-secondary-action { min-height: 36px; padding: 8px 13px; display: inline-flex; align-items: center; justify-content: center; color: var(--green); background: transparent; border: 1px solid color-mix(in srgb, var(--green) 35%, var(--border)); border-radius: 9px; cursor: pointer; font: 700 .82rem "DM Sans", sans-serif; }
 .place-secondary-action:hover { background: color-mix(in srgb, var(--green) 7%, transparent); }
@@ -625,6 +642,8 @@ button.link-danger:hover { text-decoration: underline; }
   .counter-management-actions { width: 100%; justify-content: space-between; }
   .counter-edit-panel { grid-template-columns: minmax(0, 1fr); }
   .counter-edit-actions { grid-column: 1; }
+  .routes-list-header { align-items: stretch; flex-direction: column; }
+  .routes-list-header input { width: 100%; }
   .place-list-heading { padding: 2px 16px 12px; }
   .place-card-grid { padding: 0 16px 18px; grid-template-columns: minmax(0, 1fr); }
   .place-card.editing { grid-column: auto; }

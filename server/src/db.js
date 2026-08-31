@@ -7,6 +7,7 @@ const fs = require("fs");
 const Database = require("libsql");
 const fleetsPdfBuses = require("./data/fleets-pdf-buses.json");
 const fleets2PdfBuses = require("./data/fleets-2-pdf-buses.json");
+const routePdfRoutes = require("./data/route-pdf-routes.json");
 require("dotenv").config();
 
 const tursoUrl = process.env.TURSO_DATABASE_URL?.trim();
@@ -573,6 +574,8 @@ addColumnIfMissing("transactions", "attachment_name", "TEXT");
 addColumnIfMissing("transactions", "attachment_data", "TEXT");
 addColumnIfMissing("transactions", "counter_id", "INTEGER REFERENCES counters(id) ON DELETE SET NULL");
 addColumnIfMissing("counters", "place_id", "INTEGER REFERENCES expense_places(id) ON DELETE SET NULL");
+addColumnIfMissing("routes", "source_row", "INTEGER");
+addColumnIfMissing("routes", "source_note", "TEXT");
 addColumnIfMissing("parts_catalog", "description", "TEXT");
 addColumnIfMissing("online_sales_entries", "import_batch_id", "INTEGER REFERENCES online_import_batches(id) ON DELETE SET NULL");
 addColumnIfMissing("online_cash_expenses", "import_batch_id", "INTEGER REFERENCES online_import_batches(id) ON DELETE SET NULL");
@@ -656,6 +659,54 @@ if (!db.prepare("SELECT value FROM settings WHERE key = ?").get(fleets2PdfImport
     throw new Error(`Fleets-2.pdf bus import incomplete: expected ${fleets2PdfBuses.length}, found ${importedCount}`);
   }
   db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(fleets2PdfImportKey, String(importedCount));
+}
+
+// Route.pdf contains the route Title and ticked/unticked status. Match a
+// normalized name before inserting so case, spacing, dash, or apostrophe
+// differences never create a second copy of the same route.
+const routeNameKey = (value) => String(value || "")
+  .normalize("NFKC")
+  .trim()
+  .toLowerCase()
+  .replace(/[’‘]/g, "'")
+  .replace(/[–—]/g, "-")
+  .replace(/\s*-\s*/g, "-")
+  .replace(/\s+/g, " ");
+const routePdfImportKey = "route_pdf_import_20260831";
+if (!db.prepare("SELECT value FROM settings WHERE key = ?").get(routePdfImportKey)) {
+  const sourceKeys = new Set();
+  for (const route of routePdfRoutes) {
+    const key = routeNameKey(route.name);
+    if (!key || sourceKeys.has(key)) throw new Error(`Route.pdf contains a duplicate route at source row ${route.source_row}`);
+    sourceKeys.add(key);
+  }
+
+  const routeIndex = new Map(db.prepare("SELECT id, name, is_active FROM routes").all().map((route) => [routeNameKey(route.name), route]));
+  const insertRoute = db.prepare("INSERT INTO routes (name, is_active, source_row, source_note) VALUES (?,?,?,?)");
+  const updateStatus = db.prepare("UPDATE routes SET is_active = ? WHERE id = ?");
+  let inserted = 0;
+  let matched = 0;
+
+  for (const route of routePdfRoutes) {
+    const key = routeNameKey(route.name);
+    const existing = routeIndex.get(key);
+    if (existing) {
+      updateStatus.run(route.active ? 1 : 0, existing.id);
+      matched += 1;
+      continue;
+    }
+    const info = insertRoute.run(route.name, route.active ? 1 : 0, route.source_row, "Imported from Route.pdf");
+    routeIndex.set(key, { id: info.lastInsertRowid, name: route.name, is_active: route.active ? 1 : 0 });
+    inserted += 1;
+  }
+
+  const currentRoutes = new Map(db.prepare("SELECT name, is_active FROM routes").all().map((route) => [routeNameKey(route.name), route]));
+  const incomplete = routePdfRoutes.find((route) => {
+    const stored = currentRoutes.get(routeNameKey(route.name));
+    return !stored || Boolean(stored.is_active) !== Boolean(route.active);
+  });
+  if (incomplete) throw new Error(`Route.pdf import incomplete at source row ${incomplete.source_row}`);
+  db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(routePdfImportKey, JSON.stringify({ source_rows: routePdfRoutes.length, inserted, matched }));
 }
 
 // Preserve any v1.4.0 imports that completed before the separate link table

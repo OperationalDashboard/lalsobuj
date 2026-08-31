@@ -7,6 +7,24 @@ const router = express.Router();
 router.use(requireAuth);
 const guardWrite = requireRole(...FULL_ACCESS, ROLES.CONTROL_COUNTER);
 
+function routeNameKey(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .trim()
+    .toLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/[–—]/g, "-")
+    .replace(/\s*-\s*/g, "-")
+    .replace(/\s+/g, " ");
+}
+
+function findEquivalentRoute(name, excludeId = null) {
+  const key = routeNameKey(name);
+  return db.prepare("SELECT id, name FROM routes").all().find((route) => (
+    String(route.id) !== String(excludeId ?? "") && routeNameKey(route.name) === key
+  ));
+}
+
 // GET /api/routes?active=1 — anyone logged in can read (needed for the
 // route dropdown when starting a trip or building the duty roster).
 // Includes the return route's name so the UI can show "returns via X".
@@ -32,10 +50,12 @@ router.get("/", (req, res) => {
 router.post("/", guardWrite, (req, res) => {
   const { name, return_route_id, full_trip_minutes } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: "name required" });
+  const cleanName = name.trim();
+  if (findEquivalentRoute(cleanName)) return res.status(400).json({ error: "That route already exists" });
   try {
     const info = db
       .prepare("INSERT INTO routes (name, return_route_id, full_trip_minutes) VALUES (?,?,?)")
-      .run(name.trim(), return_route_id || null, full_trip_minutes || null);
+      .run(cleanName, return_route_id || null, full_trip_minutes || null);
     res.status(201).json(db.prepare("SELECT * FROM routes WHERE id = ?").get(info.lastInsertRowid));
   } catch (err) {
     res.status(400).json({ error: "That route already exists" });
@@ -44,16 +64,35 @@ router.post("/", guardWrite, (req, res) => {
 
 router.put("/:id", guardWrite, (req, res) => {
   const { name, is_active, return_route_id, full_trip_minutes } = req.body;
+  const current = db.prepare("SELECT * FROM routes WHERE id = ?").get(req.params.id);
+  if (!current) return res.status(404).json({ error: "Not found" });
   const present = [];
   const values = [];
-  if (name !== undefined) { present.push("name = ?"); values.push(name); }
+  let cleanName = current.name;
+  if (name !== undefined) {
+    cleanName = String(name).trim();
+    if (!cleanName) return res.status(400).json({ error: "name required" });
+    if (findEquivalentRoute(cleanName, req.params.id)) return res.status(400).json({ error: "That route already exists" });
+    present.push("name = ?");
+    values.push(cleanName);
+  }
   if (is_active !== undefined) { present.push("is_active = ?"); values.push(is_active ? 1 : 0); }
   if (return_route_id !== undefined) { present.push("return_route_id = ?"); values.push(return_route_id || null); }
   if (full_trip_minutes !== undefined) { present.push("full_trip_minutes = ?"); values.push(full_trip_minutes || null); }
   if (!present.length) return res.status(400).json({ error: "No valid fields" });
-  const info = db.prepare(`UPDATE routes SET ${present.join(", ")} WHERE id = ?`).run(...values, req.params.id);
-  if (info.changes === 0) return res.status(404).json({ error: "Not found" });
-  res.json(db.prepare("SELECT * FROM routes WHERE id = ?").get(req.params.id));
+  try {
+    db.prepare(`UPDATE routes SET ${present.join(", ")} WHERE id = ?`).run(...values, req.params.id);
+    let updatedLinkedRecords = 0;
+    if (name !== undefined && cleanName !== current.name) {
+      updatedLinkedRecords += db.prepare("UPDATE buses SET route = ? WHERE route = ?").run(cleanName, current.name).changes;
+      updatedLinkedRecords += db.prepare("UPDATE rotations SET route = ? WHERE route = ?").run(cleanName, current.name).changes;
+      updatedLinkedRecords += db.prepare("UPDATE trips SET route = ? WHERE route = ?").run(cleanName, current.name).changes;
+    }
+    res.json({ ...db.prepare("SELECT * FROM routes WHERE id = ?").get(req.params.id), updated_linked_records: updatedLinkedRecords });
+  } catch (err) {
+    const duplicateName = String(err?.message || "").toLowerCase().includes("unique");
+    res.status(400).json({ error: duplicateName ? "That route already exists" : "Could not update route details" });
+  }
 });
 
 router.delete("/:id", guardWrite, (req, res) => {
