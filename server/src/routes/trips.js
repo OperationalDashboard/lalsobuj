@@ -298,6 +298,7 @@ router.post("/", requireRole(ROLES.CONTROL_COUNTER, ROLES.DRIVER, ROLES.HELPER, 
   const { openCount } = db.prepare("SELECT COUNT(*) as openCount FROM maintenance WHERE bus_id = ? AND status != 'resolved'").get(bus_id);
   // A bus that's under maintenance or retired can't start a trip.
   if (bus.status === "retired") return res.status(400).json({ error: "This bus is retired and can't start a trip" });
+  if (bus.status === "unavailable") return res.status(400).json({ error: "This bus is unavailable and can't start a trip" });
   if (openCount > 0) return res.status(400).json({ error: "This bus is currently under maintenance and can't start a trip" });
 
   // --- Rotation pairing ---------------------------------------------------

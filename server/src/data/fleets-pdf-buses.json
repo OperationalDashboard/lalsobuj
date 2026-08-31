@@ -1,0 +1,902 @@
+[
+  {
+    "source_row": 1,
+    "bus_number": "14-6868",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "HINO 1J - Japan",
+    "available": true
+  },
+  {
+    "source_row": 2,
+    "bus_number": "12-1806",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "HINO 1J - Japan",
+    "available": true
+  },
+  {
+    "source_row": 3,
+    "bus_number": "12-3815",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 4,
+    "bus_number": "12-3816",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 5,
+    "bus_number": "12-5668",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 6,
+    "bus_number": "12-4083",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 7,
+    "bus_number": "12-4084",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 8,
+    "bus_number": "12-4085",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 9,
+    "bus_number": "12-4086",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 10,
+    "bus_number": "12-4087",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 11,
+    "bus_number": "12-4088",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 12,
+    "bus_number": "12-4089",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 13,
+    "bus_number": "12-4101",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 14,
+    "bus_number": "12-4505",
+    "category": "Economy (NON AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 15,
+    "bus_number": "12-0284",
+    "category": "Economy (NON AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": false
+  },
+  {
+    "source_row": 16,
+    "bus_number": "15-9988",
+    "category": "Economy (NON AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 17,
+    "bus_number": "12-4861",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 18,
+    "bus_number": "15-9167",
+    "category": "Economy (NON AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 19,
+    "bus_number": "12-4850",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 20,
+    "bus_number": "12-5156",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 21,
+    "bus_number": "12-4126",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 22,
+    "bus_number": "12-5188",
+    "category": "Economy (NON AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "HINO 1J - Japan",
+    "available": true
+  },
+  {
+    "source_row": 23,
+    "bus_number": "12-5314",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 24,
+    "bus_number": "12-5315",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 25,
+    "bus_number": "12-8578",
+    "category": "Economy (AC)",
+    "capacity": 38,
+    "capacity_label": "38 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 26,
+    "bus_number": "15-9351",
+    "category": "Economy (AC)",
+    "capacity": 38,
+    "capacity_label": "38 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 27,
+    "bus_number": "12-5303",
+    "category": "Economy (AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 28,
+    "bus_number": "12-2431",
+    "category": "Economy (AC)",
+    "capacity": 36,
+    "capacity_label": "36 seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 29,
+    "bus_number": "11-1688",
+    "category": "Economy (AC)",
+    "capacity": 36,
+    "capacity_label": "36 Seater Bus",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 30,
+    "bus_number": "12-1588",
+    "category": "Economy (AC)",
+    "capacity": 36,
+    "capacity_label": "36 seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": false
+  },
+  {
+    "source_row": 31,
+    "bus_number": "12-2063",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 32,
+    "bus_number": "12-2706",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 33,
+    "bus_number": "12-2064",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 34,
+    "bus_number": "11-2189",
+    "category": "Suite-Class AC (AC)",
+    "capacity": 43,
+    "capacity_label": "43 Seater (28 B + 15 S)",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 35,
+    "bus_number": "11-2185",
+    "category": "Suite-Class AC (AC)",
+    "capacity": 43,
+    "capacity_label": "43 Seater (28 B + 15 S)",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 36,
+    "bus_number": "12-2013",
+    "category": "Economy (AC)",
+    "capacity": 42,
+    "capacity_label": "42 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 37,
+    "bus_number": "15-5307",
+    "category": "Economy (AC)",
+    "capacity": 44,
+    "capacity_label": "44 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 38,
+    "bus_number": "12-5828",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 39,
+    "bus_number": "12-8806",
+    "category": "Economy (AC)",
+    "capacity": 42,
+    "capacity_label": "42 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 40,
+    "bus_number": "12-2603",
+    "category": "Economy (AC)",
+    "capacity": 43,
+    "capacity_label": "43 Seater (28 B + 15 S)",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 41,
+    "bus_number": "12-2881",
+    "category": "Economy (AC)",
+    "capacity": 43,
+    "capacity_label": "43 Seater (28 B + 15 S)",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 42,
+    "bus_number": "12-2227",
+    "category": "Economy (AC)",
+    "capacity": 43,
+    "capacity_label": "43 Seater (28 B + 15 S)",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 43,
+    "bus_number": "12-2643",
+    "category": "Economy (AC)",
+    "capacity": 43,
+    "capacity_label": "43 Seater (28 B + 15 S)",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 44,
+    "bus_number": "15-8578",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 45,
+    "bus_number": "12-5178",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 46,
+    "bus_number": "15-8440",
+    "category": "Economy (AC)",
+    "capacity": 43,
+    "capacity_label": "43 Seater (28 B + 15 S)",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 47,
+    "bus_number": "15-8970",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 48,
+    "bus_number": "12-5179",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 49,
+    "bus_number": "12-5493",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 50,
+    "bus_number": "12-5819",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "HINO 1J - Japan",
+    "available": true
+  },
+  {
+    "source_row": 51,
+    "bus_number": "12-9160",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "HINO 1J - Japan",
+    "available": true
+  },
+  {
+    "source_row": 52,
+    "bus_number": "12-5665",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 53,
+    "bus_number": "12-5819",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 54,
+    "bus_number": "12-0361",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 55,
+    "bus_number": "12-5131",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 56,
+    "bus_number": "12-5395",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 57,
+    "bus_number": "12-4846",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 58,
+    "bus_number": "12-5396",
+    "category": "Economy (NON AC)",
+    "capacity": 45,
+    "capacity_label": "45 Seater",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 59,
+    "bus_number": "15-5217",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 60,
+    "bus_number": "15-5218",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 61,
+    "bus_number": "15-5219",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 62,
+    "bus_number": "15-5220",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 63,
+    "bus_number": "15-5222",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 64,
+    "bus_number": "15-5224",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 65,
+    "bus_number": "15-5225",
+    "category": "Economy (AC)",
+    "capacity": 36,
+    "capacity_label": "36 seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 66,
+    "bus_number": "15-5226",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 67,
+    "bus_number": "15-5227",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 68,
+    "bus_number": "15-5228",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 69,
+    "bus_number": "15-5229",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 70,
+    "bus_number": "15-5230",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 71,
+    "bus_number": "15-5231",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 72,
+    "bus_number": "15-5221",
+    "category": "Economy (AC)",
+    "capacity": 38,
+    "capacity_label": "38 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 73,
+    "bus_number": "15-5232",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 74,
+    "bus_number": "15-5233",
+    "category": "Economy (AC)",
+    "capacity": 38,
+    "capacity_label": "38 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 75,
+    "bus_number": "15-5234",
+    "category": "Economy (AC)",
+    "capacity": 36,
+    "capacity_label": "36 seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 76,
+    "bus_number": "15-5235",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 77,
+    "bus_number": "15-5236",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ISUZU - Japan",
+    "available": true
+  },
+  {
+    "source_row": 78,
+    "bus_number": "14-3888",
+    "category": "Economy (NON AC)",
+    "capacity": 36,
+    "capacity_label": "36 seats",
+    "manufacturer": "HINO 1J - Japan",
+    "available": false
+  },
+  {
+    "source_row": 79,
+    "bus_number": "14-2390",
+    "category": "Economy (NON AC)",
+    "capacity": 36,
+    "capacity_label": "36 seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 80,
+    "bus_number": "15-7683",
+    "category": "Economy (NON AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": false
+  },
+  {
+    "source_row": 81,
+    "bus_number": "14-4749",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "HINO 1J - Japan",
+    "available": true
+  },
+  {
+    "source_row": 82,
+    "bus_number": "15-1637",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "-",
+    "available": false
+  },
+  {
+    "source_row": 83,
+    "bus_number": "13-2431",
+    "category": "Economy (AC)",
+    "capacity": 36,
+    "capacity_label": "36 seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 84,
+    "bus_number": "15-2202",
+    "category": "Economy (AC)",
+    "capacity": 36,
+    "capacity_label": "36 seats",
+    "manufacturer": "HINO 1J - Japan",
+    "available": true
+  },
+  {
+    "source_row": 85,
+    "bus_number": "15-2203",
+    "category": "Economy (AC)",
+    "capacity": 36,
+    "capacity_label": "36 seats",
+    "manufacturer": "HINO 1J - Japan",
+    "available": true
+  },
+  {
+    "source_row": 86,
+    "bus_number": "15-8084",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 87,
+    "bus_number": "15-8085",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 88,
+    "bus_number": "15-8086",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 89,
+    "bus_number": "15-8087",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 90,
+    "bus_number": "15-8088",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 91,
+    "bus_number": "15-8089",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 92,
+    "bus_number": "15-8090",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 93,
+    "bus_number": "15-8093",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 94,
+    "bus_number": "15-5053",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 95,
+    "bus_number": "15-5058",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 96,
+    "bus_number": "15-5062",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 97,
+    "bus_number": "15-5068",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 98,
+    "bus_number": "15-5070",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 99,
+    "bus_number": "15-5071",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  },
+  {
+    "source_row": 100,
+    "bus_number": "15-5072",
+    "category": "Economy (AC)",
+    "capacity": 40,
+    "capacity_label": "40 Seats",
+    "manufacturer": "ASHOK LEYLAND - India",
+    "available": true
+  }
+]

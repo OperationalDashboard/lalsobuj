@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.12.0 — 2026-08-31
+
+- Imported the 100 visible fleet rows from Fleets.pdf using only Reg Number as Bus Number, Type as Category, Seat as Capacity, Makers as Manufacturer, and the ticked/unticked availability status.
+- Marked the five unticked buses as unavailable and made unavailable a normal editable bus status.
+- Kept unavailable buses out of Rotation and trip starts while allowing an authorized user to change their status later.
+- Preserved the duplicate `12-5819` records independently using source-row-based internal keys.
+
 ## 1.11.1 — 2026-08-31
 
 - Removed only the 201 fleet rows imported from the superseded Book 1.pdf, leaving all pre-existing and manually created bus records untouched.

@@ -5,6 +5,7 @@
 const path = require("path");
 const fs = require("fs");
 const Database = require("libsql");
+const fleetsPdfBuses = require("./data/fleets-pdf-buses.json");
 require("dotenv").config();
 
 const tursoUrl = process.env.TURSO_DATABASE_URL?.trim();
@@ -83,7 +84,7 @@ CREATE TABLE IF NOT EXISTS buses (
   class_type    TEXT,
   capacity      INTEGER,
   route         TEXT,
-  status        TEXT NOT NULL DEFAULT 'active', -- active | maintenance | retired
+  status        TEXT NOT NULL DEFAULT 'active', -- active | unavailable | maintenance | retired
   fleet_serial  INTEGER,
   source_bus_number TEXT,
   category      TEXT,
@@ -590,6 +591,39 @@ const book1RemovalKey = "book1_bus_import_removed_20260831";
 if (!db.prepare("SELECT value FROM settings WHERE key = ?").get(book1RemovalKey)) {
   const removed = db.prepare("DELETE FROM buses WHERE source_note LIKE 'Imported from Book 1.pdf%'").run().changes;
   db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(book1RemovalKey, String(removed));
+}
+
+// Import only the fields requested from Fleets.pdf. The displayed registration
+// number is preserved as source_bus_number, while an internal row-prefixed key
+// keeps the records unique when the PDF contains a repeated bus number.
+const fleetsPdfImportKey = "fleets_pdf_bus_import_20260831";
+if (!db.prepare("SELECT value FROM settings WHERE key = ?").get(fleetsPdfImportKey)) {
+  const insertFleetBus = db.prepare(`
+    INSERT OR IGNORE INTO buses (
+      reg_number, source_bus_number, category, capacity, capacity_label,
+      manufacturer, status, source_note
+    ) VALUES (?,?,?,?,?,?,?,?)
+  `);
+
+  for (const bus of fleetsPdfBuses) {
+    const internalNumber = `FLEETS-${String(bus.source_row).padStart(3, "0")} | ${bus.bus_number}`;
+    insertFleetBus.run(
+      internalNumber,
+      bus.bus_number,
+      bus.category,
+      bus.capacity,
+      bus.capacity_label,
+      bus.manufacturer,
+      bus.available ? "active" : "unavailable",
+      "Imported from Fleets.pdf"
+    );
+  }
+
+  const importedCount = db.prepare("SELECT COUNT(*) AS count FROM buses WHERE source_note = 'Imported from Fleets.pdf'").get().count;
+  if (importedCount !== fleetsPdfBuses.length) {
+    throw new Error(`Fleets.pdf bus import incomplete: expected ${fleetsPdfBuses.length}, found ${importedCount}`);
+  }
+  db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(fleetsPdfImportKey, String(importedCount));
 }
 
 // Preserve any v1.4.0 imports that completed before the separate link table

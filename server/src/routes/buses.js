@@ -42,7 +42,7 @@ function validateClassType(req, res) {
 // maintenance ticket, no matter which code path touched it last.
 const STATUS_SELECT = `
   CASE
-    WHEN b.status = 'retired' THEN 'retired'
+    WHEN b.status IN ('retired', 'unavailable') THEN b.status
     WHEN EXISTS (SELECT 1 FROM maintenance m WHERE m.bus_id = b.id AND m.status != 'resolved') THEN 'maintenance'
     ELSE 'active'
   END`;

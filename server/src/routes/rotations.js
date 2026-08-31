@@ -16,7 +16,7 @@ const WRITABLE = ["bus_id", "driver_id", "helper_id", "supervisor_id", "coach_na
 // unresolved maintenance ticket must take the bus off the road immediately.
 const BUS_STATUS_SELECT = `
   CASE
-    WHEN b.status = 'retired' THEN 'retired'
+    WHEN b.status IN ('retired', 'unavailable') THEN b.status
     WHEN EXISTS (SELECT 1 FROM maintenance m WHERE m.bus_id = b.id AND m.status != 'resolved') THEN 'maintenance'
     ELSE 'active'
   END`;
@@ -39,6 +39,10 @@ function requireActiveBus(busId, res) {
   }
   if (bus.status === "retired") {
     res.status(400).json({ error: `${bus.reg_number} is retired and cannot be added to Rotation` });
+    return false;
+  }
+  if (bus.status === "unavailable") {
+    res.status(400).json({ error: `${bus.reg_number} is unavailable and cannot be added to Rotation` });
     return false;
   }
   return true;

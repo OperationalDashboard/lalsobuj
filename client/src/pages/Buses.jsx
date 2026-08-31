@@ -131,9 +131,9 @@ export default function Buses() {
         <div className="card" style={{ marginBottom: 20 }}>
           <div className="bus-form-heading"><div><strong>{editingId ? "Edit bus details" : "Add a bus"}</strong><span>All detailed fields are optional except the unique registration key.</span></div>{editingId && <button type="button" className="secondary" onClick={cancelEdit}>Cancel editing</button>}</div>
           <form className="bus-form-grid" onSubmit={handleSubmit}>
-            <label>Unique registration key<input placeholder="Unique registration key" value={form.reg_number} required onChange={(e) => setForm({ ...form, reg_number: e.target.value })} /></label>
+            <label>Internal unique key<input placeholder="Internal unique key" value={form.reg_number} required onChange={(e) => setForm({ ...form, reg_number: e.target.value })} /></label>
             <label>Fleet serial<input type="number" placeholder="e.g. 25" value={form.fleet_serial} onChange={(e) => setForm({ ...form, fleet_serial: e.target.value })} /></label>
-            <label>Printed bus number<input placeholder="Number shown in source" value={form.source_bus_number} onChange={(e) => setForm({ ...form, source_bus_number: e.target.value })} /></label>
+            <label>Bus number<input placeholder="Bus number" value={form.source_bus_number} onChange={(e) => setForm({ ...form, source_bus_number: e.target.value })} /></label>
             <label>Category<input placeholder="e.g. Economy (AC)" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
             <label>Configured class<select value={form.class_type} onChange={(e) => setForm({ ...form, class_type: e.target.value })}>
               <option value="">Select bus class</option>
@@ -141,13 +141,14 @@ export default function Buses() {
             </select></label>
             <label>Capacity<input placeholder={t("capacity")} type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} /></label>
             <label>Capacity description<input placeholder="e.g. 43 Seater (28 B + 15 S)" value={form.capacity_label} onChange={(e) => setForm({ ...form, capacity_label: e.target.value })} /></label>
-            <label>Manufacturer<input placeholder="e.g. HINO 1J" value={form.manufacturer} onChange={(e) => setForm({ ...form, manufacturer: e.target.value, model: e.target.value })} /></label>
+            <label>Manufacturer<input placeholder="e.g. HINO 1J" value={form.manufacturer} onChange={(e) => setForm({ ...form, manufacturer: e.target.value })} /></label>
             <label>Country<input placeholder="e.g. Japan" value={form.manufacturer_country} onChange={(e) => setForm({ ...form, manufacturer_country: e.target.value })} /></label>
             <label>Model year<input type="number" placeholder="e.g. 2024" value={form.model_year} onChange={(e) => setForm({ ...form, model_year: e.target.value })} /></label>
             <label>Registration date<input type="date" value={form.registration_date} onChange={(e) => setForm({ ...form, registration_date: e.target.value })} /></label>
             <label>Route<input placeholder={t("route")} value={form.route} onChange={(e) => setForm({ ...form, route: e.target.value })} /></label>
             <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
               <option value="active">{t("active")}</option>
+              <option value="unavailable">unavailable</option>
               <option value="maintenance">maintenance</option>
               <option value="retired">{t("retired")}</option>
             </select></label>
@@ -168,7 +169,7 @@ export default function Buses() {
             {visibleBuses.map((b) => (
               <tr key={b.id}>
                 <td><div className="bus-fleet-cell"><BusIcon size={24} muted={b.status !== "active"} /><strong>{b.fleet_serial || "—"}</strong></div></td>
-                <td><strong>{b.source_bus_number || b.reg_number}</strong>{b.source_bus_number && <small>Key: {b.reg_number}</small>}</td>
+                <td><strong>{b.source_bus_number || b.reg_number}</strong></td>
                 <td><strong>{b.category || b.class_type || "—"}</strong>{canEditFull ? <select value={b.class_type || ""} onChange={(e) => handleClassChange(b.id, e.target.value)}><option value="">No configured class</option>{b.class_type && !busClasses.includes(b.class_type) && <option value={b.class_type}>{b.class_type} (legacy)</option>}{busClasses.map((classType) => <option key={classType} value={classType}>{classType}</option>)}</select> : b.class_type && <small>{b.class_type}</small>}</td>
                 <td><strong>{b.capacity ?? "—"}</strong>{b.capacity_label && <small>{b.capacity_label}</small>}</td>
                 <td><strong>{b.manufacturer || b.model || "—"}</strong>{b.manufacturer_country && <small>{b.manufacturer_country}</small>}</td>
@@ -178,6 +179,7 @@ export default function Buses() {
                   {canEditStatus && statusEditId === b.id ? (
                     <select autoFocus defaultValue={b.status} onChange={(e) => handleStatusChange(b.id, e.target.value)} onBlur={() => setStatusEditId(null)}>
                       <option value="active">{t("active")}</option>
+                      <option value="unavailable">unavailable</option>
                       <option value="maintenance">maintenance</option>
                       <option value="retired">{t("retired")}</option>
                     </select>
