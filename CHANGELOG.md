@@ -2,6 +2,12 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.18.1 — 2026-09-01
+
+- Fixed Settings-managed bus categories so Add, Edit, and Remove now use the same verified save route.
+- Staff-type save failures are now shown clearly instead of silently appearing to do nothing.
+- When removing a staff type that is still assigned to staff, Settings now offers to move those staff to another type and removes the old type completely.
+
 ## 1.18.0 — 2026-09-01
 
 - Added Settings-managed Staff Types: add, rename, group as Bus/Counter/Office staff, or remove old choices.

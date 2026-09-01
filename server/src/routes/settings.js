@@ -173,6 +173,14 @@ router.put("/bus-classes", requireFeaturePermission("settings", "write"), (req, 
 router.put("/bus-categories", requireFeaturePermission("settings", "write"), (req, res) => {
   const { action, currentName } = req.body;
   const categories = getBusCategories();
+  if (action === "add") {
+    const newName = String(req.body.newName || req.body.name || "").trim();
+    if (!newName) return res.status(400).json({ error: "Bus category name required" });
+    if (categories.some((item) => item.toLowerCase() === newName.toLowerCase())) return res.status(400).json({ error: "That bus category already exists" });
+    const next = [...categories, newName];
+    saveSetting("bus_categories", JSON.stringify(next));
+    return res.status(201).json({ bus_categories: next });
+  }
   const index = categories.findIndex((item) => item.toLowerCase() === String(currentName || "").trim().toLowerCase());
   if (index < 0) return res.status(404).json({ error: "Bus category not found" });
 
@@ -198,7 +206,7 @@ router.put("/bus-categories", requireFeaturePermission("settings", "write"), (re
     return res.json({ bus_categories: next, buses_using_removed_category: busesUsingCategory });
   }
 
-  return res.status(400).json({ error: "Choose rename or remove" });
+  return res.status(400).json({ error: "Choose add, rename, or remove" });
 });
 
 // Staff types are administrator-managed. Removing a type only removes it
@@ -235,8 +243,13 @@ router.put("/staff-types", requireFeaturePermission("settings", "write"), (req, 
     const assigned = db.prepare("SELECT COUNT(*) AS count FROM staff WHERE designation = ?").get(currentKey).count;
     const next = types.filter((type) => type.key !== currentKey);
     if (!next.length) return res.status(400).json({ error: "Keep at least one staff type" });
+    const replacementKey = String(req.body.replacementKey || "");
+    if (assigned && !next.some((type) => type.key === replacementKey)) {
+      return res.status(409).json({ error: "Move assigned staff to another type before removing this type", assigned_staff: assigned });
+    }
+    if (assigned) db.prepare("UPDATE staff SET designation = ? WHERE designation = ?").run(replacementKey, currentKey);
     saveSetting("staff_types", JSON.stringify(next));
-    return res.json({ staff_types: next, assigned_staff: assigned });
+    return res.json({ staff_types: next, assigned_staff: assigned, replacement_key: replacementKey || null });
   }
   return res.status(400).json({ error: "Choose add, rename, or remove" });
 });

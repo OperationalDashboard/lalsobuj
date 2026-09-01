@@ -11,6 +11,7 @@ export default function Settings() {
   const user = getUser();
   const canWrite = canUseFeature(user, "settings", "write");
   const [settings, setSettings] = useState(null);
+  const [settingsError, setSettingsError] = useState("");
   const [colors, setColors] = useState({ theme_primary_color: "#046a38", theme_accent_color: "#d21f3c" });
   const [callContact, setCallContact] = useState({ dedicated_call_name: "", dedicated_call_phone: "" });
   const [loginLook, setLoginLook] = useState({ app_name: "Lal Sabuj Paribahan", login_logo_data: "", login_background_data: "" });
@@ -75,8 +76,14 @@ export default function Settings() {
   useEffect(() => { loadSettings(); loadHotels(); loadParts(); loadDiscountTypes(); loadPlaceSettings(); loadLocations(); }, []);
 
   function flashMessage(message) {
+    setSettingsError("");
     setSavedMsg(message);
     setTimeout(() => setSavedMsg(""), 2600);
+  }
+
+  function showSettingsError(error) {
+    setSavedMsg("");
+    setSettingsError(error?.message || "The setting could not be saved. Please try again.");
   }
 
   async function saveAppearance(e) {
@@ -144,60 +151,75 @@ export default function Settings() {
     e.preventDefault();
     const categoryName = newBusCategory.trim();
     if (!categoryName || busCategories.some((item) => item.toLowerCase() === categoryName.toLowerCase())) return;
-    const next = [...busCategories, categoryName];
-    await api.put("/settings", { bus_categories: JSON.stringify(next) });
-    setBusCategories(next);
-    setNewBusCategory("");
-    flashMessage("Bus category added.");
+    try {
+      const result = await api.put("/settings/bus-categories", { action: "add", newName: categoryName });
+      setBusCategories(result.bus_categories);
+      setNewBusCategory("");
+      flashMessage("Bus category added.");
+    } catch (error) { showSettingsError(error); }
   }
 
   async function removeBusCategory(categoryName) {
     if (!confirm(`Remove '${categoryName}' from the bus category choices? Existing buses will keep the category as historical data.`)) return;
-    if (canWrite) {
+    try {
       const result = await api.put("/settings/bus-categories", { action: "remove", currentName: categoryName });
       setBusCategories(result.bus_categories);
       flashMessage(result.buses_using_removed_category
         ? `Category removed from choices. ${result.buses_using_removed_category} existing bus record(s) kept it as legacy data.`
         : "Bus category removed.");
-      return;
-    }
-    const next = busCategories.filter((item) => item !== categoryName);
-    await api.put("/settings", { bus_categories: JSON.stringify(next) });
-    setBusCategories(next);
-    flashMessage("Bus category removed.");
+    } catch (error) { showSettingsError(error); }
   }
 
   async function saveBusCategory(categoryName) {
     const newName = editingItem?.value?.trim();
     if (!newName) return;
-    const result = await api.put("/settings/bus-categories", { action: "rename", currentName: categoryName, newName });
-    setBusCategories(result.bus_categories);
-    setEditingItem(null);
-    flashMessage(result.updated_buses ? `Bus category renamed on ${result.updated_buses} bus record(s).` : "Bus category renamed.");
+    try {
+      const result = await api.put("/settings/bus-categories", { action: "rename", currentName: categoryName, newName });
+      setBusCategories(result.bus_categories);
+      setEditingItem(null);
+      flashMessage(result.updated_buses ? `Bus category renamed on ${result.updated_buses} bus record(s).` : "Bus category renamed.");
+    } catch (error) { showSettingsError(error); }
   }
 
   async function addStaffType(e) {
     e.preventDefault();
     const label = newStaffType.label.trim();
     if (!label) return;
-    const result = await api.put("/settings/staff-types", { action: "add", label, group: newStaffType.group });
-    setStaffTypes(result.staff_types);
-    setNewStaffType({ label: "", group: "office" });
-    flashMessage("Staff type added. You can now assign staff to it from Staff Details.");
+    try {
+      const result = await api.put("/settings/staff-types", { action: "add", label, group: newStaffType.group });
+      setStaffTypes(result.staff_types);
+      setNewStaffType({ label: "", group: "office" });
+      flashMessage("Staff type added. You can now assign staff to it from Staff Details.");
+    } catch (error) { showSettingsError(error); }
   }
   async function saveStaffType(type) {
     const label = editingItem?.value?.trim();
     if (!label) return;
-    const result = await api.put("/settings/staff-types", { action: "rename", currentKey: type.key, label, group: editingItem.group });
-    setStaffTypes(result.staff_types);
-    setEditingItem(null);
-    flashMessage("Staff type updated. Existing staff keep their assignment.");
+    try {
+      const result = await api.put("/settings/staff-types", { action: "rename", currentKey: type.key, label, group: editingItem.group });
+      setStaffTypes(result.staff_types);
+      setEditingItem(null);
+      flashMessage("Staff type updated. Existing staff keep their assignment.");
+    } catch (error) { showSettingsError(error); }
   }
   async function removeStaffType(type) {
     if (!confirm(`Remove '${type.label}' from the staff type choices? Staff already assigned to it will keep their history until you move them to another type.`)) return;
-    const result = await api.put("/settings/staff-types", { action: "remove", currentKey: type.key });
-    setStaffTypes(result.staff_types);
-    flashMessage(result.assigned_staff ? `Type removed from choices. Move ${result.assigned_staff} existing staff member(s) from Staff Details when ready.` : "Staff type removed from choices.");
+    try {
+      const result = await api.put("/settings/staff-types", { action: "remove", currentKey: type.key });
+      setStaffTypes(result.staff_types);
+      flashMessage("Staff type removed from choices.");
+    } catch (error) {
+      const replacement = staffTypes.find((candidate) => candidate.key !== type.key);
+      if (error?.message?.startsWith("Move assigned staff") && replacement && confirm(`${error.message}\n\nMove those staff to ${replacement.label} and remove the old type?`)) {
+        try {
+          const result = await api.put("/settings/staff-types", { action: "remove", currentKey: type.key, replacementKey: replacement.key });
+          setStaffTypes(result.staff_types);
+          flashMessage(`${type.label} removed. ${result.assigned_staff} staff member(s) moved to ${replacement.label}.`);
+          return;
+        } catch (retryError) { showSettingsError(retryError); return; }
+      }
+      showSettingsError(error);
+    }
   }
 
   async function addHotel(e) {
@@ -345,6 +367,7 @@ export default function Settings() {
       </div>
 
       {savedMsg && <p style={{ color: "var(--green)", fontWeight: 600 }}>{savedMsg}</p>}
+      {settingsError && <p role="alert" style={{ color: "var(--red)", fontWeight: 700 }}>{settingsError}</p>}
       {canWrite && <div className="super-admin-control-note">
         <span aria-hidden="true">◆</span>
         <div><strong>Super Admin editing enabled</strong><p>You can rename every Settings list item. Linked records are updated automatically so reports keep their data.</p></div>
