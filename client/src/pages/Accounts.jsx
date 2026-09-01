@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { api, getUser } from "../api.js";
 import { ROLES, isFullAccess } from "../roles.js";
 import { t } from "../i18n.js";
@@ -19,6 +19,20 @@ const INCOME_CATEGORIES = [
   { value: "additional_sale", labelKey: "additional_sale" },
 ];
 const EXPENSE_CATEGORIES = ["fuel", "salary", "repair", "toll", "counter_rent", "counter_staff_salary", "counter_electricity", "other"];
+const BUS_PAGE_SIZE = 10;
+
+// Imported buses keep an internal key such as "FLEETS-001 | 14-6868" so
+// duplicate source rows remain independent. People should only ever see the
+// actual Bus Number in Accounts, while older/manual buses still need a safe
+// fallback when they do not have source_bus_number yet.
+function displayBusNumber(bus) {
+  const sourceNumber = String(bus?.source_bus_number ?? "").trim();
+  if (sourceNumber) return sourceNumber;
+
+  const internalKey = String(bus?.reg_number ?? "").trim();
+  const importedMatch = internalKey.match(/^FLEETS-\d+\s*\|\s*(.+)$/i);
+  return importedMatch?.[1]?.trim() || internalKey || "—";
+}
 
 function RotationDetails({ rows }) {
   const income = rows.filter((tx) => tx.type === "income").reduce((sum, tx) => sum + tx.amount, 0);
@@ -36,6 +50,8 @@ export default function Accounts() {
   const [buses, setBuses] = useState([]);
   const [discountTypes, setDiscountTypes] = useState([]);
   const [selectedBus, setSelectedBus] = useState("");
+  const [busSearch, setBusSearch] = useState("");
+  const [busPage, setBusPage] = useState(1);
 
   const [busTrips, setBusTrips] = useState([]);
   const [busTransactions, setBusTransactions] = useState([]);
@@ -305,7 +321,32 @@ export default function Accounts() {
     loadOverview();
   }
 
-  const busName = (id) => buses.find((b) => b.id === Number(id))?.reg_number || "";
+  const busName = (id, fallbackBus) => displayBusNumber(
+    buses.find((bus) => bus.id === Number(id))
+      || busSummaries.find((bus) => Number(bus.bus_id) === Number(id))
+      || fallbackBus,
+  );
+  const searchableBusSummaries = useMemo(() => {
+    const busesById = new Map(buses.map((bus) => [Number(bus.id), bus]));
+    const needle = busSearch.trim().toLocaleLowerCase();
+
+    return busSummaries
+      .map((summary) => {
+        const bus = busesById.get(Number(summary.bus_id));
+        const number = displayBusNumber(bus || summary);
+        return { ...summary, busNumber: number };
+      })
+      .filter((summary) => !needle || summary.busNumber.toLocaleLowerCase().includes(needle))
+      .sort((a, b) => a.busNumber.localeCompare(b.busNumber, undefined, { numeric: true, sensitivity: "base" }));
+  }, [buses, busSearch, busSummaries]);
+  const busPageCount = Math.max(1, Math.ceil(searchableBusSummaries.length / BUS_PAGE_SIZE));
+  const currentBusPage = Math.min(busPage, busPageCount);
+  const visibleBusSummaries = searchableBusSummaries.slice(
+    (currentBusPage - 1) * BUS_PAGE_SIZE,
+    currentBusPage * BUS_PAGE_SIZE,
+  );
+  const firstVisibleBus = searchableBusSummaries.length ? (currentBusPage - 1) * BUS_PAGE_SIZE + 1 : 0;
+  const lastVisibleBus = Math.min(currentBusPage * BUS_PAGE_SIZE, searchableBusSummaries.length);
   const placePeriodLabel = placePeriod.mode === "day"
     ? readableDate(placePeriod.day)
     : placePeriod.from === placePeriod.to
@@ -337,22 +378,55 @@ export default function Accounts() {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 20 }}>
-        <table>
-          <thead><tr><th>{t("bus")}</th><th>{t("income")}</th><th>{t("expense")}</th><th>{t("net")}</th><th></th></tr></thead>
-          <tbody>
-            {busSummaries.map((b) => (
-              <tr key={b.bus_id} style={{ cursor: "pointer" }} onClick={() => selectBus(b.bus_id)}>
-                <td><strong>{b.reg_number}</strong></td>
-                <td>৳{b.income.toLocaleString()}</td>
-                <td>৳{b.expense.toLocaleString()}</td>
-                <td style={{ color: b.net >= 0 ? "var(--green)" : "var(--red)" }}>৳{b.net.toLocaleString()}</td>
-                <td><button className="primary" onClick={() => selectBus(b.bus_id)}>Open</button></td>
-              </tr>
-            ))}
-            {busSummaries.length === 0 && <tr><td colSpan={5}>{t("no_buses_yet")}</td></tr>}
-          </tbody>
-        </table>
+      <div className="card accounts-bus-browser" style={{ marginBottom: 20 }}>
+        <div className="accounts-bus-toolbar">
+          <div className="accounts-bus-heading">
+            <span className="settings-eyebrow">BUS-WISE ACCOUNTS</span>
+            <h2 id="accounts-bus-list-heading">Find a bus account</h2>
+            <p>Search by Bus Number. Only 10 buses are shown on each page.</p>
+          </div>
+          <div className="accounts-bus-search">
+            <label htmlFor="accounts-bus-number-search">Search bus number</label>
+            <div>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+              <input
+                id="accounts-bus-number-search"
+                type="search"
+                placeholder="Type a bus number"
+                value={busSearch}
+                onChange={(event) => { setBusSearch(event.target.value); setBusPage(1); }}
+              />
+              {busSearch && <button type="button" onClick={() => { setBusSearch(""); setBusPage(1); }} aria-label="Clear bus number search">Clear</button>}
+            </div>
+          </div>
+        </div>
+        <div className="accounts-bus-list-box" role="region" aria-labelledby="accounts-bus-list-heading">
+          <div className="accounts-bus-table-scroll">
+            <table className="accounts-bus-table">
+              <thead><tr><th>Bus number</th><th>{t("income")}</th><th>{t("expense")}</th><th>{t("net")}</th><th></th></tr></thead>
+              <tbody>
+                {visibleBusSummaries.map((b) => (
+                  <tr key={b.bus_id} className={String(selectedBus) === String(b.bus_id) ? "selected" : ""}>
+                    <td><strong>{b.busNumber}</strong></td>
+                    <td>৳{b.income.toLocaleString()}</td>
+                    <td>৳{b.expense.toLocaleString()}</td>
+                    <td style={{ color: b.net >= 0 ? "var(--green)" : "var(--red)" }}>৳{b.net.toLocaleString()}</td>
+                    <td><button type="button" className="primary" onClick={() => selectBus(b.bus_id)}>{String(selectedBus) === String(b.bus_id) ? "Opened" : "Open"}</button></td>
+                  </tr>
+                ))}
+                {!visibleBusSummaries.length && <tr><td colSpan={5}>{busSummaries.length ? `No bus number matches “${busSearch.trim()}”.` : t("no_buses_yet")}</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          <div className="accounts-bus-pagination">
+            <span>Showing {firstVisibleBus}–{lastVisibleBus} of {searchableBusSummaries.length} buses</span>
+            <div>
+              <button type="button" className="secondary" disabled={currentBusPage === 1} onClick={() => setBusPage((page) => Math.max(1, page - 1))}>Previous</button>
+              <strong>Page {currentBusPage} of {busPageCount}</strong>
+              <button type="button" className="secondary" disabled={currentBusPage === busPageCount} onClick={() => setBusPage((page) => Math.min(busPageCount, page + 1))}>Next</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
@@ -434,12 +508,12 @@ export default function Accounts() {
                     explicit rather than picking one leg somewhat arbitrarily. */}
                 {!isIncome && rotationGroups.filter((g) => g.legs.length === 2 && g.legs.every((l) => l.accounts_status === "open")).map((g) => (
                   <option key={`both-${g.group_id}`} value={`both:${g.group_id}`}>
-                    {g.legs[0].reg_number} — Rotation #{g.rotation_no} — Both outbound and return leg
+                    {busName(g.legs[0].bus_id || selectedBus, g.legs[0])} — Rotation #{g.rotation_no} — Both outbound and return leg
                   </option>
                 ))}
                 {openLegsForEntry.map((tr) => (
                   <option key={tr.id} value={tr.id}>
-                    {tr.reg_number} — Rotation #{tr.rotation_no} {tr.leg_no === 2 ? `(${t("leg2")})` : `(${t("leg1")})`}
+                    {busName(tr.bus_id || selectedBus, tr)} — Rotation #{tr.rotation_no} {tr.leg_no === 2 ? `(${t("leg2")})` : `(${t("leg1")})`}
                   </option>
                 ))}
               </select>
@@ -496,7 +570,7 @@ export default function Accounts() {
                   <>
                   <tr key={g.group_id}>
                     <td><input type="checkbox" checked={closingGroupIds.includes(g.group_id)} onChange={() => toggleClosingGroup(g.group_id)} /></td>
-                    <td>{g.legs[0].reg_number} — #{g.rotation_no}</td>
+                    <td>{busName(g.legs[0].bus_id || selectedBus, g.legs[0])} — #{g.rotation_no}</td>
                     <td>{g.trip_date}</td>
                     <td>{g.legs.length === 2 ? `${t("leg1")} + ${t("leg2")}` : t("leg1")}</td>
                     <td><span className="badge active">{t("open")}</span></td>
@@ -509,7 +583,7 @@ export default function Accounts() {
                   <>
                   <tr key={g.group_id}>
                     <td></td>
-                    <td>{g.legs[0].reg_number} — #{g.rotation_no}</td>
+                    <td>{busName(g.legs[0].bus_id || selectedBus, g.legs[0])} — #{g.rotation_no}</td>
                     <td>{g.trip_date}</td>
                     <td>{g.legs.length === 2 ? `${t("leg1")} + ${t("leg2")}` : t("leg1")}</td>
                     <td><span className="badge maintenance">{t("done")}</span></td>

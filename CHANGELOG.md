@@ -2,6 +2,12 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.15.0 — 2026-09-01
+
+- Replaced the crowded Accounts bus list with a dedicated Bus Number search and a boxed 10-bus-per-page browser.
+- Made every bus label in Accounts show only the real Bus Number, hiding imported internal keys such as `FLEETS-001 | ...` while preserving each bus's separate identity and account history.
+- Kept older and manually added buses searchable by their saved number when no separate imported Bus Number exists.
+
 ## 1.14.0 — 2026-08-31
 
 - Imported the 62 route Titles from Route.pdf, treating every visible tick as active and supporting unticked source rows as inactive.

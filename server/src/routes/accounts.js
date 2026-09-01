@@ -103,11 +103,12 @@ router.get("/", (req, res) => {
 router.get("/by-bus", (req, res) => {
   const rows = db
     .prepare(
-      `SELECT b.id as bus_id, b.reg_number,
+      `SELECT b.id as bus_id, b.reg_number, b.source_bus_number,
               COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END), 0) as income,
               COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) as expense
        FROM buses b LEFT JOIN transactions t ON t.bus_id = b.id
-       GROUP BY b.id ORDER BY b.reg_number ASC`
+       GROUP BY b.id
+       ORDER BY COALESCE(NULLIF(TRIM(b.source_bus_number), ''), b.reg_number) COLLATE NOCASE ASC`
     )
     .all();
   res.json(rows.map((r) => ({ ...r, net: r.income - r.expense })));
