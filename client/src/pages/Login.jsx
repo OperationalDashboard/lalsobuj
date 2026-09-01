@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, setToken, setUser } from "../api.js";
-import { homeRouteFor, isFullAccess } from "../roles.js";
+import { isFullAccess } from "../roles.js";
+import { firstPermittedRoute } from "../permissions.js";
 import BusIcon from "../components/BusIcon.jsx";
 
 function PortalGlyph({ admin }) {
@@ -32,9 +33,14 @@ export default function Login() {
         setError(admin ? "Use the Admin Portal on the left." : "Use the Staff Portal on the right.");
         return;
       }
-      setToken(data.token); setUser(data.user);
-      try { const me = await api.get("/auth/me"); if (me.permissions) setUser({ ...data.user, permissions: me.permissions }); } catch { /* optional navigation data */ }
-      navigate(homeRouteFor(data.user.role));
+      setToken(data.token);
+      let signedInUser = data.user;
+      try {
+        const me = await api.get("/auth/me");
+        if (me.permissions) signedInUser = { ...data.user, permissions: me.permissions };
+      } catch { /* full-access users and temporary network failures still use a safe landing page */ }
+      setUser(signedInUser);
+      navigate(firstPermittedRoute(signedInUser));
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   }
   const admin = portal === "admin";

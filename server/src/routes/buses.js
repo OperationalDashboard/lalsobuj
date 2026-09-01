@@ -1,11 +1,10 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireRole, requireModulePermission } = require("../middleware/auth");
-const { FULL_ACCESS, ROLES } = require("../roles");
+const { requireAuth, requireFeaturePermission } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireAuth);
-const guardWrite = requireModulePermission("buses", "write");
+const guardWrite = requireFeaturePermission("buses", "write");
 
 const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
 const WRITABLE = [
@@ -80,7 +79,7 @@ router.put("/:id", guardWrite, (req, res) => {
 
 // Status-only change: Admin/Super Admin always, plus Maintenance (they're
 // the ones who know when a bus is pulled off the road or back in service).
-router.put("/:id/status", requireRole(...FULL_ACCESS, ROLES.MAINTENANCE), (req, res) => {
+router.put("/:id/status", guardWrite, (req, res) => {
   const { status } = req.body;
   if (!status) return res.status(400).json({ error: "status required" });
   const info = db.prepare("UPDATE buses SET status = ? WHERE id = ?").run(status, req.params.id);

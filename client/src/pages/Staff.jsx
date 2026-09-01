@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api.js";
+import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
+import { canUseFeature } from "../permissions.js";
 
 const DESIGNATIONS = [
   { group: "Bus staff", options: ["driver", "supervisor", "bus_staff", "helper", "conductor", "mechanic"] },
@@ -23,6 +24,7 @@ const designationLabel = (d) => d.split("_").map((w) => w[0].toUpperCase() + w.s
 const empty = { name: "", designation: "driver", phone: "", nid_number: "", joining_date: "", assigned_bus_id: "", counter_id: "", status: "active" };
 
 export default function Staff() {
+  const canWrite = canUseFeature(getUser(), "staff", "write");
   const [staff, setStaff] = useState([]);
   const [buses, setBuses] = useState([]);
   const [counters, setCounters] = useState([]);
@@ -115,7 +117,7 @@ export default function Staff() {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 20 }}>
+      {canWrite && <div className="card" style={{ marginBottom: 20 }}>
         <form className="form-row" onSubmit={handleAdd}>
           <input placeholder={t("full_name")} value={form.name} required
             onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -146,7 +148,7 @@ export default function Staff() {
           <button className="primary" type="submit">{t("add_staff")}</button>
         </form>
         {error && <p className="error-text">{error}</p>}
-      </div>
+      </div>}
 
       <div className="card">
         <table>
@@ -156,7 +158,7 @@ export default function Staff() {
           <tbody>
             {staff.map((s) => (
               <tr key={s.id}>
-                {editingId === s.id ? <>
+                {canWrite && editingId === s.id ? <>
                   <td><input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></td>
                   <td><select value={editForm.designation} onChange={(e) => setEditForm({ ...editForm, designation: e.target.value, assigned_bus_id: "", counter_id: "" })}>{DESIGNATIONS.map((group) => <optgroup key={group.group} label={group.group}>{group.options.map((option) => <option key={option} value={option}>{designationLabel(option)}</option>)}</optgroup>)}</select></td>
                   <td><input value={editForm.phone || ""} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></td>
@@ -171,7 +173,7 @@ export default function Staff() {
                 <td>{s.phone}</td>
                 <td>{s.nid_number || "—"}</td>
                 <td>
-                  {postedEditId === s.id ? (
+                  {canWrite && postedEditId === s.id ? (
                     COUNTER_DESIGNATIONS.includes(s.designation) ? (
                       <select autoFocus defaultValue={s.counter_id || ""} onChange={(e) => handlePostedChange(s, e.target.value)} onBlur={() => setPostedEditId(null)}>
                         <option value="">{t("unassigned_bus")}</option>
@@ -184,24 +186,24 @@ export default function Staff() {
                       </select>
                     )
                   ) : (
-                    <span style={{ cursor: "pointer" }} onClick={() => setPostedEditId(s.id)} title={t("click_to_change")}>
-                      {COUNTER_DESIGNATIONS.includes(s.designation) ? (s.counter_name || counterName(s.counter_id)) : busName(s.assigned_bus_id)} ✎
+                    <span style={canWrite ? { cursor: "pointer" } : undefined} onClick={() => canWrite && setPostedEditId(s.id)} title={canWrite ? t("click_to_change") : undefined}>
+                      {COUNTER_DESIGNATIONS.includes(s.designation) ? (s.counter_name || counterName(s.counter_id)) : busName(s.assigned_bus_id)} {canWrite ? "✎" : ""}
                     </span>
                   )}
                 </td>
                 <td>
-                  {statusEditId === s.id ? (
+                  {canWrite && statusEditId === s.id ? (
                     <select autoFocus defaultValue={s.status} onChange={(e) => handleStatusChange(s.id, e.target.value)} onBlur={() => setStatusEditId(null)}>
                       <option value="active">{t("active")}</option>
                       <option value="on_leave">on_leave</option>
                       <option value="terminated">terminated</option>
                     </select>
                   ) : (
-                    <span className={`badge ${s.status}`} style={{ cursor: "pointer" }} onClick={() => setStatusEditId(s.id)} title="Click to change (Admin only)">{s.status}</span>
+                    <span className={`badge ${s.status}`} style={canWrite ? { cursor: "pointer" } : undefined} onClick={() => canWrite && setStatusEditId(s.id)} title={canWrite ? "Click to change" : undefined}>{s.status}</span>
                   )}
                 </td>
                 <td style={{ fontSize: "0.8rem", color: "var(--muted)" }}>{new Date(s.status_changed_at).toLocaleString()}</td>
-                <td><button className="link-danger" onClick={() => startEdit(s)}>{t("edit")}</button> <button className="link-danger" onClick={() => handleDelete(s.id)}>{t("remove")}</button></td>
+                <td>{canWrite && <><button className="link-danger" onClick={() => startEdit(s)}>{t("edit")}</button> <button className="link-danger" onClick={() => handleDelete(s.id)}>{t("remove")}</button></>}</td>
                 </>}
               </tr>
             ))}

@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { api, getUser } from "../api.js";
-import { isFullAccess } from "../roles.js";
 import { t } from "../i18n.js";
 import { BUS_DESIGNATIONS } from "./Staff.jsx";
+import { canUseFeature } from "../permissions.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const STATUS_CYCLE = ["present", "late", "absent", "leave"];
 
 export default function Attendance() {
   const me = getUser();
-  const canEditTimeAndStatus = isFullAccess(me?.role);
+  const canEditTimeAndStatus = canUseFeature(me, "attendance", "write");
 
   const [rows, setRows] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -169,8 +169,8 @@ export default function Attendance() {
                     )}
                   </td>
                   <td style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {!row?.check_in && <button className="primary" onClick={() => handleCheckIn(s.id)}>{t("check_in_now")}</button>}
-                    {row?.check_in && !row?.check_out && <button className="primary" onClick={() => handleCheckOut(row.id)}>{t("check_out_now")}</button>}
+                    {canEditTimeAndStatus && !row?.check_in && <button className="primary" onClick={() => handleCheckIn(s.id)}>{t("check_in_now")}</button>}
+                    {canEditTimeAndStatus && row?.check_in && !row?.check_out && <button className="primary" onClick={() => handleCheckOut(row.id)}>{t("check_out_now")}</button>}
                     {canEditTimeAndStatus && row && !row.check_in && <button className="link-danger" onClick={() => reopenAttendance(row.id, "checkin")}>Reopen check-in</button>}
                     {canEditTimeAndStatus && row?.check_in && row?.check_out && <button className="link-danger" onClick={() => reopenAttendance(row.id, "checkout")}>Reopen check-out</button>}
                     {!row && canEditTimeAndStatus && <><button className="link-danger" onClick={() => handleMarkAbsent(s.id, "absent")}>{t("mark_absent")}</button><button className="link-danger" onClick={() => handleMarkAbsent(s.id, "leave")}>Mark leave</button></>}

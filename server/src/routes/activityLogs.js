@@ -1,6 +1,6 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireRole } = require("../middleware/auth");
+const { requireAuth, requireFeaturePermission, requireAnyFeaturePermission } = require("../middleware/auth");
 const { ROLES, FULL_ACCESS, OWN_COUNTER_ROLES } = require("../roles");
 
 const router = express.Router();
@@ -31,7 +31,7 @@ function canLogEvent(role, eventType) {
 }
 
 // GET /api/activity-logs?trip_id=5  -- open to any logged-in role
-router.get("/", (req, res) => {
+router.get("/", requireAnyFeaturePermission(["dashboard", "live_activity", "reports"], "read"), (req, res) => {
   const { trip_id, bus_id } = req.query;
   const clauses = [];
   const params = [];
@@ -48,13 +48,13 @@ router.get("/", (req, res) => {
 // Admin: known stop locations plus every counter name, so they can name
 // any arbitrary place when logging on someone's behalf — everyone else
 // never sees this list, since their place is fixed to their own counter.
-router.get("/places", requireRole(...FULL_ACCESS), (req, res) => {
+router.get("/places", requireAnyFeaturePermission(["live_activity", "settings"], "read"), (req, res) => {
   const stops = db.prepare("SELECT name FROM stop_locations ORDER BY name ASC").all().map((r) => r.name);
   const counters = db.prepare("SELECT name FROM counters ORDER BY name ASC").all().map((r) => r.name);
   res.json({ places: Array.from(new Set([...stops, ...counters])) });
 });
 
-router.post("/places", requireRole(...FULL_ACCESS), (req, res) => {
+router.post("/places", requireAnyFeaturePermission(["live_activity", "settings"], "write"), (req, res) => {
   const { name } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: "name required" });
   try {
@@ -85,7 +85,7 @@ function resolveLocationName(req, event_type, submittedLocation) {
 // recorded_at: Admin/Super Admin may set an explicit time when creating an
 // entry (e.g. logging something after the fact on someone's behalf) —
 // everyone else is always stamped with the current server time.
-router.post("/", (req, res) => {
+router.post("/", requireFeaturePermission("live_activity", "write"), (req, res) => {
   const { trip_id, bus_id, event_type, passengers_count, fuel_liters, fuel_cost, note, recorded_at } = req.body;
   if (!trip_id || !bus_id || !event_type) {
     return res.status(400).json({ error: "trip_id, bus_id, event_type required" });
@@ -109,7 +109,7 @@ router.post("/", (req, res) => {
 
 // Admin/Super Admin can edit any part of any checkpoint entry after the
 // fact — including giving/correcting its time.
-router.put("/:id", requireRole(...FULL_ACCESS), (req, res) => {
+router.put("/:id", requireFeaturePermission("live_activity", "write"), (req, res) => {
   const fields = ["location_name", "passengers_count", "fuel_liters", "fuel_cost", "note", "recorded_at"];
   const present = fields.filter((f) => req.body[f] !== undefined);
   if (!present.length) return res.status(400).json({ error: "No valid fields" });
@@ -120,7 +120,7 @@ router.put("/:id", requireRole(...FULL_ACCESS), (req, res) => {
   res.json(db.prepare("SELECT * FROM activity_logs WHERE id = ?").get(req.params.id));
 });
 
-router.delete("/:id", requireRole(...FULL_ACCESS), (req, res) => {
+router.delete("/:id", requireFeaturePermission("live_activity", "write"), (req, res) => {
   const info = db.prepare("DELETE FROM activity_logs WHERE id = ?").run(req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: "Not found" });
   res.status(204).end();

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, getUser } from "../api.js";
-import { ROLES } from "../roles.js";
+import { canUseFeature } from "../permissions.js";
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);
@@ -8,7 +8,7 @@ export default function Chat() {
   const [callContact, setCallContact] = useState(null);
   const bottomRef = useRef(null);
   const me = getUser();
-  const isMonitor = me?.role === ROLES.MONITOR;
+  const canWrite = canUseFeature(me, "chat", "write");
 
   function load() {
     api.get("/chat").then(setMessages).catch(() => {});
@@ -60,7 +60,7 @@ export default function Chat() {
           ))}
           <div ref={bottomRef} />
         </div>
-        <form className="chat-input-row" onSubmit={handleSend} style={isMonitor ? { display: "none" } : undefined}>
+        <form className="chat-input-row" onSubmit={handleSend} style={!canWrite ? { display: "none" } : undefined}>
           <input
             placeholder="Type a message..."
             value={text}

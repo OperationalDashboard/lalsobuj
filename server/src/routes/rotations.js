@@ -1,11 +1,10 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireModulePermission, requireRole } = require("../middleware/auth");
-const { FULL_ACCESS } = require("../roles");
+const { requireAuth, requireFeaturePermission } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireAuth);
-const guardWrite = requireModulePermission("rotations", "write");
+const guardWrite = requireFeaturePermission("rotations", "write");
 
 // Coach is deliberately a free-text rotation detail, not a Staff record.
 // coach_id remains readable for older rotations created before this change.
@@ -131,9 +130,6 @@ router.delete("/:id", guardWrite, (req, res) => {
   if (!row) return res.status(404).json({ error: "Not found" });
 
   if (row.trip_id) {
-    if (!FULL_ACCESS.includes(req.user.role)) {
-      return res.status(403).json({ error: "Only Admin/Super Admin can remove a rotation that has a live trip — it moves to Trash." });
-    }
     db.prepare(
       "UPDATE trips SET deleted_at = datetime('now'), deleted_by = ? WHERE group_id = (SELECT group_id FROM trips WHERE id = ?)"
     ).run(req.user.id, row.trip_id);

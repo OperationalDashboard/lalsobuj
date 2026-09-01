@@ -1,7 +1,6 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireRole, requireModulePermission } = require("../middleware/auth");
-const { FULL_ACCESS, ROLES } = require("../roles");
+const { requireAuth, requireFeaturePermission, requireAnyFeaturePermission } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -18,14 +17,12 @@ function validateMaintenanceStatus(req, res) {
 
 // Maintenance role always has write access here; other roles need an
 // explicit grant from Admin via Users & Permissions.
-function guardWrite(req, res, next) {
-  if (FULL_ACCESS.includes(req.user.role) || req.user.role === ROLES.MAINTENANCE) return next();
-  return requireModulePermission("maintenance", "write")(req, res, next);
-}
+const guardWrite = requireFeaturePermission("maintenance", "write");
+const guardCatalogWrite = requireAnyFeaturePermission(["maintenance", "settings"], "write");
 
 // Posting/removing a ticket's cost as a bus expense is a deliberate
 // accounting decision — Admin/Super Admin or the Accounts role only.
-const guardExpense = requireRole(...FULL_ACCESS, ROLES.ACCOUNTS);
+const guardExpense = requireFeaturePermission("accounts_bus", "write");
 
 function withParts(ticket) {
   const parts = db
@@ -56,7 +53,7 @@ router.get("/locations", (req, res) => {
   res.json(db.prepare("SELECT * FROM maintenance_locations ORDER BY name ASC").all());
 });
 
-router.post("/locations", guardWrite, (req, res) => {
+router.post("/locations", guardCatalogWrite, (req, res) => {
   const { name } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: "name required" });
   try {
@@ -67,7 +64,7 @@ router.post("/locations", guardWrite, (req, res) => {
   }
 });
 
-router.put("/locations/:id", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
+router.put("/locations/:id", guardCatalogWrite, (req, res) => {
   const name = req.body.name?.trim();
   if (!name) return res.status(400).json({ error: "name required" });
   const current = db.prepare("SELECT * FROM maintenance_locations WHERE id = ?").get(req.params.id);
@@ -81,7 +78,7 @@ router.put("/locations/:id", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
   }
 });
 
-router.delete("/locations/:id", guardWrite, (req, res) => {
+router.delete("/locations/:id", guardCatalogWrite, (req, res) => {
   const info = db.prepare("DELETE FROM maintenance_locations WHERE id = ?").run(req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: "Not found" });
   res.status(204).end();
@@ -92,7 +89,7 @@ router.get("/parts-catalog", (req, res) => {
   res.json(db.prepare("SELECT * FROM parts_catalog ORDER BY part_name ASC").all());
 });
 
-router.post("/parts-catalog", requireRole(...FULL_ACCESS), (req, res) => {
+router.post("/parts-catalog", guardCatalogWrite, (req, res) => {
   const { part_name, description } = req.body;
   if (!part_name || !part_name.trim()) return res.status(400).json({ error: "part_name required" });
   try {
@@ -102,7 +99,7 @@ router.post("/parts-catalog", requireRole(...FULL_ACCESS), (req, res) => {
     res.status(400).json({ error: "That part is already on the list" });
   }
 });
-router.put("/parts-catalog/:id", requireRole(...FULL_ACCESS), (req, res) => {
+router.put("/parts-catalog/:id", guardCatalogWrite, (req, res) => {
   const { part_name, description } = req.body;
   if (!part_name?.trim()) return res.status(400).json({ error: "part_name required" });
   const current = db.prepare("SELECT * FROM parts_catalog WHERE id = ?").get(req.params.id);
@@ -114,7 +111,7 @@ router.put("/parts-catalog/:id", requireRole(...FULL_ACCESS), (req, res) => {
   } catch { res.status(400).json({ error: "That part already exists" }); }
 });
 
-router.delete("/parts-catalog/:id", requireRole(...FULL_ACCESS), (req, res) => {
+router.delete("/parts-catalog/:id", guardCatalogWrite, (req, res) => {
   const info = db.prepare("DELETE FROM parts_catalog WHERE id = ?").run(req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: "Not found" });
   res.status(204).end();
@@ -223,7 +220,7 @@ router.put("/:id", guardWrite, (req, res) => {
 
 // Deleting a whole ticket also removes its linked expense — kept to
 // Admin/Super Admin only, since it touches the financial trail.
-router.delete("/:id", requireRole(...FULL_ACCESS), (req, res) => {
+router.delete("/:id", guardWrite, (req, res) => {
   const ticket = db.prepare("SELECT * FROM maintenance WHERE id = ?").get(req.params.id);
   if (!ticket) return res.status(404).json({ error: "Not found" });
   if (ticket.linked_transaction_id) {

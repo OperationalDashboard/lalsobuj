@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, getUser } from "../api.js";
-import { ROLES, isFullAccess } from "../roles.js";
 import { t } from "../i18n.js";
 import BusIcon from "../components/BusIcon.jsx";
+import { canUseFeature } from "../permissions.js";
 
 const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
 const DEFAULT_BUS_CATEGORIES = ["Economy (AC)", "Economy (NON AC)", "Suite-Class AC (AC)", "Sleeper (AC)"];
@@ -15,8 +15,8 @@ const PAGE_SIZE = 25;
 
 export default function Buses() {
   const me = getUser();
-  const canEditFull = isFullAccess(me?.role);
-  const canEditStatus = canEditFull || me?.role === ROLES.MAINTENANCE;
+  const canEditFull = canUseFeature(me, "buses", "write");
+  const canEditStatus = canEditFull;
 
   const [buses, setBuses] = useState([]);
   const [form, setForm] = useState(empty);

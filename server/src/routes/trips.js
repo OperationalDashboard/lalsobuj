@@ -1,6 +1,6 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireRole } = require("../middleware/auth");
+const { requireAuth, requireFeaturePermission, requireAnyFeaturePermission } = require("../middleware/auth");
 const { ROLES, FULL_ACCESS, OWN_BUS_ROLES } = require("../roles");
 const { autoCheckIn, autoCheckOut } = require("../autoAttendance");
 
@@ -42,7 +42,7 @@ function autoCompleteOverdueTrips() {
 setInterval(autoCompleteOverdueTrips, 60 * 1000).unref();
 
 // GET /api/trips?date=2026-08-26&bus_id=&status=  -- open to any logged-in role
-router.get("/", (req, res) => {
+router.get("/", requireAnyFeaturePermission(["live_activity", "rotations", "accounts_bus", "reports", "trash"], "read"), (req, res) => {
   const { date, bus_id, status } = req.query;
   const clauses = ["t.deleted_at IS NULL"];
   const params = [];
@@ -57,7 +57,7 @@ router.get("/", (req, res) => {
 });
 
 // GET /api/trips/live -> currently running trips, each with its latest activity log
-router.get("/live", (req, res) => {
+router.get("/live", requireAnyFeaturePermission(["dashboard", "live_activity"], "read"), (req, res) => {
   autoCompleteOverdueTrips();
   const rows = db
     .prepare(
@@ -77,7 +77,7 @@ router.get("/live", (req, res) => {
 // GET /api/trips/rotation-counts?date=2026-08-26 -> how many ROTATIONS
 // (round trips, i.e. distinct group_id — not individual legs) each bus has
 // done on that date.
-router.get("/rotation-counts", (req, res) => {
+router.get("/rotation-counts", requireAnyFeaturePermission(["dashboard", "live_activity", "rotations", "reports"], "read"), (req, res) => {
   const date = req.query.date || new Date().toISOString().slice(0, 10);
   const rows = db
     .prepare(
@@ -100,7 +100,7 @@ router.get("/rotation-counts", (req, res) => {
 // by Reports ("buses that ran a rotation") and the Rotation/Accounts pages.
 // Falls back to today when no date/range is given. Deleted (trashed)
 // rotations never appear here.
-router.get("/rotations", (req, res) => {
+router.get("/rotations", requireAnyFeaturePermission(["rotations", "accounts_bus", "reports"], "read"), (req, res) => {
   const { bus_id } = req.query;
   const from = req.query.from || req.query.date || new Date().toISOString().slice(0, 10);
   const to = req.query.to || req.query.date || from;
@@ -185,7 +185,7 @@ router.get("/rotations", (req, res) => {
 // Rotation #2" instead of just "#2", plus this leg's logged passenger
 // count and fuel total (from Passenger Checker / Pump Manager checkpoint
 // entries) so Accounts can prefill from the source of truth.
-router.get("/for-accounts", (req, res) => {
+router.get("/for-accounts", requireFeaturePermission("accounts_bus", "read"), (req, res) => {
   const { bus_id } = req.query;
   if (!bus_id) return res.status(400).json({ error: "bus_id required" });
   const rows = db
@@ -206,7 +206,7 @@ router.get("/for-accounts", (req, res) => {
 // GET /api/trips/trash -> Admin/Super Admin only. Every rotation (grouped,
 // both legs) that's been removed from Rotation/Accounts/Reports, so it can
 // be restored, or its report pulled without restoring it.
-router.get("/trash", requireRole(...FULL_ACCESS), (req, res) => {
+router.get("/trash", requireFeaturePermission("trash", "read"), (req, res) => {
   const legs = db
     .prepare(
       `SELECT t.*, b.reg_number, u.full_name as deleted_by_name
@@ -231,7 +231,7 @@ router.get("/trash", requireRole(...FULL_ACCESS), (req, res) => {
 });
 
 // Restore a trashed rotation (both legs) back into Rotation/Accounts/Reports.
-router.post("/:id/restore", requireRole(...FULL_ACCESS), (req, res) => {
+router.post("/:id/restore", requireFeaturePermission("trash", "write"), (req, res) => {
   const info = db
     .prepare(
       "UPDATE trips SET deleted_at = NULL, deleted_by = NULL WHERE group_id = (SELECT group_id FROM trips WHERE id = ?)"
@@ -259,7 +259,7 @@ router.post("/:id/restore", requireRole(...FULL_ACCESS), (req, res) => {
 // Helper, Admin, Super Admin may do this. Driver/Helper can only start a
 // trip on their OWN assigned bus — bus_id they submit is ignored in favor
 // of their staff record's assigned_bus_id.
-router.post("/", requireRole(ROLES.CONTROL_COUNTER, ROLES.DRIVER, ROLES.HELPER, ...FULL_ACCESS), (req, res) => {
+router.post("/", requireFeaturePermission("live_activity", "write"), (req, res) => {
   let { bus_id, route, trip_date, departure_time, price_per_seat, rotation_id } = req.body;
   if (!rotation_id) return res.status(400).json({ error: "Select an open rotation before starting a trip" });
   const selectedRotation = db.prepare("SELECT * FROM rotations WHERE id = ?").get(rotation_id);
@@ -376,7 +376,7 @@ router.post("/", requireRole(ROLES.CONTROL_COUNTER, ROLES.DRIVER, ROLES.HELPER, 
 // Admin/Accounts-only override: correct which two trips form a rotation,
 // for when a bus took an unexpected route back. Pairs `id` with
 // `paired_trip_id` (both legs must belong to the same bus and date).
-router.put("/:id/pair", requireRole(...FULL_ACCESS, ROLES.ACCOUNTS), (req, res) => {
+router.put("/:id/pair", requireFeaturePermission("accounts_bus", "write"), (req, res) => {
   const { paired_trip_id } = req.body;
   const a = db.prepare("SELECT * FROM trips WHERE id = ?").get(req.params.id);
   const b = paired_trip_id ? db.prepare("SELECT * FROM trips WHERE id = ?").get(paired_trip_id) : null;
@@ -397,7 +397,7 @@ router.put("/:id/pair", requireRole(...FULL_ACCESS, ROLES.ACCOUNTS), (req, res) 
 // Control Counter and Counter can both close a trip out.
 router.put(
   "/:id/complete",
-  requireRole(ROLES.CONTROL_COUNTER, ROLES.COUNTER, ...FULL_ACCESS),
+  requireFeaturePermission("live_activity", "write"),
   (req, res) => {
     const { arrival_time } = req.body;
     const trip = db.prepare("SELECT * FROM trips WHERE id = ?").get(req.params.id);
@@ -425,7 +425,7 @@ router.put(
 
 // Admin/Super Admin can give or edit the departure/arrival time for ANY
 // trip, at any point — not just while starting or completing it.
-router.put("/:id/time", requireRole(...FULL_ACCESS), (req, res) => {
+router.put("/:id/time", requireFeaturePermission("live_activity", "write"), (req, res) => {
   const { departure_time, arrival_time } = req.body;
   const present = [];
   const values = [];
@@ -443,7 +443,7 @@ router.put("/:id/time", requireRole(...FULL_ACCESS), (req, res) => {
 // for Admin/Super Admin. Accounts role and Admin/Super Admin can do this.
 router.post(
   "/close-accounts",
-  requireRole(ROLES.ACCOUNTS, ...FULL_ACCESS),
+  requireFeaturePermission("accounts_bus", "write"),
   (req, res) => {
     const { trip_ids } = req.body;
     if (!Array.isArray(trip_ids) || trip_ids.length === 0) {
@@ -460,7 +460,7 @@ router.post(
 );
 
 // Admin/Accounts-only reopen, for corrections — reopens the whole rotation.
-router.post("/:id/reopen-accounts", requireRole(...FULL_ACCESS, ROLES.ACCOUNTS), (req, res) => {
+router.post("/:id/reopen-accounts", requireFeaturePermission("accounts_bus", "write"), (req, res) => {
   const info = db
     .prepare(
       "UPDATE trips SET accounts_status = 'open', accounts_closed_by = NULL, accounts_closed_at = NULL WHERE group_id = (SELECT group_id FROM trips WHERE id = ?)"
@@ -470,7 +470,7 @@ router.post("/:id/reopen-accounts", requireRole(...FULL_ACCESS, ROLES.ACCOUNTS),
   res.json(db.prepare("SELECT * FROM trips WHERE id = ?").get(req.params.id));
 });
 
-router.delete("/:id", requireRole(...FULL_ACCESS), (req, res) => {
+router.delete("/:id", requireAnyFeaturePermission(["live_activity", "rotations"], "write"), (req, res) => {
   const info = db.prepare("DELETE FROM trips WHERE id = ?").run(req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: "Not found" });
   res.status(204).end();
@@ -478,7 +478,7 @@ router.delete("/:id", requireRole(...FULL_ACCESS), (req, res) => {
 
 // Permanent deletion is intentionally only available from Trash and removes
 // every leg, checkpoint, transaction and roster row of the selected rotation.
-router.delete("/:id/permanent", requireRole(...FULL_ACCESS), (req, res) => {
+router.delete("/:id/permanent", requireFeaturePermission("trash", "write"), (req, res) => {
   const trip = db.prepare("SELECT group_id FROM trips WHERE id = ?").get(req.params.id);
   if (!trip) return res.status(404).json({ error: "Not found" });
   const ids = db.prepare("SELECT id FROM trips WHERE group_id = ?").all(trip.group_id).map((r) => r.id);

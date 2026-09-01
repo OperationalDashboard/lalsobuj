@@ -1,25 +1,22 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireRole } = require("../middleware/auth");
+const { requireAuth, requireFeaturePermission } = require("../middleware/auth");
 const { ROLES, ASSIGNABLE_ROLES, ROLE_LABELS, FULL_ACCESS } = require("../roles");
+const { PERMISSION_FEATURES, permissionsForRole } = require("../permissionCatalog");
 
 const router = express.Router();
 router.use(requireAuth);
 
-// Modules whose write access can be granted via role_permissions.
-// (Live Activity's per-checkpoint rules stay fixed in activityLogs.js.)
-const PERMISSION_MODULES = ["buses", "staff", "rotations", "attendance", "accounts", "online_accounts", "maintenance"];
-
 // GET /api/roles — every role the system knows about (built-in + custom),
 // for populating role dropdowns.
-router.get("/", (req, res) => {
+router.get("/", requireFeaturePermission("users", "read"), (req, res) => {
   const custom = db.prepare("SELECT slug, label FROM custom_roles ORDER BY label ASC").all();
   const builtIn = ASSIGNABLE_ROLES.map((slug) => ({ slug, label: ROLE_LABELS[slug] }));
-  res.json({ builtIn, custom, modules: PERMISSION_MODULES });
+  res.json({ builtIn, custom, features: PERMISSION_FEATURES });
 });
 
 // Only Admin/Super Admin can create new roles.
-router.post("/", requireRole(...FULL_ACCESS), (req, res) => {
+router.post("/", requireFeaturePermission("users", "write"), (req, res) => {
   const { slug, label } = req.body;
   if (!slug || !label) return res.status(400).json({ error: "slug and label required" });
   const cleanSlug = slug.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
@@ -37,7 +34,7 @@ router.post("/", requireRole(...FULL_ACCESS), (req, res) => {
   }
 });
 
-router.delete("/:slug", requireRole(...FULL_ACCESS), (req, res) => {
+router.delete("/:slug", requireFeaturePermission("users", "write"), (req, res) => {
   const inUse = db.prepare("SELECT COUNT(*) as c FROM users WHERE role = ?").get(req.params.slug).c;
   if (inUse > 0) return res.status(400).json({ error: "Can't delete a role that's still assigned to a user" });
   db.prepare("DELETE FROM role_permissions WHERE role = ?").run(req.params.slug);
@@ -47,19 +44,12 @@ router.delete("/:slug", requireRole(...FULL_ACCESS), (req, res) => {
 });
 
 // GET /api/roles/:role/permissions — current module grants for a role.
-router.get("/:role/permissions", requireRole(...FULL_ACCESS), (req, res) => {
-  const rows = db.prepare("SELECT module, can_read, can_write FROM role_permissions WHERE role = ?").all(req.params.role);
-  const byModule = {};
-  // No saved row means no access. This keeps the permission screen aligned
-  // with the server and with the documented "custom roles start empty" rule.
-  PERMISSION_MODULES.forEach((m) => { byModule[m] = { can_read: false, can_write: false }; });
-  rows.forEach((r) => { byModule[r.module] = { can_read: !!r.can_read, can_write: !!r.can_write }; });
-  if (req.params.role === ROLES.ONLINE_MANAGER) byModule.online_accounts = { can_read: true, can_write: true };
-  res.json(byModule);
+router.get("/:role/permissions", requireFeaturePermission("users", "read"), (req, res) => {
+  res.json(permissionsForRole(db, req.params.role));
 });
 
 // PUT /api/roles/:role/permissions — bulk upsert: { buses: {can_read, can_write}, ... }
-router.put("/:role/permissions", requireRole(...FULL_ACCESS), (req, res) => {
+router.put("/:role/permissions", requireFeaturePermission("users", "write"), (req, res) => {
   const upsert = db.prepare(
     `INSERT INTO role_permissions (role, module, can_read, can_write) VALUES (?,?,?,?)
      ON CONFLICT(role, module) DO UPDATE SET can_read = excluded.can_read, can_write = excluded.can_write`
@@ -69,12 +59,11 @@ router.put("/:role/permissions", requireRole(...FULL_ACCESS), (req, res) => {
   // independently idempotent, so saving the grants sequentially is safe to
   // retry and works for both local SQLite and the production Turso database.
   const grants = req.body || {};
-  for (const module of PERMISSION_MODULES) {
-    const grant = grants[module];
-    if (!grant) continue;
-    const canWrite = Boolean(grant.can_write);
+  for (const feature of PERMISSION_FEATURES) {
+    const grant = grants[feature.key] || {};
+    const canWrite = feature.can_edit && Boolean(grant.can_write);
     const canRead = Boolean(grant.can_read) || canWrite;
-    upsert.run(req.params.role, module, canRead ? 1 : 0, canWrite ? 1 : 0);
+    upsert.run(req.params.role, feature.key, canRead ? 1 : 0, canWrite ? 1 : 0);
   }
   res.json({ updated: true });
 });

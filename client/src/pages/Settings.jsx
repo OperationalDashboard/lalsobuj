@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getUser } from "../api.js";
-import { ROLES } from "../roles.js";
 import { APP_RELEASE, APP_REVISION, APP_VERSION, clearAppCacheAndRefresh } from "../version.js";
+import { canUseFeature } from "../permissions.js";
 
 const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
 const DEFAULT_BUS_CATEGORIES = ["Economy (AC)", "Economy (NON AC)", "Suite-Class AC (AC)", "Sleeper (AC)"];
 
 export default function Settings() {
   const user = getUser();
-  const isSuperAdmin = user?.role === ROLES.SUPER_ADMIN;
+  const canWrite = canUseFeature(user, "settings", "write");
   const [settings, setSettings] = useState(null);
   const [colors, setColors] = useState({ theme_primary_color: "#046a38", theme_accent_color: "#d21f3c" });
   const [callContact, setCallContact] = useState({ dedicated_call_name: "", dedicated_call_phone: "" });
@@ -111,7 +111,7 @@ export default function Settings() {
   }
   async function removeBusClass(className) {
     if (!confirm(`Remove '${className}' from the bus class choices? Existing buses will keep the class as historical data.`)) return;
-    if (isSuperAdmin) {
+    if (canWrite) {
       const result = await api.put("/settings/bus-classes", { action: "remove", currentName: className });
       setBusClasses(result.bus_classes);
       flashMessage(result.buses_using_removed_class
@@ -147,7 +147,7 @@ export default function Settings() {
 
   async function removeBusCategory(categoryName) {
     if (!confirm(`Remove '${categoryName}' from the bus category choices? Existing buses will keep the category as historical data.`)) return;
-    if (isSuperAdmin) {
+    if (canWrite) {
       const result = await api.put("/settings/bus-categories", { action: "remove", currentName: categoryName });
       setBusCategories(result.bus_categories);
       flashMessage(result.buses_using_removed_category
@@ -315,7 +315,7 @@ export default function Settings() {
       </div>
 
       {savedMsg && <p style={{ color: "var(--green)", fontWeight: 600 }}>{savedMsg}</p>}
-      {isSuperAdmin && <div className="super-admin-control-note">
+      {canWrite && <div className="super-admin-control-note">
         <span aria-hidden="true">◆</span>
         <div><strong>Super Admin editing enabled</strong><p>You can rename every Settings list item. Linked records are updated automatically so reports keep their data.</p></div>
       </div>}
@@ -332,6 +332,9 @@ export default function Settings() {
         </div>
         <p className="system-cache-note">This refreshes website files only. Database records, uploaded settings, and your login stay safe.</p>
       </section>
+
+      {!canWrite && <p className="permission-readonly-note">View-only access: settings are visible, but all configuration controls are locked.</p>}
+      <fieldset className="permission-fieldset" disabled={!canWrite}>
 
       <div className="grid grid-2" style={{ marginBottom: 20 }}>
         <div className="card">
@@ -396,8 +399,8 @@ export default function Settings() {
             : <div key={className} className="settings-managed-item">
               <div><strong>{className}</strong>{DEFAULT_BUS_CLASSES.includes(className) && <small>Original class</small>}</div>
               <div className="settings-item-actions">
-                {isSuperAdmin && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "busClass", id: className, value: className })}>Edit</button>}
-                {(isSuperAdmin || !DEFAULT_BUS_CLASSES.includes(className)) && <button type="button" className="link-danger" onClick={() => removeBusClass(className)}>Remove</button>}
+                {canWrite && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "busClass", id: className, value: className })}>Edit</button>}
+                {canWrite && <button type="button" className="link-danger" onClick={() => removeBusClass(className)}>Remove</button>}
               </div>
             </div>)}
           {busClasses.length === 0 && <div className="settings-list-empty">No bus classes configured. Add one above.</div>}
@@ -422,8 +425,8 @@ export default function Settings() {
             : <div key={categoryName} className="settings-managed-item category-item">
               <div><span className="category-marker" aria-hidden="true"/><strong>{categoryName}</strong>{DEFAULT_BUS_CATEGORIES.includes(categoryName) && <small>Recognised fleet category</small>}</div>
               <div className="settings-item-actions">
-                {isSuperAdmin && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "busCategory", id: categoryName, value: categoryName })}>Edit</button>}
-                {(isSuperAdmin || !DEFAULT_BUS_CATEGORIES.includes(categoryName)) && <button type="button" className="link-danger" onClick={() => removeBusCategory(categoryName)}>Remove</button>}
+                {canWrite && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "busCategory", id: categoryName, value: categoryName })}>Edit</button>}
+                {canWrite && <button type="button" className="link-danger" onClick={() => removeBusCategory(categoryName)}>Remove</button>}
               </div>
             </div>)}
           {busCategories.length === 0 && <div className="settings-list-empty">No bus categories configured. Add one above.</div>}
@@ -443,7 +446,7 @@ export default function Settings() {
                 ? <tr key={h.id} className="settings-edit-row"><td><input aria-label="Hotel name" value={editingItem.value} onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })} /></td><td><div className="settings-item-actions"><button type="button" className="primary" onClick={() => saveHotel(h.id)}>Save</button><button type="button" className="place-secondary-action" onClick={() => setEditingItem(null)}>Cancel</button></div></td></tr>
                 : <tr key={h.id}>
                   <td>{h.name}</td>
-                  <td style={{ textAlign: "right" }}><div className="settings-item-actions right">{isSuperAdmin && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "hotel", id: h.id, value: h.name })}>Edit</button>}<button type="button" className="link-danger" onClick={() => removeHotel(h.id)}>Remove</button></div></td>
+                  <td style={{ textAlign: "right" }}><div className="settings-item-actions right">{canWrite && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "hotel", id: h.id, value: h.name })}>Edit</button>}{canWrite && <button type="button" className="link-danger" onClick={() => removeHotel(h.id)}>Remove</button>}</div></td>
                 </tr>)}
               {hotels.length === 0 && <tr><td>No hotels added yet.</td></tr>}
             </tbody>
@@ -464,7 +467,7 @@ export default function Settings() {
                 ? <tr key={p.id} className="settings-edit-row"><td><div className="settings-edit-fields"><input aria-label="Part name" value={editingItem.value} onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })} /><input aria-label="Part description" placeholder="Description (optional)" value={editingItem.description} onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })} /></div></td><td><div className="settings-item-actions"><button type="button" className="primary" onClick={() => savePart(p.id)}>Save</button><button type="button" className="place-secondary-action" onClick={() => setEditingItem(null)}>Cancel</button></div></td></tr>
                 : <tr key={p.id}>
                   <td><strong>{p.part_name}</strong>{p.description && <div style={{ color: "var(--muted)", fontSize: "0.8rem" }}>{p.description}</div>}</td>
-                  <td style={{ textAlign: "right" }}><div className="settings-item-actions right">{isSuperAdmin && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "part", id: p.id, value: p.part_name, description: p.description || "" })}>Edit</button>}<button type="button" className="link-danger" onClick={() => removePart(p.id)}>Remove</button></div></td>
+                  <td style={{ textAlign: "right" }}><div className="settings-item-actions right">{canWrite && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "part", id: p.id, value: p.part_name, description: p.description || "" })}>Edit</button>}{canWrite && <button type="button" className="link-danger" onClick={() => removePart(p.id)}>Remove</button>}</div></td>
                 </tr>)}
               {parts.length === 0 && <tr><td>No parts added yet.</td></tr>}
             </tbody>
@@ -485,7 +488,7 @@ export default function Settings() {
               ? <tr key={d.id} className="settings-edit-row"><td><input aria-label="Deduction type name" value={editingItem.value} onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })} /></td><td><div className="settings-item-actions"><button type="button" className="primary" onClick={() => saveDiscountType(d.id)}>Save</button><button type="button" className="place-secondary-action" onClick={() => setEditingItem(null)}>Cancel</button></div></td></tr>
               : <tr key={d.id}>
                 <td>{d.name}</td>
-                <td style={{ textAlign: "right" }}><div className="settings-item-actions right">{isSuperAdmin && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "discount", id: d.id, value: d.name })}>Edit</button>}<button type="button" className="link-danger" onClick={() => removeDiscountType(d.id)}>Remove</button></div></td>
+                <td style={{ textAlign: "right" }}><div className="settings-item-actions right">{canWrite && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "discount", id: d.id, value: d.name })}>Edit</button>}{canWrite && <button type="button" className="link-danger" onClick={() => removeDiscountType(d.id)}>Remove</button>}</div></td>
               </tr>)}
             {discountTypes.length === 0 && <tr><td>No deduction types added yet.</td></tr>}
           </tbody>
@@ -615,10 +618,11 @@ export default function Settings() {
         <table><tbody>
           {locations.map((location) => editingItem?.type === "location" && editingItem.id === location.id
             ? <tr key={location.id} className="settings-edit-row"><td><input aria-label="Repair place name" value={editingItem.value} onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })} /></td><td><div className="settings-item-actions"><button type="button" className="primary" onClick={() => saveLocation(location.id)}>Save</button><button type="button" className="place-secondary-action" onClick={() => setEditingItem(null)}>Cancel</button></div></td></tr>
-            : <tr key={location.id}><td>{location.name}</td><td style={{ textAlign: "right" }}><div className="settings-item-actions right">{isSuperAdmin && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "location", id: location.id, value: location.name })}>Edit</button>}<button type="button" className="link-danger" onClick={() => removeLocation(location.id)}>Remove</button></div></td></tr>)}
+            : <tr key={location.id}><td>{location.name}</td><td style={{ textAlign: "right" }}><div className="settings-item-actions right">{canWrite && <button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "location", id: location.id, value: location.name })}>Edit</button>}{canWrite && <button type="button" className="link-danger" onClick={() => removeLocation(location.id)}>Remove</button>}</div></td></tr>)}
           {locations.length === 0 && <tr><td>No repair places added yet.</td></tr>}
         </tbody></table>
       </div>
+      </fieldset>
     </div>
   );
 }

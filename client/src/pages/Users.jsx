@@ -1,14 +1,10 @@
 import { useEffect, useState } from "react";
 import { api, getUser, setToken, setUser } from "../api.js";
 import { ROLES, ROLE_LABELS } from "../roles.js";
+import { canUseFeature } from "../permissions.js";
 
 const empty = { username: "", password: "", full_name: "", role: ROLES.CONTROL_COUNTER, staff_id: "" };
 const newRoleEmpty = { slug: "", label: "" };
-const MODULE_LABELS = {
-  buses: "Buses", staff: "Staff", rotations: "Rotation",
-  attendance: "Time Management", accounts: "Accounts", online_accounts: "Online Accounts", maintenance: "Maintenance",
-};
-
 function parseDatabaseTime(value) {
   if (!value) return null;
   const parsed = new Date(`${String(value).replace(" ", "T")}Z`);
@@ -35,10 +31,11 @@ function userInitials(name) {
 export default function Users() {
   const currentUser = getUser();
   const isSuperAdmin = currentUser?.role === ROLES.SUPER_ADMIN;
+  const canManageUsers = canUseFeature(currentUser, "users", "write");
   const requestedUsername = new URLSearchParams(window.location.search).get("username");
   const [users, setUsers] = useState([]);
   const [staff, setStaff] = useState([]);
-  const [rolesInfo, setRolesInfo] = useState({ builtIn: [], custom: [], modules: [] });
+  const [rolesInfo, setRolesInfo] = useState({ builtIn: [], custom: [], features: [] });
   const [form, setForm] = useState(empty);
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -88,6 +85,12 @@ export default function Users() {
   }, [isSuperAdmin]);
 
   const allRoles = [...rolesInfo.builtIn, ...rolesInfo.custom.map((r) => ({ slug: r.slug, label: r.label }))];
+  const permissionGroups = rolesInfo.features.reduce((groups, feature) => {
+    const existing = groups.find((group) => group.name === feature.group);
+    if (existing) existing.features.push(feature);
+    else groups.push({ name: feature.group, features: [feature] });
+    return groups;
+  }, []);
   const roleLabel = (slug) => ROLE_LABELS[slug] || allRoles.find((r) => r.slug === slug)?.label || slug;
 
   const unlinkedStaff = staff.filter((s) => !users.some((u) => u.staff_id === s.id));
@@ -212,6 +215,7 @@ export default function Users() {
         </div>
       </div>
       {permissionMessage && <p className="success-text" style={{ marginBottom: 16 }}>{permissionMessage}</p>}
+      {!canManageUsers && <p className="permission-readonly-note">View-only access: you can review users and role permissions, but only a role with Edit permission can change them.</p>}
 
       {isSuperAdmin && (
         <section className="card active-users-card">
@@ -258,7 +262,7 @@ export default function Users() {
         </div>
       )}
 
-      <div className="card" style={{ marginBottom: 20 }}>
+      {canManageUsers && <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ marginTop: 0 }}>Add a user</h3>
         <form className="form-row" onSubmit={handleCreate}>
           <input placeholder="Username" value={form.username} required
@@ -287,7 +291,7 @@ export default function Users() {
           Linking a staff member is optional. Link one only when the account needs staff-based attendance, counter, or bus-duty information.
         </p>
         {error && <p className="error-text">{error}</p>}
-      </div>
+      </div>}
 
       <div className="card" style={{ marginBottom: 20 }}>
         <table>
@@ -302,7 +306,7 @@ export default function Users() {
                 <td>
                   {u.role === ROLES.SUPER_ADMIN ? (
                     <span className="badge active">{roleLabel(u.role)}</span>
-                  ) : editingId === u.id ? (
+                  ) : canManageUsers && editingId === u.id ? (
                     <select value={editRole} onChange={(e) => setEditRole(e.target.value)}>
                       {allRoles.map((r) => <option key={r.slug} value={r.slug}>{r.label}</option>)}
                     </select>
@@ -314,17 +318,17 @@ export default function Users() {
                 <td>
                   {u.role === ROLES.SUPER_ADMIN ? (
                     <span style={{ color: "var(--muted)", fontSize: "0.82rem" }}>Protected</span>
-                  ) : editingId === u.id ? (
+                  ) : canManageUsers && editingId === u.id ? (
                     <>
                       <button className="primary" style={{ marginRight: 8 }} onClick={() => saveRole(u)}>Save</button>
                       <button className="link-danger" onClick={() => setEditingId(null)}>Cancel</button>
                     </>
-                  ) : (
+                  ) : canManageUsers ? (
                     <>
                       <button className="link-danger" style={{ marginRight: 12 }} onClick={() => startEdit(u)}>Change role</button>
                       <button className="link-danger" onClick={() => handleDelete(u)}>Remove</button>
                     </>
-                  )}
+                  ) : <span style={{ color: "var(--muted)", fontSize: "0.82rem" }}>View only</span>}
                 </td>
               </tr>
             ))}
@@ -335,15 +339,15 @@ export default function Users() {
       <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ marginTop: 0 }}>Custom roles</h3>
         <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 }}>
-          Create a role beyond the built-in ones, then set which modules it can view or edit below. Permissions apply to every user with that role; create a custom role when access should be limited to one person. Live Activity's checkpoint permissions stay fixed.
+          Choose View and Edit separately for every website area. Bus Accounts and Place-wise Accounts are independent, and the same permissions apply to every user assigned to this role.
         </p>
-        <form className="form-row" onSubmit={handleCreateRole}>
+        {canManageUsers && <form className="form-row" onSubmit={handleCreateRole}>
           <input placeholder="Internal name (e.g. regional_manager)" value={newRole.slug}
             onChange={(e) => setNewRole({ ...newRole, slug: e.target.value })} />
           <input placeholder="Display label (e.g. Regional Manager)" value={newRole.label}
             onChange={(e) => setNewRole({ ...newRole, label: e.target.value })} />
           <button className="primary" type="submit">Create role</button>
-        </form>
+        </form>}
 
         <table style={{ marginTop: 12 }}>
           <thead><tr><th>Role</th><th></th></tr></thead>
@@ -352,8 +356,8 @@ export default function Users() {
               <tr key={r.slug}>
                 <td>{r.label}</td>
                 <td>
-                  <button className="link-danger" style={{ marginRight: 12 }} onClick={() => openPermissions(r.slug)}>Edit permissions</button>
-                  {rolesInfo.custom.some((c) => c.slug === r.slug) && (
+                  <button className="link-danger" style={{ marginRight: 12 }} onClick={() => openPermissions(r.slug)}>{canManageUsers ? "Edit permissions" : "View permissions"}</button>
+                  {canManageUsers && rolesInfo.custom.some((c) => c.slug === r.slug) && (
                     <button className="link-danger" onClick={() => handleDeleteRole(r.slug)}>Delete role</button>
                   )}
                 </td>
@@ -370,24 +374,19 @@ export default function Users() {
             <p style={{ color: "var(--muted)" }}>This role always has full access — nothing to configure.</p>
           ) : (
             <>
-              <table>
-                <thead><tr><th>Module</th><th>View</th><th>Edit</th></tr></thead>
-                <tbody>
-                  {rolesInfo.modules.map((m) => (
-                    <tr key={m}>
-                      <td>{MODULE_LABELS[m] || m}</td>
-                      <td><input type="checkbox" checked={!!perms[m]?.can_read} onChange={() => togglePerm(m, "can_read")} /></td>
-                      <td><input type="checkbox" checked={!!perms[m]?.can_write} onChange={() => togglePerm(m, "can_write")} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {(permsRole === ROLES.ACCOUNTS || permsRole === ROLES.MAINTENANCE || permsRole === ROLES.ONLINE_MANAGER) && (
-                <p style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
-                  Note: {roleLabel(permsRole)} already has full access to its own built-in work module — these checkboxes can add other modules on top of that.
-                </p>
-              )}
-              <button className="primary" style={{ marginTop: 10 }} onClick={savePermissions}>Save permissions</button>
+              <div className="permission-matrix">
+                {permissionGroups.map((group) => <section key={group.name} className="permission-group">
+                  <div className="permission-group-heading"><span>{group.name}</span><small>{group.features.length} option{group.features.length === 1 ? "" : "s"}</small></div>
+                  <div className="permission-feature-list">
+                    {group.features.map((feature) => <div className="permission-feature-row" key={feature.key}>
+                      <div><strong>{feature.label}</strong><small>{feature.description}</small></div>
+                      <label><span>View</span><input type="checkbox" checked={!!perms[feature.key]?.can_read} disabled={!canManageUsers} onChange={() => togglePerm(feature.key, "can_read")} /></label>
+                      <label title={feature.can_edit ? "Allow adding, changing and removing data" : "This page has no edit actions"}><span>Edit</span><input type="checkbox" checked={!!perms[feature.key]?.can_write} disabled={!canManageUsers || !feature.can_edit} onChange={() => togglePerm(feature.key, "can_write")} /></label>
+                    </div>)}
+                  </div>
+                </section>)}
+              </div>
+              {canManageUsers && <button className="primary" style={{ marginTop: 14 }} onClick={savePermissions}>Save all permissions</button>}
               <button className="link-danger" style={{ marginTop: 10, marginLeft: 10 }} onClick={() => setPermsRole("")}>Close</button>
             </>
           )}

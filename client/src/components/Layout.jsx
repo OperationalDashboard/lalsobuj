@@ -128,7 +128,7 @@ export default function Layout() {
         onClick={() => setNavOpen(false)}
       />
       <main className="main" id="main-content">
-        <Outlet key={lang} />
+        <Outlet key={`${lang}-${JSON.stringify(sessionUser?.permissions || {})}`} />
       </main>
     </div>
   );

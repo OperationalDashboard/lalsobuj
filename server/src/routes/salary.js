@@ -1,7 +1,6 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireRole } = require("../middleware/auth");
-const { FULL_ACCESS } = require("../roles");
+const { requireAuth, requireFeaturePermission, requireAnyFeaturePermission } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -9,7 +8,7 @@ router.use(requireAuth);
 // GET /api/salary/assignments -> every staff member with their salary plan
 // (staff who don't have a row yet show as salary_type 'none' / unassigned —
 // "No salary staff" is a deliberate, visible choice, not a missing entry).
-router.get("/assignments", (req, res) => {
+router.get("/assignments", requireFeaturePermission("salary", "read"), (req, res) => {
   const rows = db
     .prepare(
       `SELECT s.id as staff_id, s.name, s.designation, s.status,
@@ -26,7 +25,7 @@ router.get("/assignments", (req, res) => {
 // salary_type: 'monthly' (fixed amount every payroll run regardless of
 // attendance), 'daily' (amount per day actually worked), or 'none'
 // (explicitly not on payroll here).
-router.put("/assignments/:staffId", requireRole(...FULL_ACCESS), (req, res) => {
+router.put("/assignments/:staffId", requireFeaturePermission("salary", "write"), (req, res) => {
   const { salary_type, amount } = req.body;
   if (!["monthly", "daily", "none"].includes(salary_type)) {
     return res.status(400).json({ error: "salary_type must be monthly, daily, or none" });
@@ -80,7 +79,7 @@ router.put("/assignments/:staffId", requireRole(...FULL_ACCESS), (req, res) => {
 //   own daily rate — not the covering staff's rate — per instance, on top
 //   of their normal pay. This matches "Staff B covers absent Staff A and
 //   gets Staff A's day rate (500) as overtime, in addition to their own pay."
-router.get("/payroll", requireRole(...FULL_ACCESS), (req, res) => {
+router.get("/payroll", requireFeaturePermission("salary", "read"), (req, res) => {
   const month = req.query.month || new Date().toISOString().slice(0, 7); // "2026-08"
 
   const assignments = db.prepare("SELECT * FROM salary_assignments").all();
@@ -148,7 +147,7 @@ router.get("/payroll", requireRole(...FULL_ACCESS), (req, res) => {
 // Post the calculated base payroll of counter-assigned staff into the
 // separate Place-wise Accounts sector. One staff/month entry is created at
 // most once, so it cannot duplicate a place expense on repeated clicks.
-router.post("/post-place-expenses", requireRole(...FULL_ACCESS), (req, res) => {
+router.post("/post-place-expenses", requireAnyFeaturePermission(["salary", "accounts_place"], "write"), (req, res) => {
   const month = req.body.month || new Date().toISOString().slice(0, 7);
   if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: "Choose a valid salary month" });
   const requestedPostingDate = String(req.body.txn_date || "");

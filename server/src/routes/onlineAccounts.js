@@ -1,7 +1,6 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireModulePermission } = require("../middleware/auth");
-const { ROLES } = require("../roles");
+const { requireAuth, requireFeaturePermission } = require("../middleware/auth");
 
 const router = express.Router();
 const CHANNELS = ["website", "android", "ios", "website_android", "cash"];
@@ -9,17 +8,8 @@ const ENTRY_CHANNELS = ["website", "android", "ios", "cash"];
 
 router.use(requireAuth);
 
-function requireOnlineAccounts(mode) {
-  return (req, res, next) => {
-    // Online Manager keeps its built-in full access. Every other non-admin
-    // role is governed by the same role-permission matrix as other modules.
-    if (req.user?.role === ROLES.ONLINE_MANAGER) return next();
-    return requireModulePermission("online_accounts", mode)(req, res, next);
-  };
-}
-
-const guardRead = requireOnlineAccounts("read");
-const guardWrite = requireOnlineAccounts("write");
+const guardRead = requireFeaturePermission("online_accounts", "read");
+const guardWrite = requireFeaturePermission("online_accounts", "write");
 
 function cleanDate(value, field = "date") {
   const date = String(value || "").trim();

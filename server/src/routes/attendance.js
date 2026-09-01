@@ -1,7 +1,6 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireRole, requireModulePermission } = require("../middleware/auth");
-const { FULL_ACCESS, ROLES } = require("../roles");
+const { requireAuth, requireFeaturePermission, requireAnyFeaturePermission } = require("../middleware/auth");
 const { BUS_DESIGNATIONS } = require("../designations");
 
 const router = express.Router();
@@ -11,10 +10,8 @@ router.use(requireAuth);
 // Admin has granted "attendance" write access to (Users & Permissions),
 // same as every other module — this used to be hardcoded to Admin/Super
 // Admin only, which meant granted permissions were silently ignored.
-function guardWrite(req, res, next) {
-  if (FULL_ACCESS.includes(req.user.role)) return next();
-  return requireModulePermission("attendance", "write")(req, res, next);
-}
+const guardRead = requireAnyFeaturePermission(["attendance", "reports"], "read");
+const guardWrite = requireFeaturePermission("attendance", "write");
 
 const MAX_CHECKINS_PER_DAY = 3;
 
@@ -57,7 +54,7 @@ function clearForAbsence(staffId, workDate, status = "absent") {
   }
 }
 
-router.get("/", (req, res) => {
+router.get("/", guardRead, (req, res) => {
   res.json(db.prepare("SELECT * FROM attendance ORDER BY work_date DESC, id DESC").all());
 });
 
@@ -136,7 +133,7 @@ router.put("/:id/checkout", guardWrite, (req, res) => {
 // Admin/Super Admin can reopen a completed checkout, or reopen a missed
 // check-in. This deliberately resets the record to an active present shift
 // instead of allowing ordinary attendance roles to alter past records.
-router.post("/:id/reopen", requireRole(...FULL_ACCESS), (req, res) => {
+router.post("/:id/reopen", guardWrite, (req, res) => {
   const row = db.prepare("SELECT * FROM attendance WHERE id = ?").get(req.params.id);
   if (!row) return res.status(404).json({ error: "Not found" });
   const stage = req.body.stage || "checkout";
@@ -154,7 +151,6 @@ router.post("/:id/reopen", requireRole(...FULL_ACCESS), (req, res) => {
 router.post("/", guardWrite, (req, res) => {
   const { staff_id, work_date, status } = req.body;
   if (!staff_id || !work_date || !status) return res.status(400).json({ error: "staff_id, work_date, status required" });
-  if (["absent", "leave"].includes(status) && !FULL_ACCESS.includes(req.user.role)) return res.status(403).json({ error: "Only Admin or Super Admin can mark staff absent or on leave" });
   if (isBusStaff(staff_id)) {
     return res.status(400).json({ error: "Bus staff are tracked automatically from Live Activity/Rotation, not here" });
   }
@@ -171,7 +167,7 @@ router.post("/", guardWrite, (req, res) => {
 // Correcting a recorded check_in/check_out TIME after the fact — Admin/
 // Super Admin only. Everyone else can change WHO checked in/out (via
 // checkin/checkout above) but never edit a stamped time directly.
-router.put("/:id", requireRole(...FULL_ACCESS), (req, res) => {
+router.put("/:id", guardWrite, (req, res) => {
   const fields = ["check_in", "check_out"];
   const present = fields.filter((f) => req.body[f] !== undefined);
   if (!present.length) return res.status(400).json({ error: "No valid fields" });
@@ -184,7 +180,7 @@ router.put("/:id", requireRole(...FULL_ACCESS), (req, res) => {
 
 // Changing the STATUS of an already checked-in/out record (present, late,
 // absent, leave) is Admin/Super Admin only.
-router.put("/:id/status", requireRole(...FULL_ACCESS), (req, res) => {
+router.put("/:id/status", guardWrite, (req, res) => {
   const { status } = req.body;
   if (!status) return res.status(400).json({ error: "status required" });
   const row = db.prepare("SELECT * FROM attendance WHERE id = ?").get(req.params.id);
@@ -198,7 +194,7 @@ router.put("/:id/status", requireRole(...FULL_ACCESS), (req, res) => {
   res.json(db.prepare("SELECT * FROM attendance WHERE id = ?").get(req.params.id));
 });
 
-router.delete("/:id", requireRole(...FULL_ACCESS), (req, res) => {
+router.delete("/:id", guardWrite, (req, res) => {
   const info = db.prepare("DELETE FROM attendance WHERE id = ?").run(req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: "Not found" });
   res.status(204).end();

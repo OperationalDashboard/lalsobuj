@@ -1,11 +1,11 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireRole } = require("../middleware/auth");
-const { FULL_ACCESS } = require("../roles");
+const { requireAuth, requireFeaturePermission, requireAnyFeaturePermission } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireAuth);
-const guardWrite = requireRole(...FULL_ACCESS);
+const guardWrite = requireFeaturePermission("counters", "write");
+const guardCounterOrSettingsWrite = requireAnyFeaturePermission(["counters", "settings"], "write");
 
 // GET /api/counters — anyone logged in can read (needed to display/assign
 // which counter a staff member is posted at).
@@ -30,7 +30,7 @@ router.post("/", guardWrite, (req, res) => {
   }
 });
 
-router.put("/:id", guardWrite, (req, res) => {
+router.put("/:id", guardCounterOrSettingsWrite, (req, res) => {
   const { name, location, place_id } = req.body;
   const present = [];
   const values = [];

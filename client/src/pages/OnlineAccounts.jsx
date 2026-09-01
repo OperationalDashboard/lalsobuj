@@ -3,6 +3,7 @@ import { api, getUser } from "../api.js";
 import OnlineAccountsImporter from "../components/OnlineAccountsImporter.jsx";
 import OnlineAccountsImportHistory from "../components/OnlineAccountsImportHistory.jsx";
 import { ROLES, isFullAccess } from "../roles.js";
+import { canUseFeature } from "../permissions.js";
 
 const today = () => {
   const now = new Date();
@@ -228,7 +229,7 @@ function DailySalesChart({ days }) {
 
 export default function OnlineAccounts() {
   const user = getUser();
-  const canWrite = isFullAccess(user?.role) || user?.role === ROLES.ONLINE_MANAGER || Boolean(user?.permissions?.online_accounts?.can_write);
+  const canWrite = canUseFeature(user, "online_accounts", "write");
   const [view, setView] = useState("daily");
   const [selectedDate, setSelectedDate] = useState(today());
   const [entries, setEntries] = useState([]);

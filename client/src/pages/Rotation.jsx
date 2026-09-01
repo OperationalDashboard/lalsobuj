@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
+import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
+import { canUseFeature } from "../permissions.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const empty = { bus_id: "", driver_id: "", helper_id: "", supervisor_id: "", coach_name: "", route: "", duty_date: today(), shift_start: "" };
 
 export default function Rotation() {
+  const canWrite = canUseFeature(getUser(), "rotations", "write");
   const [rows, setRows] = useState([]);
   const [buses, setBuses] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -90,7 +92,7 @@ export default function Rotation() {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 20 }}>
+      {canWrite && <div className="card" style={{ marginBottom: 20 }}>
         <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 }}>
           This form is for scheduling a duty ahead of time. Once a bus actually leaves the counter on
           Live Activity, its rotation appears below automatically — no need to add it again here.
@@ -126,7 +128,7 @@ export default function Rotation() {
           <button className="primary" type="submit">{t("add_rotation")}</button>
         </form>
         {error && <p className="error-text">{error}</p>}
-      </div>
+      </div>}
 
       <div className="card">
         {hiddenUnavailableCount > 0 && (
@@ -151,14 +153,14 @@ export default function Rotation() {
                 <td>{linkedRouteFor(r.route)?.name || "—"}</td>
                 <td>{r.shift_start || "—"} – {r.shift_end || "—"}{r.trip_id ? " (from trip)" : ""}</td>
                 <td><span className={`badge ${r.status}`}>{r.status}</span></td>
-                <td><button className="primary" onClick={() => openReturnModal(r)} disabled={!linkedRouteFor(r.route) || r.bus_status !== "active"} title={r.bus_status !== "active" ? "This bus is unavailable" : ""}>Start linked trip</button> <button className="link-danger" onClick={() => handleDelete(r.id)}>{t("remove")}</button></td>
+                <td>{canWrite && <><button className="primary" onClick={() => openReturnModal(r)} disabled={!linkedRouteFor(r.route) || r.bus_status !== "active"} title={r.bus_status !== "active" ? "This bus is unavailable" : ""}>Start linked trip</button> <button className="link-danger" onClick={() => handleDelete(r.id)}>{t("remove")}</button></>}</td>
               </tr>
             ))}
             {visibleRows.length === 0 && <tr><td colSpan={11}>{t("no_rotations_yet")}</td></tr>}
           </tbody>
         </table>
       </div>
-      {returnModal && (
+      {canWrite && returnModal && (
         <div className="card" style={{ position: "fixed", zIndex: 10, width: "min(560px, calc(100vw - 32px))", left: "50%", top: "25%", transform: "translateX(-50%)", boxShadow: "0 10px 35px #0005" }}>
           <h3 style={{ marginTop: 0 }}>Confirm linked trip</h3>
           <p>You are adding the next rotation for <strong>{busName(returnModal.bus_id)}</strong>. The configured linked route is shown first; choose another route only if this trip is an exception.</p>

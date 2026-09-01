@@ -1,10 +1,10 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireModulePermission } = require("../middleware/auth");
+const { requireAuth, requireFeaturePermission } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireAuth);
-const guardWrite = requireModulePermission("staff", "write");
+const guardWrite = requireFeaturePermission("staff", "write");
 
 const WRITABLE = ["name", "designation", "phone", "nid_number", "joining_date", "assigned_bus_id", "counter_id", "status"];
 

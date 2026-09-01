@@ -2,19 +2,11 @@ import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { api, getUser, setToken, setUser } from "../api.js";
 import { ROLES, ROLE_LABELS, isFullAccess } from "../roles.js";
+import { canUseAnyFeature } from "../permissions.js";
 import { t, getLanguage, setLanguage } from "../i18n.js";
 import { APP_REVISION, APP_VERSION } from "../version.js";
 import BusIcon from "./BusIcon.jsx";
 
-const MODULE_ROUTES = {
-  buses: { to: "/buses", key: "buses" },
-  staff: { to: "/staff", key: "staff_details" },
-  rotations: { to: "/rotation", key: "rotation" },
-  attendance: { to: "/attendance", key: "time_management" },
-  accounts: { to: "/accounts", key: "accounts" },
-  online_accounts: { to: "/online-accounts", label: "Online Accounts" },
-  maintenance: { to: "/maintenance", key: "maintenance" },
-};
 const NAV_ICONS = { "/": "home", "/live-activity": "pulse", "/accounts": "wallet", "/online-accounts": "cloud", "/rotation": "rotate", "/attendance": "clock", "/staff": "people", "/buses": "bus", "/routes": "route", "/counters": "pin", "/maintenance": "tool", "/reports": "chart", "/salary": "money", "/trash": "trash", "/chat": "chat", "/users": "shield", "/settings": "gear" };
 const SIDEBAR_ORDER_STORAGE_KEY = "lsp_sidebar_order";
 
@@ -40,21 +32,8 @@ function NavIcon({ name }) {
 // get everything; other built-in roles get just what their job needs.
 // Custom roles are built dynamically from their granted permissions
 // (passed in as `permissions`, fetched from /auth/me).
-function withGrantedLinks(links, permissions) {
-  if (!permissions) return links;
-  const next = [...links];
-  Object.entries(permissions).forEach(([module, grant]) => {
-    const route = MODULE_ROUTES[module];
-    if (grant.can_read && route && !next.some((link) => link.to === route.to)) {
-      next.push({ to: route.to, label: route.label || t(route.key) });
-    }
-  });
-  return next;
-}
-
-function linksFor(role, permissions) {
-  if (isFullAccess(role)) {
-    return [
+function linksFor(user) {
+  const allLinks = [
       { to: "/", label: t("dashboard"), end: true },
       { to: "/live-activity", label: t("live_activity") },
       { to: "/accounts", label: t("accounts") },
@@ -72,61 +51,17 @@ function linksFor(role, permissions) {
       { to: "/chat", label: t("chat_box") },
       { to: "/users", label: t("users_permissions") },
       { to: "/settings", label: t("settings") },
-    ];
-  }
-  if (role === ROLES.MONITOR) {
-    return withGrantedLinks([
-      { to: "/reports", label: t("reports"), end: true },
-      { to: "/chat", label: t("chat_box") },
-    ], permissions);
-  }
-  if (role === ROLES.ACCOUNTS) {
-    return withGrantedLinks([
-      { to: "/accounts", label: t("accounts"), end: true },
-      { to: "/chat", label: t("chat_box") },
-    ], permissions);
-  }
-  if (role === ROLES.ONLINE_MANAGER) {
-    return withGrantedLinks([
-      { to: "/online-accounts", label: "Online Accounts", end: true },
-      { to: "/chat", label: t("chat_box") },
-    ], permissions);
-  }
-  if (role === ROLES.MAINTENANCE) {
-    return withGrantedLinks([
-      { to: "/maintenance", label: t("maintenance"), end: true },
-      { to: "/buses", label: t("buses") },
-      { to: "/chat", label: t("chat_box") },
-    ], permissions);
-  }
-  if (role === ROLES.CONTROL_COUNTER) {
-    return withGrantedLinks([
-      { to: "/live-activity", label: t("live_activity"), end: true },
-      { to: "/rotation", label: t("rotation") },
-      { to: "/routes", label: t("routes") },
-      { to: "/chat", label: t("chat_box") },
-    ], permissions);
-  }
-  if (role === ROLES.COUNTER || role === ROLES.PASSENGER_CHECKER) {
-    return withGrantedLinks([
-      { to: "/live-activity", label: t("live_activity"), end: true },
-      { to: "/chat", label: t("chat_box") },
-    ], permissions);
-  }
-  if (role === ROLES.HOTEL || role === ROLES.PUMP_MANAGER || role === ROLES.DRIVER || role === ROLES.HELPER) {
-    return withGrantedLinks([
-      { to: "/live-activity", label: t("live_activity"), end: true },
-      { to: "/chat", label: t("chat_box") },
-    ], permissions);
-  }
-
-  // Custom role: build links from whatever modules Admin granted read
-  // access to, plus Live Activity/Chat which every role can at least view.
-  const links = [
-    { to: "/live-activity", label: t("live_activity"), end: true },
-    { to: "/chat", label: t("chat_box") },
   ];
-  return withGrantedLinks(links, permissions);
+  if (isFullAccess(user?.role)) return allLinks;
+
+  const routeFeatures = {
+    "/": ["dashboard"], "/live-activity": ["live_activity"], "/accounts": ["accounts_bus", "accounts_place"],
+    "/online-accounts": ["online_accounts"], "/rotation": ["rotations"], "/attendance": ["attendance"],
+    "/staff": ["staff"], "/buses": ["buses"], "/routes": ["routes"], "/counters": ["counters"],
+    "/maintenance": ["maintenance"], "/reports": ["reports"], "/salary": ["salary"], "/trash": ["trash"],
+    "/chat": ["chat"], "/users": ["users"], "/settings": ["settings"],
+  };
+  return allLinks.filter((link) => canUseAnyFeature(user, routeFeatures[link.to] || [], "read"));
 }
 
 export default function Sidebar({ user: sessionUser, isOpen = false, onNavigate = () => {} }) {
@@ -162,7 +97,7 @@ export default function Sidebar({ user: sessionUser, isOpen = false, onNavigate 
     }).catch(() => {});
   }, [isSuperAdmin]);
 
-  const baseLinks = linksFor(user?.role, user?.permissions);
+  const baseLinks = linksFor(user);
   const links = isSuperAdmin && navOrder.length
     ? [...baseLinks].sort((a, b) => {
       const aIndex = navOrder.indexOf(a.to);

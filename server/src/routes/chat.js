@@ -1,7 +1,6 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth } = require("../middleware/auth");
-const { ROLES } = require("../roles");
+const { requireAuth, requireFeaturePermission } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -9,7 +8,7 @@ router.use(requireAuth);
 // Simple shared office chat room, kept to the last 100 messages.
 // Frontend polls this every few seconds. Swap for websockets later if
 // real-time delivery becomes important.
-router.get("/", (req, res) => {
+router.get("/", requireFeaturePermission("chat", "read"), (req, res) => {
   const rows = db
     .prepare(
       `SELECT c.id, c.message, c.created_at, u.id as sender_id, u.full_name as sender_name
@@ -20,10 +19,7 @@ router.get("/", (req, res) => {
   res.json(rows.reverse());
 });
 
-router.post("/", (req, res) => {
-  if (req.user.role === ROLES.MONITOR) {
-    return res.status(403).json({ error: "Monitor role is read-only" });
-  }
+router.post("/", requireFeaturePermission("chat", "write"), (req, res) => {
   const { message } = req.body;
   if (!message || !message.trim()) return res.status(400).json({ error: "message required" });
   const info = db

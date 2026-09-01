@@ -8,6 +8,7 @@ const Database = require("libsql");
 const fleetsPdfBuses = require("./data/fleets-pdf-buses.json");
 const fleets2PdfBuses = require("./data/fleets-2-pdf-buses.json");
 const routePdfRoutes = require("./data/route-pdf-routes.json");
+const { DEFAULT_ROLE_MODES } = require("./permissionCatalog");
 require("dotenv").config();
 
 const tursoUrl = process.env.TURSO_DATABASE_URL?.trim();
@@ -595,6 +596,23 @@ const book1RemovalKey = "book1_bus_import_removed_20260831";
 if (!db.prepare("SELECT value FROM settings WHERE key = ?").get(book1RemovalKey)) {
   const removed = db.prepare("DELETE FROM buses WHERE source_note LIKE 'Imported from Book 1.pdf%'").run().changes;
   db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(book1RemovalKey, String(removed));
+}
+
+// v1.16 makes every sidebar feature independently configurable. Preserve
+// the established built-in workspaces on first upgrade, then let the Admin
+// permission screen own every explicit View/Edit choice from that point on.
+const granularPermissionMarker = "granular_permissions_v1_16";
+if (!db.prepare("SELECT 1 FROM settings WHERE key = ?").get(granularPermissionMarker)) {
+  const upsertPermission = db.prepare(
+    `INSERT INTO role_permissions (role, module, can_read, can_write) VALUES (?,?,?,?)
+     ON CONFLICT(role, module) DO UPDATE SET can_read = excluded.can_read, can_write = excluded.can_write`
+  );
+  for (const [role, grants] of Object.entries(DEFAULT_ROLE_MODES)) {
+    for (const [feature, mode] of Object.entries(grants)) {
+      upsertPermission.run(role, feature, 1, mode === "write" ? 1 : 0);
+    }
+  }
+  db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(granularPermissionMarker, "applied");
 }
 
 // Import only the fields requested from Fleets.pdf. The displayed registration

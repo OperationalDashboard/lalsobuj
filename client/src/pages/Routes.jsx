@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
+import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
+import { canUseFeature } from "../permissions.js";
 
 export default function Routes() {
+  const canWrite = canUseFeature(getUser(), "routes", "write");
   const [routes, setRoutes] = useState([]);
   const [name, setName] = useState("");
   const [returnRouteId, setReturnRouteId] = useState("");
@@ -101,7 +103,7 @@ export default function Routes() {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 20 }}>
+      {canWrite && <div className="card" style={{ marginBottom: 20 }}>
         <form className="form-row" onSubmit={handleAdd}>
           <input placeholder={t("route_name")} value={name} onChange={(e) => setName(e.target.value)} />
           <select value={returnRouteId} onChange={(e) => setReturnRouteId(e.target.value)}>
@@ -119,7 +121,7 @@ export default function Routes() {
           has passed since departure.
         </p>
         {error && <p className="error-text">{error}</p>}
-      </div>
+      </div>}
 
       <div className="card routes-management-card">
         <div className="routes-list-header">
@@ -154,8 +156,8 @@ export default function Routes() {
                   ? <select className="route-edit-control route-status-control" value={editForm.is_active} onChange={(e) => setEditForm({ ...editForm, is_active: e.target.value })}><option value="1">{t("active")}</option><option value="0">{t("inactive")}</option></select>
                   : <span className={`badge ${r.is_active ? "active" : "on_leave"}`}>{r.is_active ? t("active") : t("inactive")}</span>}</td>
                 <td>
-                  {editingId === r.id ? <div className="route-actions"><button className="primary" type="button" disabled={!editForm.name.trim() || savingId === r.id} aria-busy={savingId === r.id} onClick={() => saveEdit(r)}>{savingId === r.id ? "Saving…" : t("save")}</button><button className="place-secondary-action" type="button" disabled={savingId === r.id} onClick={cancelEdit}>{t("cancel")}</button></div>
-                    : <div className="route-actions"><button className="settings-edit-button" type="button" onClick={() => startEdit(r)}>Edit route</button><button className="link-danger" type="button" onClick={() => toggleActive(r)}>{r.is_active ? t("deactivate") : t("activate")}</button><button className="link-danger" type="button" onClick={() => handleDelete(r.id)}>{t("remove")}</button></div>}
+                  {canWrite && (editingId === r.id ? <div className="route-actions"><button className="primary" type="button" disabled={!editForm.name.trim() || savingId === r.id} aria-busy={savingId === r.id} onClick={() => saveEdit(r)}>{savingId === r.id ? "Saving…" : t("save")}</button><button className="place-secondary-action" type="button" disabled={savingId === r.id} onClick={cancelEdit}>{t("cancel")}</button></div>
+                    : <div className="route-actions"><button className="settings-edit-button" type="button" onClick={() => startEdit(r)}>Edit route</button><button className="link-danger" type="button" onClick={() => toggleActive(r)}>{r.is_active ? t("deactivate") : t("activate")}</button><button className="link-danger" type="button" onClick={() => handleDelete(r.id)}>{t("remove")}</button></div>)}
                 </td>
               </tr>
             ))}

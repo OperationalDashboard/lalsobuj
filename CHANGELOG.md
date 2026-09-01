@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.16.0 — 2026-09-01
+
+- Rebuilt role permissions into a full feature-by-feature matrix with separate View and Edit choices for every sidebar section.
+- Split Accounts permission into independent **Bus Accounts** and **Place-wise Accounts** access, enforced in both the interface and server APIs.
+- Added view-only page behavior, so users can review authorized information without being offered edit controls they cannot use.
+- Preserved the existing workspaces of built-in roles on upgrade; after an Admin saves a role, every selected and unselected permission is applied exactly as configured.
+
 ## 1.15.0 — 2026-09-01
 
 - Replaced the crowded Accounts bus list with a dedicated Bus Number search and a boxed 10-bus-per-page browser.

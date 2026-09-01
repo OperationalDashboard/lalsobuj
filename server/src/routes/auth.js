@@ -3,8 +3,9 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const db = require("../db");
-const { requireAuth, requireRole } = require("../middleware/auth");
+const { requireAuth, requireRole, requireFeaturePermission } = require("../middleware/auth");
 const { ROLES, ASSIGNABLE_ROLES, FULL_ACCESS } = require("../roles");
+const { permissionsForRole } = require("../permissionCatalog");
 
 const router = express.Router();
 const attempts = new Map();
@@ -159,9 +160,7 @@ router.get("/me", requireAuth, (req, res) => {
 
   let permissions = null;
   if (!FULL_ACCESS.includes(req.user.role)) {
-    const rows = db.prepare("SELECT module, can_read, can_write FROM role_permissions WHERE role = ?").all(req.user.role);
-    permissions = {};
-    rows.forEach((r) => { permissions[r.module] = { can_read: !!r.can_read, can_write: !!r.can_write }; });
+    permissions = permissionsForRole(db, req.user.role);
   }
 
   res.json({ user: req.user, staff, permissions });
@@ -197,9 +196,9 @@ router.get("/presence", requireAuth, requireRole(ROLES.SUPER_ADMIN), (req, res) 
 
 // --- User / role management -------------------------------------------
 // Only Admin and Super Admin can view or manage the user list.
-router.use("/users", requireAuth, requireRole(...FULL_ACCESS));
+router.use("/users", requireAuth);
 
-router.get("/users", (req, res) => {
+router.get("/users", requireFeaturePermission("users", "read"), (req, res) => {
   const users = db
     .prepare(
       `SELECT u.id, u.username, u.full_name, u.role, u.staff_id, u.created_at, s.name as staff_name
@@ -209,7 +208,7 @@ router.get("/users", (req, res) => {
   res.json(users);
 });
 
-router.post("/users", (req, res) => {
+router.post("/users", requireFeaturePermission("users", "write"), (req, res) => {
   const { username, password, full_name, role, staff_id } = req.body;
   if (!username || !password || !full_name || !role) {
     return res.status(400).json({ error: "username, password, full_name, role required" });
@@ -239,7 +238,7 @@ router.post("/users", (req, res) => {
 // Change a user's role, name, staff link, or password. The Super Admin
 // account is completely protected — it can't be edited through the API
 // by anyone, including another Admin.
-router.put("/users/:id", (req, res) => {
+router.put("/users/:id", requireFeaturePermission("users", "write"), (req, res) => {
   const target = db.prepare("SELECT * FROM users WHERE id = ?").get(req.params.id);
   if (!target) return res.status(404).json({ error: "Not found" });
   if (target.role === ROLES.SUPER_ADMIN) {
@@ -278,7 +277,7 @@ router.put("/users/:id", (req, res) => {
 });
 
 // Same Super Admin protection applies to deletion.
-router.delete("/users/:id", (req, res) => {
+router.delete("/users/:id", requireFeaturePermission("users", "write"), (req, res) => {
   const target = db.prepare("SELECT * FROM users WHERE id = ?").get(req.params.id);
   if (!target) return res.status(404).json({ error: "Not found" });
   if (target.role === ROLES.SUPER_ADMIN) {

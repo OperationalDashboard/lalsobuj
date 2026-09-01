@@ -1,7 +1,6 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireRole } = require("../middleware/auth");
-const { FULL_ACCESS, ROLES } = require("../roles");
+const { requireAuth, requireFeaturePermission } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -11,7 +10,7 @@ router.get("/", (req, res) => {
   res.json(db.prepare("SELECT * FROM discount_types ORDER BY name ASC").all());
 });
 
-router.post("/", requireRole(...FULL_ACCESS), (req, res) => {
+router.post("/", requireFeaturePermission("settings", "write"), (req, res) => {
   const { name } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: "name required" });
   try {
@@ -22,7 +21,7 @@ router.post("/", requireRole(...FULL_ACCESS), (req, res) => {
   }
 });
 
-router.put("/:id", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
+router.put("/:id", requireFeaturePermission("settings", "write"), (req, res) => {
   const name = req.body.name?.trim();
   if (!name) return res.status(400).json({ error: "name required" });
   const current = db.prepare("SELECT * FROM discount_types WHERE id = ?").get(req.params.id);
@@ -36,7 +35,7 @@ router.put("/:id", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
   }
 });
 
-router.delete("/:id", requireRole(...FULL_ACCESS), (req, res) => {
+router.delete("/:id", requireFeaturePermission("settings", "write"), (req, res) => {
   const info = db.prepare("DELETE FROM discount_types WHERE id = ?").run(req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: "Not found" });
   res.status(204).end();

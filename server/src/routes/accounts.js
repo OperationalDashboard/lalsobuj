@@ -1,24 +1,34 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireModulePermission } = require("../middleware/auth");
+const { requireAuth, requireFeaturePermission, requireAnyFeaturePermission } = require("../middleware/auth");
 const { FULL_ACCESS, ROLES } = require("../roles");
 
 const router = express.Router();
 router.use(requireAuth);
 
-// Accounts role always has write access to this module; other roles need
-// an explicit grant from Admin via Users & Permissions.
-function guardWrite(req, res, next) {
-  if (FULL_ACCESS.includes(req.user.role) || req.user.role === ROLES.ACCOUNTS) return next();
-  return requireModulePermission("accounts", "write")(req, res, next);
+const guardBusRead = requireAnyFeaturePermission(["accounts_bus", "reports", "trash"], "read");
+const guardPlaceRead = requireAnyFeaturePermission(["accounts_place", "reports"], "read");
+const guardBusWrite = requireFeaturePermission("accounts_bus", "write");
+const guardPlaceWrite = requireAnyFeaturePermission(["accounts_place", "settings"], "write");
+
+function guardNewTransaction(req, res, next) {
+  const isPlaceEntry = !req.body.bus_id && (req.body.place_name || ["place_income", "place_expense"].includes(req.body.category));
+  return (isPlaceEntry ? guardPlaceWrite : guardBusWrite)(req, res, next);
+}
+
+function guardExistingTransaction(req, res, next) {
+  const row = db.prepare("SELECT bus_id, place_name, category FROM transactions WHERE id = ?").get(req.params.id);
+  if (!row) return res.status(404).json({ error: "Not found" });
+  const isPlaceEntry = !row.bus_id && (row.place_name || ["place_income", "place_expense"].includes(row.category));
+  return (isPlaceEntry ? requireFeaturePermission("accounts_place", "write") : guardBusWrite)(req, res, next);
 }
 
 // Separate place-wise operating-expense setup. Accounts, Admin and Super
 // Admin can manage this sector; each saved expense uses one place only.
-router.get("/expense-places", (req, res) => {
+router.get("/expense-places", requireAnyFeaturePermission(["accounts_place", "settings"], "read"), (req, res) => {
   res.json(db.prepare("SELECT * FROM expense_places ORDER BY name").all());
 });
-router.post("/expense-places", guardWrite, (req, res) => {
+router.post("/expense-places", guardPlaceWrite, (req, res) => {
   const name = req.body.name?.trim();
   if (!name) return res.status(400).json({ error: "Place name required" });
   try {
@@ -26,7 +36,7 @@ router.post("/expense-places", guardWrite, (req, res) => {
     res.status(201).json(db.prepare("SELECT * FROM expense_places WHERE id = ?").get(info.lastInsertRowid));
   } catch { res.status(400).json({ error: "That place already exists" }); }
 });
-router.put("/expense-places/:id", guardWrite, (req, res) => {
+router.put("/expense-places/:id", guardPlaceWrite, (req, res) => {
   const name = req.body.name?.trim();
   if (!name) return res.status(400).json({ error: "Place name required" });
   const current = db.prepare("SELECT * FROM expense_places WHERE id = ?").get(req.params.id);
@@ -37,12 +47,12 @@ router.put("/expense-places/:id", guardWrite, (req, res) => {
     res.json(db.prepare("SELECT * FROM expense_places WHERE id = ?").get(req.params.id));
   } catch { res.status(400).json({ error: "That place already exists" }); }
 });
-router.delete("/expense-places/:id", guardWrite, (req, res) => {
+router.delete("/expense-places/:id", guardPlaceWrite, (req, res) => {
   const info = db.prepare("DELETE FROM expense_places WHERE id = ?").run(req.params.id);
   if (!info.changes) return res.status(404).json({ error: "Not found" });
   res.status(204).end();
 });
-router.get("/expense-types", (req, res) => {
+router.get("/expense-types", requireAnyFeaturePermission(["accounts_place", "settings"], "read"), (req, res) => {
   const existing = db.prepare("SELECT COUNT(*) AS c FROM expense_types").get();
   if (!existing.c) {
     const insertDefault = db.prepare("INSERT OR IGNORE INTO expense_types (name) VALUES (?)");
@@ -50,7 +60,7 @@ router.get("/expense-types", (req, res) => {
   }
   res.json(db.prepare("SELECT * FROM expense_types ORDER BY name").all());
 });
-router.post("/expense-types", guardWrite, (req, res) => {
+router.post("/expense-types", guardPlaceWrite, (req, res) => {
   const name = req.body.name?.trim();
   if (!name) return res.status(400).json({ error: "Expense type required" });
   try {
@@ -58,7 +68,7 @@ router.post("/expense-types", guardWrite, (req, res) => {
     res.status(201).json(db.prepare("SELECT * FROM expense_types WHERE id = ?").get(info.lastInsertRowid));
   } catch { res.status(400).json({ error: "That expense type already exists" }); }
 });
-router.delete("/expense-types/:id", guardWrite, (req, res) => {
+router.delete("/expense-types/:id", guardPlaceWrite, (req, res) => {
   const info = db.prepare("DELETE FROM expense_types WHERE id = ?").run(req.params.id);
   if (!info.changes) return res.status(404).json({ error: "Not found" });
   res.status(204).end();
@@ -73,7 +83,7 @@ router.delete("/expense-types/:id", guardWrite, (req, res) => {
 // alone used to leave those out, making this look income-only whenever a
 // place's costs were entered as one of those other categories instead of
 // "place_expense".
-router.get("/place-finance", (req, res) => {
+router.get("/place-finance", guardPlaceRead, (req, res) => {
   const { from, to } = req.query;
   const clauses = ["place_name IS NOT NULL", "place_name != ''"];
   const params = [];
@@ -84,7 +94,7 @@ router.get("/place-finance", (req, res) => {
 });
 
 // GET /api/accounts?bus_id=3&from=2026-08-01&to=2026-08-31&trip_id=
-router.get("/", (req, res) => {
+router.get("/", guardBusRead, (req, res) => {
   const { bus_id, from, to, type, trip_id } = req.query;
   const clauses = [];
   const params = [];
@@ -100,7 +110,7 @@ router.get("/", (req, res) => {
 
 // GET /api/accounts/by-bus — every bus with its running income/expense/net,
 // for the reorganized "accounts per bus" view.
-router.get("/by-bus", (req, res) => {
+router.get("/by-bus", guardBusRead, (req, res) => {
   const rows = db
     .prepare(
       `SELECT b.id as bus_id, b.reg_number, b.source_bus_number,
@@ -117,7 +127,7 @@ router.get("/by-bus", (req, res) => {
 // GET /api/accounts/summary?bus_id=3&from=&to= -> totals for quick dashboard
 // cards and for the bus-wise solo report (net income/loss per bus), over
 // an optional date range (defaults to all time when no range given).
-router.get("/summary", (req, res) => {
+router.get("/summary", guardBusRead, (req, res) => {
   const { bus_id, from, to } = req.query;
   const clauses = [];
   const params = [];
@@ -170,7 +180,7 @@ function validateCategory(type, category, description) {
   return null;
 }
 
-router.post("/", guardWrite, (req, res) => {
+router.post("/", guardNewTransaction, (req, res) => {
   const { bus_id, trip_id, type, category, description, txn_date, passengers_count, price_per_seat, deduction_type, deducted_passengers, leg_scope, place_name, counter_id, attachment_name, attachment_data, apply_to_both, both_leg_amounts } = req.body;
   const amount = computeAmount(req.body);
   if (!type || !category || amount === undefined || amount === null || !txn_date) {
@@ -217,7 +227,7 @@ router.post("/", guardWrite, (req, res) => {
   res.status(201).json(db.prepare("SELECT * FROM transactions WHERE id = ?").get(info.lastInsertRowid));
 });
 
-router.put("/:id", guardWrite, (req, res) => {
+router.put("/:id", guardExistingTransaction, (req, res) => {
   const existing = db.prepare("SELECT * FROM transactions WHERE id = ?").get(req.params.id);
   if (!existing) return res.status(404).json({ error: "Not found" });
 
@@ -267,7 +277,7 @@ router.put("/:id", guardWrite, (req, res) => {
   res.json(db.prepare("SELECT * FROM transactions WHERE id = ?").get(req.params.id));
 });
 
-router.delete("/:id", guardWrite, (req, res) => {
+router.delete("/:id", guardExistingTransaction, (req, res) => {
   const info = db.prepare("DELETE FROM transactions WHERE id = ?").run(req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: "Not found" });
   res.status(204).end();

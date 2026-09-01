@@ -1344,6 +1344,37 @@ table button { white-space: nowrap; }
   .online-sales-date-report-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
+.permission-readonly-note {
+  margin: 0 0 16px;
+  padding: 11px 14px;
+  border: 1px solid color-mix(in srgb, var(--green) 30%, var(--border));
+  border-radius: 10px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--green) 8%, var(--card));
+  font-size: .86rem;
+  font-weight: 650;
+}
+.permission-empty-state { max-width: 620px; margin: 40px auto; text-align: center; }
+.permission-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.permission-fieldset:disabled { opacity: .88; }
+.permission-matrix { display: grid; gap: 16px; }
+.permission-group { overflow: hidden; border: 1px solid var(--border); border-radius: 13px; background: var(--card); }
+.permission-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; background: color-mix(in srgb, var(--green) 7%, var(--surface)); border-bottom: 1px solid var(--border); }
+.permission-group-heading span { font-weight: 800; }
+.permission-group-heading small { color: var(--muted); }
+.permission-feature-list { display: grid; }
+.permission-feature-row { display: grid; grid-template-columns: minmax(240px, 1fr) 86px 86px; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.permission-feature-row:last-child { border-bottom: 0; }
+.permission-feature-row > div { display: grid; gap: 3px; }
+.permission-feature-row > div small { color: var(--muted); line-height: 1.4; }
+.permission-feature-row > label { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: .82rem; font-weight: 750; }
+.permission-feature-row input[type="checkbox"] { width: 19px; height: 19px; accent-color: var(--green); }
+
+@media (max-width: 620px) {
+  .permission-feature-row { grid-template-columns: minmax(0, 1fr) auto auto; gap: 9px; padding: 12px; }
+  .permission-feature-row > label span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+}
+
 @media print {
   body { background: #fff !important; }
   body * { visibility: hidden !important; }

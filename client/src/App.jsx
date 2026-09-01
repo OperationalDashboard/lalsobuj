@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { getToken, getUser } from "./auth.js";
-import { ROLES, isFullAccess, homeRouteFor } from "./roles.js";
+import { canUseAnyFeature, firstPermittedRoute } from "./permissions.js";
 import Layout from "./components/Layout.jsx";
 import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -31,27 +31,24 @@ function Protected({ children }) {
 // the UI from showing pages that would only error out. `moduleName`, if
 // given, lets a custom role in via its granted permissions even when it
 // doesn't match any of the fixed built-in checks.
-function RoleGate({ allow, moduleName, children }) {
+function PermissionGate({ features, children }) {
   const user = getUser();
-  const grantedByPermission = moduleName && user?.permissions?.[moduleName]?.can_read;
-  if (!allow(user?.role) && !grantedByPermission) return <Navigate to={homeRouteFor(user?.role)} replace />;
-  return children;
+  if (!canUseAnyFeature(user, features, "read")) return <Navigate to={firstPermittedRoute(user)} replace />;
+  const hasEditableFeature = features.some((feature) => !["dashboard", "reports"].includes(feature));
+  const canWrite = canUseAnyFeature(user, features, "write");
+  return <>{hasEditableFeature && !canWrite && <p className="permission-readonly-note">View-only access: this role can review this section, but changes are disabled by the server.</p>}{children}</>;
 }
 
 function IndexRedirect() {
   const user = getUser();
-  const home = homeRouteFor(user?.role);
+  const home = firstPermittedRoute(user);
   if (home === "/") return <Dashboard />;
   return <Navigate to={home} replace />;
 }
 
-const canSeeAccounts = (r) => isFullAccess(r) || r === ROLES.ACCOUNTS;
-const canSeeMaintenance = (r) => isFullAccess(r) || r === ROLES.MAINTENANCE;
-const canSeeReports = (r) => isFullAccess(r) || r === ROLES.MONITOR;
-const canSeeBuses = (r) => isFullAccess(r) || r === ROLES.MAINTENANCE;
-const canSeeRoutes = (r) => isFullAccess(r) || r === ROLES.CONTROL_COUNTER;
-const canSeeRotation = (r) => isFullAccess(r) || r === ROLES.CONTROL_COUNTER;
-const canSeeOnlineAccounts = (r) => isFullAccess(r) || r === ROLES.ONLINE_MANAGER;
+function NoAccess() {
+  return <div className="card permission-empty-state"><h2>No features assigned</h2><p>Ask an Admin to enable View permission for at least one website feature.</p></div>;
+}
 
 export default function App() {
   return (
@@ -66,22 +63,23 @@ export default function App() {
         }
       >
         <Route index element={<IndexRedirect />} />
-        <Route path="live-activity" element={<LiveActivity />} />
-        <Route path="chat" element={<Chat />} />
-        <Route path="accounts" element={<RoleGate allow={canSeeAccounts} moduleName="accounts"><Accounts /></RoleGate>} />
-        <Route path="online-accounts" element={<RoleGate allow={canSeeOnlineAccounts} moduleName="online_accounts"><OnlineAccounts /></RoleGate>} />
-        <Route path="rotation" element={<RoleGate allow={canSeeRotation} moduleName="rotations"><Rotation /></RoleGate>} />
-        <Route path="attendance" element={<RoleGate allow={isFullAccess} moduleName="attendance"><Attendance /></RoleGate>} />
-        <Route path="staff" element={<RoleGate allow={isFullAccess} moduleName="staff"><Staff /></RoleGate>} />
-        <Route path="buses" element={<RoleGate allow={canSeeBuses} moduleName="buses"><Buses /></RoleGate>} />
-        <Route path="routes" element={<RoleGate allow={canSeeRoutes}><RoutesPage /></RoleGate>} />
-        <Route path="counters" element={<RoleGate allow={isFullAccess}><Counters /></RoleGate>} />
-        <Route path="maintenance" element={<RoleGate allow={canSeeMaintenance} moduleName="maintenance"><Maintenance /></RoleGate>} />
-        <Route path="users" element={<RoleGate allow={isFullAccess}><Users /></RoleGate>} />
-        <Route path="settings" element={<RoleGate allow={isFullAccess}><Settings /></RoleGate>} />
-        <Route path="reports" element={<RoleGate allow={canSeeReports}><Reports /></RoleGate>} />
-        <Route path="salary" element={<RoleGate allow={isFullAccess}><Salary /></RoleGate>} />
-        <Route path="trash" element={<RoleGate allow={isFullAccess}><Trash /></RoleGate>} />
+        <Route path="live-activity" element={<PermissionGate features={["live_activity"]}><LiveActivity /></PermissionGate>} />
+        <Route path="chat" element={<PermissionGate features={["chat"]}><Chat /></PermissionGate>} />
+        <Route path="accounts" element={<PermissionGate features={["accounts_bus", "accounts_place"]}><Accounts /></PermissionGate>} />
+        <Route path="online-accounts" element={<PermissionGate features={["online_accounts"]}><OnlineAccounts /></PermissionGate>} />
+        <Route path="rotation" element={<PermissionGate features={["rotations"]}><Rotation /></PermissionGate>} />
+        <Route path="attendance" element={<PermissionGate features={["attendance"]}><Attendance /></PermissionGate>} />
+        <Route path="staff" element={<PermissionGate features={["staff"]}><Staff /></PermissionGate>} />
+        <Route path="buses" element={<PermissionGate features={["buses"]}><Buses /></PermissionGate>} />
+        <Route path="routes" element={<PermissionGate features={["routes"]}><RoutesPage /></PermissionGate>} />
+        <Route path="counters" element={<PermissionGate features={["counters"]}><Counters /></PermissionGate>} />
+        <Route path="maintenance" element={<PermissionGate features={["maintenance"]}><Maintenance /></PermissionGate>} />
+        <Route path="users" element={<PermissionGate features={["users"]}><Users /></PermissionGate>} />
+        <Route path="settings" element={<PermissionGate features={["settings"]}><Settings /></PermissionGate>} />
+        <Route path="reports" element={<PermissionGate features={["reports"]}><Reports /></PermissionGate>} />
+        <Route path="salary" element={<PermissionGate features={["salary"]}><Salary /></PermissionGate>} />
+        <Route path="trash" element={<PermissionGate features={["trash"]}><Trash /></PermissionGate>} />
+        <Route path="no-access" element={<NoAccess />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

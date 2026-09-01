@@ -1,11 +1,10 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireRole } = require("../middleware/auth");
-const { FULL_ACCESS, ROLES } = require("../roles");
+const { requireAuth, requireFeaturePermission } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireAuth);
-const guardWrite = requireRole(...FULL_ACCESS, ROLES.CONTROL_COUNTER);
+const guardWrite = requireFeaturePermission("routes", "write");
 
 function routeNameKey(value) {
   return String(value || "")

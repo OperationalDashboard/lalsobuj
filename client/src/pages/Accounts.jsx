@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { api, getUser } from "../api.js";
 import { ROLES, isFullAccess } from "../roles.js";
 import { t } from "../i18n.js";
+import { canUseFeature } from "../permissions.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const readableDate = (value) => value
@@ -43,8 +44,12 @@ function RotationDetails({ rows }) {
 export default function Accounts() {
   const me = getUser();
   const isAccountsRole = me?.role === ROLES.ACCOUNTS;
-  const canFixPairing = isAccountsRole || isFullAccess(me?.role);
-  const canRemoveRotations = isFullAccess(me?.role);
+  const canViewBus = canUseFeature(me, "accounts_bus", "read");
+  const canViewPlace = canUseFeature(me, "accounts_place", "read");
+  const canWriteBus = canUseFeature(me, "accounts_bus", "write");
+  const canWritePlace = canUseFeature(me, "accounts_place", "write");
+  const canFixPairing = canWriteBus;
+  const canRemoveRotations = canWriteBus;
 
   const [busSummaries, setBusSummaries] = useState([]);
   const [buses, setBuses] = useState([]);
@@ -84,11 +89,15 @@ export default function Accounts() {
   const [pairB, setPairB] = useState("");
 
   function loadOverview() {
-    api.get("/accounts/by-bus").then(setBusSummaries).catch(() => {});
-    api.get("/buses").then(setBuses).catch(() => {});
-    api.get("/discount-types").then(setDiscountTypes).catch(() => {});
-    loadPlaceExpenseSector();
-    loadPlaceTransactions();
+    if (canViewBus) {
+      api.get("/accounts/by-bus").then(setBusSummaries).catch(() => {});
+      api.get("/buses").then(setBuses).catch(() => {});
+      api.get("/discount-types").then(setDiscountTypes).catch(() => {});
+    }
+    if (canViewPlace) {
+      loadPlaceExpenseSector();
+      loadPlaceTransactions();
+    }
   }
   useEffect(loadOverview, []);
 
@@ -378,7 +387,7 @@ export default function Accounts() {
         </div>
       </div>
 
-      <div className="card accounts-bus-browser" style={{ marginBottom: 20 }}>
+      {canViewBus && <div className="card accounts-bus-browser" style={{ marginBottom: 20 }}>
         <div className="accounts-bus-toolbar">
           <div className="accounts-bus-heading">
             <span className="settings-eyebrow">BUS-WISE ACCOUNTS</span>
@@ -427,9 +436,9 @@ export default function Accounts() {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
-      <div className="card" style={{ marginBottom: 20 }}>
+      {canViewPlace && <div className="card" style={{ marginBottom: 20 }}>
         <div className="page-header" style={{ marginBottom: 12 }}>
           <div><h3 style={{ margin: 0 }}>Place-wise Accounts</h3><p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "0.85rem" }}>A separate sector for each Place and its optional counters. Every entry is assigned to one Place only; income and expenses are included in the company Report totals.</p></div>
         </div>
@@ -447,7 +456,8 @@ export default function Accounts() {
           </div>
           <div className="place-period-current"><small>Showing totals for</small><strong>{placePeriodLabel}</strong></div>
         </div>
-        <form className="form-row" onSubmit={addPlaceExpense}>
+        {!canWritePlace && <p className="permission-readonly-note">View-only access: you can review Place-wise Accounts, but cannot add or change entries.</p>}
+        {canWritePlace && <form className="form-row" onSubmit={addPlaceExpense}>
           <select value={placeForm.type} onChange={(e) => setPlaceForm({ ...placeForm, type: e.target.value, finance_type: "" })}><option value="expense">Expense</option><option value="income">Income</option></select>
           <select value={placeForm.place_name} onChange={(e) => setPlaceForm({ ...placeForm, place_name: e.target.value, counter_id: "" })}><option value="">Select one place</option>{expensePlaces.map((place) => <option key={place.id} value={place.name}>{place.name}</option>)}</select>
           <select value={placeForm.counter_id} onChange={(e) => setPlaceForm({ ...placeForm, counter_id: e.target.value })}><option value="">No counter / whole place</option>{placeCounters.filter((counter) => counter.place_name === placeForm.place_name).map((counter) => <option key={counter.id} value={counter.id}>{counter.name}</option>)}</select>
@@ -457,11 +467,11 @@ export default function Accounts() {
           <input placeholder="Note (optional)" value={placeForm.note} onChange={(e) => setPlaceForm({ ...placeForm, note: e.target.value })} />
           {placeForm.type === "expense" && placeForm.finance_type === "Counter Staff Salary" && <button className="primary" type="button" onClick={postCounterSalary} disabled={!placeForm.counter_id || !placeForm.txn_date || postingCounterSalary}>{postingCounterSalary ? "Posting salary…" : "Post staff salary for this counter"}</button>}
           <button className="primary" type="submit">Add place {placeForm.type}</button>
-        </form>
+        </form>}
         {placeMessage && <p className={placeMessage.startsWith("Saved") || placeMessage.startsWith("Posted") ? "success-text" : "error-text"}>{placeMessage}</p>}
           <div className="grid grid-2" style={{ marginTop: 14 }}>
             <p style={{ color: "var(--muted)", fontSize: "0.85rem", margin: "8px 0" }}>Manage parent places and assign counters from <strong>Settings → Place and counter setup</strong>.</p>
-            <form className="form-row" onSubmit={addExpenseType}><input placeholder="New expense type" value={newExpenseType} onChange={(e) => setNewExpenseType(e.target.value)} /><button className="link-danger" type="submit">Add expense type</button></form>
+            {canWritePlace && <form className="form-row" onSubmit={addExpenseType}><input placeholder="New expense type" value={newExpenseType} onChange={(e) => setNewExpenseType(e.target.value)} /><button className="link-danger" type="submit">Add expense type</button></form>}
           </div>
         <div className="place-results-heading"><div><strong>Place totals</strong><span>{placePeriodLabel}</span></div><small>{placeTransactionsLoading ? "Updating…" : `${placeTransactions.length} transaction${placeTransactions.length === 1 ? "" : "s"}`}</small></div>
         {placePeriodError && <p className="error-text">{placePeriodError}</p>}
@@ -469,9 +479,9 @@ export default function Accounts() {
           {expensePlaces.map((place) => { const rows = placeTransactions.filter((tx) => tx.place_name === place.name); const income = rows.filter((tx) => tx.type === "income").reduce((sum, tx) => sum + tx.amount, 0); const expense = rows.filter((tx) => tx.type === "expense").reduce((sum, tx) => sum + tx.amount, 0); const counters = placeCounters.filter((counter) => counter.place_name === place.name); const detailRows = selectedCounterDetail ? rows.filter((row) => String(row.counter_id) === String(selectedCounterDetail)) : rows; return <Fragment key={place.id}><tr><td>{place.name}</td><td>৳{income.toLocaleString()}</td><td>৳{expense.toLocaleString()}</td><td style={{ color: income - expense >= 0 ? "var(--green)" : "var(--red)" }}>৳{(income - expense).toLocaleString()}</td><td><button className="link-danger" onClick={() => { setOpenPlace(openPlace === place.name ? "" : place.name); setSelectedCounterDetail(""); }}>Counter-wise details</button></td></tr>{openPlace === place.name && <tr><td colSpan={5}><div style={{ padding: 8 }}><label style={{ fontSize: "0.82rem", fontWeight: 700 }}>Counter details <select value={selectedCounterDetail} onChange={(e) => setSelectedCounterDetail(e.target.value)} style={{ marginLeft: 8 }}><option value="">All counters and whole-place entries</option>{counters.map((counter) => <option key={counter.id} value={counter.id}>{counter.name}</option>)}</select></label><RotationDetails rows={detailRows} /></div></td></tr>}</Fragment>; })}
           {expensePlaces.length === 0 && <tr><td colSpan={5}>Add a place to begin recording separate place-wise expenses.</td></tr>}
         </tbody></table>
-      </div>
+      </div>}
 
-      {selectedBus && (
+      {canViewBus && selectedBus && (
         <>
           <div className="grid grid-3" style={{ marginBottom: 20 }}>
             <div className="card stat-card income"><div className="stat-label">{busName(selectedBus)} — {t("income")}</div><div className="stat-value">৳{busSummary.income.toLocaleString()}</div></div>
@@ -479,7 +489,7 @@ export default function Accounts() {
             <div className="card stat-card"><div className="stat-label">{t("net")}</div><div className="stat-value">৳{busSummary.net.toLocaleString()}</div></div>
           </div>
 
-          <div className="card" style={{ marginBottom: 20 }}>
+          {canWriteBus ? <div className="card" style={{ marginBottom: 20 }}>
             <h3 style={{ marginTop: 0 }}>{t("record_entry")}</h3>
             <form className="form-row" onSubmit={handleAddEntry}>
               <select value={entryForm.type} onChange={(e) => handleTypeChange(e.target.value)}>
@@ -558,7 +568,7 @@ export default function Accounts() {
               <button className="primary" type="submit">{t("add_entry")}</button>
             </form>
             {error && <p className="error-text">{error}</p>}
-          </div>
+          </div> : <p className="permission-readonly-note">View-only access: you can review this bus account, but cannot add, edit, close, reopen, or remove records.</p>}
 
           <div className="card" style={{ marginBottom: 20 }}>
             <h3 style={{ marginTop: 0 }}>{t("rotations_heading")}</h3>
@@ -569,7 +579,7 @@ export default function Accounts() {
                 {openGroups.map((g) => (
                   <>
                   <tr key={g.group_id}>
-                    <td><input type="checkbox" checked={closingGroupIds.includes(g.group_id)} onChange={() => toggleClosingGroup(g.group_id)} /></td>
+                    <td>{canWriteBus && <input type="checkbox" checked={closingGroupIds.includes(g.group_id)} onChange={() => toggleClosingGroup(g.group_id)} />}</td>
                     <td>{busName(g.legs[0].bus_id || selectedBus, g.legs[0])} — #{g.rotation_no}</td>
                     <td>{g.trip_date}</td>
                     <td>{g.legs.length === 2 ? `${t("leg1")} + ${t("leg2")}` : t("leg1")}</td>
@@ -587,7 +597,7 @@ export default function Accounts() {
                     <td>{g.trip_date}</td>
                     <td>{g.legs.length === 2 ? `${t("leg1")} + ${t("leg2")}` : t("leg1")}</td>
                     <td><span className="badge maintenance">{t("done")}</span></td>
-                    <td><button className="link-danger" onClick={() => setOpenGroupId(openGroupId === g.group_id ? null : g.group_id)}>Details</button> <button className="link-danger" onClick={() => handleReopen(g.group_id)}>{t("reopen_admin")}</button>{canRemoveRotations && <> <button className="link-danger" onClick={() => handleRemoveRotation(g)}>Remove rotation</button></>}</td>
+                    <td><button className="link-danger" onClick={() => setOpenGroupId(openGroupId === g.group_id ? null : g.group_id)}>Details</button>{canWriteBus && <> <button className="link-danger" onClick={() => handleReopen(g.group_id)}>{t("reopen_admin")}</button></>}{canRemoveRotations && <> <button className="link-danger" onClick={() => handleRemoveRotation(g)}>Remove rotation</button></>}</td>
                   </tr>
                   {openGroupId === g.group_id && <tr><td colSpan={6}><RotationDetails rows={busTransactions.filter((tx) => g.legs.some((leg) => String(leg.id) === String(tx.trip_id)))} /></td></tr>}
                   </>
@@ -595,7 +605,7 @@ export default function Accounts() {
                 {rotationGroups.length === 0 && <tr><td colSpan={6}>{t("no_rotations_bus")}</td></tr>}
               </tbody>
             </table>
-            <button className="primary" style={{ marginTop: 10 }} onClick={handleMarkDone} disabled={closingGroupIds.length === 0}>{t("mark_done")}</button>
+            {canWriteBus && <button className="primary" style={{ marginTop: 10 }} onClick={handleMarkDone} disabled={closingGroupIds.length === 0}>{t("mark_done")}</button>}
 
             {canFixPairing && unpairedLegs.length > 1 && (
               <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
@@ -631,9 +641,10 @@ export default function Accounts() {
                       <td>৳{m.total_cost.toLocaleString()}</td>
                       <td><span className={`badge ${m.status}`}>{m.status}</span></td>
                       <td>
+                        {canWriteBus &&
                         <button className={m.linked_transaction_id ? "link-danger" : "primary"} onClick={() => togglePostExpense(m)} disabled={m.total_cost <= 0}>
                           {m.linked_transaction_id ? t("remove_from_expenses") : t("post_as_expense")}
-                        </button>
+                        </button>}
                       </td>
                     </tr>
                   ))}
@@ -653,13 +664,13 @@ export default function Accounts() {
                     <td><span className={`badge ${tx.type === "income" ? "active" : "maintenance"}`}>{tx.type}</span></td>
                     <td>{tx.category}{tx.passengers_count ? ` (${tx.passengers_count} pax × ৳${tx.price_per_seat}${tx.deduction_amount ? ` − ৳${tx.deduction_amount} (${tx.deducted_passengers} pax ${tx.deduction_type || ""})` : ""})` : ""}</td>
                     <td>
-                      {editingId === tx.id ? (
+                      {canWriteBus && editingId === tx.id ? (
                         <input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} style={{ width: 90 }} />
                       ) : `৳${tx.amount.toLocaleString()}`}
                     </td>
                     <td>{tx.description}{tx.edit_note ? <div style={{ fontSize: "0.78rem", color: "var(--muted)" }}>Edit note: {tx.edit_note}</div> : null}</td>
                     <td>
-                      {editingId === tx.id ? (
+                      {canWriteBus && (editingId === tx.id ? (
                         <>
                           {isAccountsRole && <input placeholder={t("reason_for_change")} value={editNote} onChange={(e) => setEditNote(e.target.value)} style={{ width: 140, marginRight: 6 }} />}
                           <button className="primary" style={{ marginRight: 6 }} onClick={() => saveEdit(tx)}>{t("save")}</button>
@@ -670,7 +681,7 @@ export default function Accounts() {
                           <button className="link-danger" style={{ marginRight: 10 }} onClick={() => startEdit(tx)}>{t("edit")}</button>
                           <button className="link-danger" onClick={() => handleDelete(tx.id)}>{t("remove")}</button>
                         </>
-                      )}
+                      ))}
                     </td>
                   </tr>
                 ))}

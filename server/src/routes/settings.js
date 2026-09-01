@@ -1,7 +1,7 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireRole } = require("../middleware/auth");
-const { FULL_ACCESS, ROLES } = require("../roles");
+const { requireAuth, requireRole, requireFeaturePermission } = require("../middleware/auth");
+const { ROLES } = require("../roles");
 
 const router = express.Router();
 
@@ -130,7 +130,7 @@ router.put("/sidebar-order", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
 // Super Admin can rename or remove any configured bus class, including the
 // original defaults. Renaming also updates buses already using that class;
 // removing only removes it from future choices and keeps existing bus data.
-router.put("/bus-classes", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
+router.put("/bus-classes", requireFeaturePermission("settings", "write"), (req, res) => {
   const { action, currentName } = req.body;
   const classes = getBusClasses();
   const index = classes.findIndex((item) => item.toLowerCase() === String(currentName || "").trim().toLowerCase());
@@ -164,7 +164,7 @@ router.put("/bus-classes", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
 // Categories are independent from the technical bus class. Type values from
 // the fleet PDFs are stored here, and renaming a category updates every bus
 // already assigned to it so the setting remains the single source of truth.
-router.put("/bus-categories", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
+router.put("/bus-categories", requireFeaturePermission("settings", "write"), (req, res) => {
   const { action, currentName } = req.body;
   const categories = getBusCategories();
   const index = categories.findIndex((item) => item.toLowerCase() === String(currentName || "").trim().toLowerCase());
@@ -196,7 +196,7 @@ router.put("/bus-categories", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
 });
 
 // Only Admin/Super Admin can change appearance or the dedicated call contact.
-router.put("/", requireRole(...FULL_ACCESS), (req, res) => {
+router.put("/", requireFeaturePermission("settings", "write"), (req, res) => {
   const allowedKeys = Object.keys(DEFAULTS).filter((key) => key !== "sidebar_nav_order");
   const upsert = db.prepare(
     `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
