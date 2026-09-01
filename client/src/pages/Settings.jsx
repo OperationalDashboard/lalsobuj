@@ -22,6 +22,7 @@ export default function Settings() {
   const [newBusCategory, setNewBusCategory] = useState("");
   const [staffTypes, setStaffTypes] = useState([]);
   const [newStaffType, setNewStaffType] = useState({ label: "", group: "office" });
+  const [removingStaffType, setRemovingStaffType] = useState(null);
 
   const [hotels, setHotels] = useState([]);
   const [newHotel, setNewHotel] = useState("");
@@ -202,22 +203,13 @@ export default function Settings() {
       flashMessage("Staff type updated. Existing staff keep their assignment.");
     } catch (error) { showSettingsError(error); }
   }
-  async function removeStaffType(type) {
-    if (!confirm(`Remove '${type.label}' from the staff type choices? Staff already assigned to it will keep their history until you move them to another type.`)) return;
+  async function removeStaffType(type, replacementKey) {
     try {
-      const result = await api.put("/settings/staff-types", { action: "remove", currentKey: type.key });
+      const result = await api.put("/settings/staff-types", { action: "remove", currentKey: type.key, replacementKey });
       setStaffTypes(result.staff_types);
-      flashMessage("Staff type removed from choices.");
+      setRemovingStaffType(null);
+      flashMessage(result.assigned_staff ? `${type.label} removed. ${result.assigned_staff} staff member(s) were moved to the selected type.` : "Staff type removed from choices.");
     } catch (error) {
-      const replacement = staffTypes.find((candidate) => candidate.key !== type.key);
-      if (error?.message?.startsWith("Move assigned staff") && replacement && confirm(`${error.message}\n\nMove those staff to ${replacement.label} and remove the old type?`)) {
-        try {
-          const result = await api.put("/settings/staff-types", { action: "remove", currentKey: type.key, replacementKey: replacement.key });
-          setStaffTypes(result.staff_types);
-          flashMessage(`${type.label} removed. ${result.assigned_staff} staff member(s) moved to ${replacement.label}.`);
-          return;
-        } catch (retryError) { showSettingsError(retryError); return; }
-      }
       showSettingsError(error);
     }
   }
@@ -499,7 +491,9 @@ export default function Settings() {
         <div className="settings-managed-list">
           {staffTypes.map((type) => editingItem?.type === "staffType" && editingItem.id === type.key
             ? <div key={type.key} className="settings-managed-item editing"><input aria-label="Staff type name" value={editingItem.value} onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })} /><select value={editingItem.group} onChange={(e) => setEditingItem({ ...editingItem, group: e.target.value })}><option value="bus">Bus staff</option><option value="counter">Counter staff</option><option value="office">Office staff</option></select><div className="settings-item-actions"><button type="button" className="primary" onClick={() => saveStaffType(type)}>Save</button><button type="button" className="place-secondary-action" onClick={() => setEditingItem(null)}>Cancel</button></div></div>
-            : <div key={type.key} className="settings-managed-item"><div><strong>{type.label}</strong><small>{type.group === "bus" ? "Bus staff — auto-attendance with rotations" : type.group === "counter" ? "Counter staff — can be posted to a counter" : "Office staff"}</small></div><div className="settings-item-actions"><button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "staffType", id: type.key, value: type.label, group: type.group })}>Edit</button><button type="button" className="link-danger" onClick={() => removeStaffType(type)}>Remove</button></div></div>)}
+            : removingStaffType?.key === type.key
+              ? <div key={type.key} className="settings-managed-item editing"><div><strong>Remove {type.label}</strong><small>Choose the staff type that will receive any staff currently assigned here.</small></div><select aria-label="Move staff to type" value={removingStaffType.replacementKey} onChange={(e) => setRemovingStaffType({ ...removingStaffType, replacementKey: e.target.value })}>{staffTypes.filter((candidate) => candidate.key !== type.key).map((candidate) => <option key={candidate.key} value={candidate.key}>{candidate.label}</option>)}</select><div className="settings-item-actions"><button type="button" className="link-danger" onClick={() => removeStaffType(type, removingStaffType.replacementKey)}>Move &amp; remove</button><button type="button" className="place-secondary-action" onClick={() => setRemovingStaffType(null)}>Cancel</button></div></div>
+            : <div key={type.key} className="settings-managed-item"><div><strong>{type.label}</strong><small>{type.group === "bus" ? "Bus staff — auto-attendance with rotations" : type.group === "counter" ? "Counter staff — can be posted to a counter" : "Office staff"}</small></div><div className="settings-item-actions"><button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "staffType", id: type.key, value: type.label, group: type.group })}>Edit</button><button type="button" className="link-danger" onClick={() => setRemovingStaffType({ key: type.key, replacementKey: staffTypes.find((candidate) => candidate.key !== type.key)?.key || "" })}>Remove</button></div></div>)}
           {staffTypes.length === 0 && <div className="settings-list-empty">No staff types configured.</div>}
         </div>
       </div>

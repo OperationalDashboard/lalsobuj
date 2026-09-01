@@ -2,6 +2,10 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.18.2 — 2026-09-01
+
+- Made staff-type removal explicit and reliable: choose a replacement staff type in Settings, then use **Move & remove**. Any assigned staff are moved in the same save, and the removed type disappears completely.
+
 ## 1.18.1 — 2026-09-01
 
 - Fixed Settings-managed bus categories so Add, Edit, and Remove now use the same verified save route.
