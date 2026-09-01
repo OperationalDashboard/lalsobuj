@@ -61,7 +61,7 @@ router.get("/live", requireAnyFeaturePermission(["dashboard", "live_activity"], 
   autoCompleteOverdueTrips();
   const rows = db
     .prepare(
-      `SELECT t.*, b.reg_number,
+      `SELECT t.*, b.reg_number, b.source_bus_number,
               (SELECT r.id FROM rotations r WHERE r.trip_id = t.id LIMIT 1) AS rotation_id,
               (SELECT event_type FROM activity_logs WHERE trip_id = t.id ORDER BY recorded_at DESC LIMIT 1) as last_event,
               (SELECT location_name FROM activity_logs WHERE trip_id = t.id ORDER BY recorded_at DESC LIMIT 1) as last_location,
@@ -81,7 +81,7 @@ router.get("/rotation-counts", requireAnyFeaturePermission(["dashboard", "live_a
   const date = req.query.date || new Date().toISOString().slice(0, 10);
   const rows = db
     .prepare(
-      `SELECT b.id as bus_id, b.reg_number,
+      `SELECT b.id as bus_id, b.reg_number, b.source_bus_number,
               COUNT(DISTINCT t.group_id) as rotations,
               SUM(CASE WHEN t.status = 'running' THEN 1 ELSE 0 END) as running_now
        FROM buses b
@@ -111,7 +111,7 @@ router.get("/rotations", requireAnyFeaturePermission(["rotations", "accounts_bus
 
   const legs = db
     .prepare(
-      `SELECT t.*, b.reg_number,
+      `SELECT t.*, b.reg_number, b.source_bus_number,
               duty.driver_id, driver.name AS driver_name,
               duty.helper_id, helper.name AS helper_name,
               duty.supervisor_id, supervisor.name AS supervisor_name,
@@ -148,6 +148,7 @@ router.get("/rotations", requireAnyFeaturePermission(["rotations", "accounts_bus
         group_id: leg.group_id,
         bus_id: leg.bus_id,
         reg_number: leg.reg_number,
+        source_bus_number: leg.source_bus_number,
         rotation_no: leg.rotation_no,
         trip_date: leg.trip_date,
         accounts_status: leg.accounts_status,
@@ -190,7 +191,7 @@ router.get("/for-accounts", requireFeaturePermission("accounts_bus", "read"), (r
   if (!bus_id) return res.status(400).json({ error: "bus_id required" });
   const rows = db
     .prepare(
-      `SELECT t.*, b.reg_number,
+      `SELECT t.*, b.reg_number, b.source_bus_number,
               (SELECT r.id FROM rotations r WHERE r.trip_id = t.id LIMIT 1) AS rotation_id,
               (SELECT SUM(passengers_count) FROM activity_logs WHERE trip_id = t.id AND event_type = 'passenger_count') as logged_passengers,
               (SELECT SUM(fuel_cost) FROM activity_logs WHERE trip_id = t.id AND event_type = 'fuel') as logged_fuel_cost,
@@ -209,7 +210,7 @@ router.get("/for-accounts", requireFeaturePermission("accounts_bus", "read"), (r
 router.get("/trash", requireFeaturePermission("trash", "read"), (req, res) => {
   const legs = db
     .prepare(
-      `SELECT t.*, b.reg_number, u.full_name as deleted_by_name
+      `SELECT t.*, b.reg_number, b.source_bus_number, u.full_name as deleted_by_name
        FROM trips t JOIN buses b ON b.id = t.bus_id
        LEFT JOIN users u ON u.id = t.deleted_by
        WHERE t.deleted_at IS NOT NULL
@@ -220,7 +221,7 @@ router.get("/trash", requireFeaturePermission("trash", "read"), (req, res) => {
   for (const leg of legs) {
     if (!groups.has(leg.group_id)) {
       groups.set(leg.group_id, {
-        group_id: leg.group_id, bus_id: leg.bus_id, reg_number: leg.reg_number,
+        group_id: leg.group_id, bus_id: leg.bus_id, reg_number: leg.reg_number, source_bus_number: leg.source_bus_number,
         rotation_no: leg.rotation_no, trip_date: leg.trip_date,
         deleted_at: leg.deleted_at, deleted_by_name: leg.deleted_by_name, legs: [],
       });

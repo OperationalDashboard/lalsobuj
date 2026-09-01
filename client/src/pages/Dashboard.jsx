@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { t } from "../i18n.js";
+import { busLabel } from "../busLabel.js";
 import BusIcon from "../components/BusIcon.jsx";
 
 export default function Dashboard() {
@@ -58,7 +59,7 @@ export default function Dashboard() {
           <tbody>
             {buses.map((b) => (
               <tr key={b.id}>
-                <td>{b.reg_number}</td>
+                <td>{busLabel(b)}</td>
                 <td>{b.model}</td>
                 <td>{b.route}</td>
                 <td><span className={`badge ${b.status}`}>{b.status}</span></td>

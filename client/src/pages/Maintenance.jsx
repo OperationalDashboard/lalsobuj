@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { t } from "../i18n.js";
+import { busLabel } from "../busLabel.js";
 
 const ticketEmpty = { bus_id: "", issue: "", location: "", reported_date: "", status: "open" };
 const partEmpty = { part_name: "", cost: "", changed_date: "" };
@@ -106,7 +107,7 @@ export default function Maintenance() {
     setEditingPart(null); load();
   }
 
-  const busName = (id) => buses.find((b) => b.id === id)?.reg_number || "—";
+  const busName = (id) => busLabel(buses.find((b) => b.id === id));
 
   return (
     <div>
@@ -129,7 +130,7 @@ export default function Maintenance() {
         <form className="form-row" onSubmit={handleCreateTicket}>
           <select value={ticketForm.bus_id} onChange={(e) => setTicketForm({ ...ticketForm, bus_id: e.target.value })}>
             <option value="">{t("select_bus")}</option>
-            {buses.map((b) => <option key={b.id} value={b.id}>{b.reg_number}</option>)}
+            {buses.map((b) => <option key={b.id} value={b.id}>{busLabel(b)}</option>)}
           </select>
           <input placeholder="Issue / problem" value={ticketForm.issue}
             onChange={(e) => setTicketForm({ ...ticketForm, issue: e.target.value })} />
@@ -216,7 +217,7 @@ export default function Maintenance() {
           <h3 style={{ margin: 0 }}>{t("parts_service_history")}</h3>
           <select value={reportBus} onChange={(e) => setReportBus(e.target.value)}>
             <option value="">{t("all_buses")}</option>
-            {buses.map((b) => <option key={b.id} value={b.id}>{b.reg_number}</option>)}
+            {buses.map((b) => <option key={b.id} value={b.id}>{busLabel(b)}</option>)}
           </select>
         </div>
         <table>
@@ -224,7 +225,7 @@ export default function Maintenance() {
           <tbody>
             {partsReport.map((r, i) => (
               <tr key={i}>
-                <td>{r.reg_number}</td>
+                <td>{busLabel(r)}</td>
                 <td>{r.part_name}</td>
                 <td>{r.last_changed}</td>
                 <td>৳{r.total_spent.toLocaleString()}</td>

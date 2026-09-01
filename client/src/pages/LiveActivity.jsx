@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, getUser } from "../api.js";
 import { ROLES, isFullAccess } from "../roles.js";
+import { busLabel } from "../busLabel.js";
 import { t } from "../i18n.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -156,7 +157,7 @@ export default function LiveActivity() {
   }
 
   async function removeLiveTrip(trip) {
-    if (!confirm(`Remove ${trip.reg_number}'s running trip?`)) return;
+    if (!confirm(`Remove ${busLabel(trip)}'s running trip?`)) return;
     try { await api.del(`/trips/${trip.id}`); load(); } catch (err) { setError(err.message); }
   }
 
@@ -252,7 +253,7 @@ export default function LiveActivity() {
 
       {(role === ROLES.DRIVER || role === ROLES.HELPER) && (
         <div className="card" style={{ marginBottom: 20, background: "var(--surface-soft)" }}>
-          <strong>Your bus: {myAssignedBus?.assigned_bus_id ? buses.find((b) => b.id === myAssignedBus.assigned_bus_id)?.reg_number : "not assigned"}</strong>
+          <strong>Your bus: {myAssignedBus?.assigned_bus_id ? busLabel(buses.find((b) => b.id === myAssignedBus.assigned_bus_id)) : "not assigned"}</strong>
         </div>
       )}
 
@@ -263,7 +264,7 @@ export default function LiveActivity() {
             <select value={startForm.rotation_id} onChange={(e) => setStartForm({ ...startForm, rotation_id: e.target.value })}>
               <option value="">Select open rotation</option>
               {openRotations.filter((r) => ![ROLES.DRIVER, ROLES.HELPER].includes(role) || String(r.bus_id) === String(myAssignedBus?.assigned_bus_id)).map((r) => (
-                <option key={r.id} value={r.id}>{r.reg_number} — {r.route || "no route"} — {r.duty_date}</option>
+                <option key={r.id} value={r.id}>{busLabel(r)} — {r.route || "no route"} — {r.duty_date}</option>
               ))}
             </select>
             <input type="time" value={startForm.departure_time} title={t("departure_time")} required
@@ -286,7 +287,7 @@ export default function LiveActivity() {
           <tbody>
             {rotationCounts.map((r) => (
               <tr key={r.bus_id}>
-                <td>{r.reg_number}</td>
+                <td>{busLabel(r)}</td>
                 <td>{r.rotations}</td>
                 <td>{r.running_now > 0 ? <span className="badge maintenance">Yes</span> : <span className="badge active">No</span>}</td>
               </tr>
@@ -302,7 +303,7 @@ export default function LiveActivity() {
           <div key={trip.id} style={{ border: "1px solid var(--border)", borderRadius: 8, marginBottom: 12, padding: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
               <div>
-                <strong>{trip.reg_number}</strong> — Rotation #{trip.rotation_no} ({trip.leg_no === 2 ? t("leg2") : t("leg1")}) — {trip.route || "no route set"}
+                <strong>{busLabel(trip)}</strong> — Rotation #{trip.rotation_no} ({trip.leg_no === 2 ? t("leg2") : t("leg1")}) — {trip.route || "no route set"}
                 {trip.price_per_seat ? ` — ৳${trip.price_per_seat}/seat` : ""}
                 <div style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
                   {editingTripTimeId === trip.id ? (

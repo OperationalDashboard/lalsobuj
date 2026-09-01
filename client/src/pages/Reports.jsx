@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { api } from "../api.js";
 import { t } from "../i18n.js";
+import { busLabel } from "../busLabel.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const BUS_DESIGNATIONS = ["Driver", "Supervisor", "Bus Staff", "Helper", "Conductor", "Mechanic"];
@@ -85,7 +86,7 @@ export default function Reports() {
   const rotationStart = (rotationPage - 1) * ROTATIONS_PER_PAGE;
   const visibleRotations = rotations.slice(rotationStart, rotationStart + ROTATIONS_PER_PAGE);
   const totalPassengers = rotations.reduce((s, g) => s + (g.passengers || 0), 0);
-  const busName = (id) => buses.find((b) => b.id === id)?.reg_number || `Bus #${id}`;
+  const busName = (id) => busLabel(buses.find((b) => b.id === id)) || `Bus #${id}`;
   const rangeLabel = fromDate === toDate ? fromDate : `${fromDate} → ${toDate}`;
   const financialLabel = fromDate === toDate ? `Daily totals — ${fromDate}` : `Totals for ${rangeLabel}`;
 
@@ -161,7 +162,7 @@ export default function Reports() {
               {visibleRotations.map((g) => (
                 <Fragment key={g.group_id}>
                   <tr style={{ cursor: "pointer" }} onClick={() => setOpenGroupId(openGroupId === g.group_id ? null : g.group_id)}>
-                    <td><strong className="rotation-report-bus">{g.reg_number}</strong></td>
+                    <td><strong className="rotation-report-bus">{busLabel(g)}</strong></td>
                     <td><strong className="rotation-report-title">#{g.rotation_no} · {g.legs.length} {g.legs.length === 1 ? "leg" : "legs"} {openGroupId === g.group_id ? "▲" : "▼"}</strong></td>
                     <td><RotationStaffDetails legs={g.legs} compact /></td>
                     <td>{g.passengers || 0}</td>
@@ -318,7 +319,7 @@ export default function Reports() {
           <h3 style={{ margin: 0 }}>{t("bus_wise_solo_report")} — {rangeLabel}</h3>
           <select value={selectedBus} onChange={(e) => setSelectedBus(e.target.value)}>
             <option value="">{t("select_bus")}</option>
-            {buses.map((b) => <option key={b.id} value={b.id}>{b.reg_number}</option>)}
+            {buses.map((b) => <option key={b.id} value={b.id}>{busLabel(b)}</option>)}
           </select>
         </div>
 
@@ -372,7 +373,7 @@ export default function Reports() {
                 const y = i * 34 + 6;
                 return (
                   <g key={b.bus_id}>
-                    <text x="0" y={y + 14} fontSize="12" fill="var(--ink)">{b.reg_number}</text>
+                    <text x="0" y={y + 14} fontSize="12" fill="var(--ink)">{busLabel(b)}</text>
                     <rect x="90" y={y} width={barWidth} height="20" rx="4" fill="var(--red)" />
                     <text x={90 + barWidth + 8} y={y + 14} fontSize="12" fill="var(--muted)">৳{b.total_cost.toLocaleString()}</text>
                   </g>

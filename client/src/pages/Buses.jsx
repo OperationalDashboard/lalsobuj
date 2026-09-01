@@ -3,6 +3,7 @@ import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
 import BusIcon from "../components/BusIcon.jsx";
 import { canUseFeature } from "../permissions.js";
+import { busLabel } from "../busLabel.js";
 
 const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
 const DEFAULT_BUS_CATEGORIES = ["Economy (AC)", "Economy (NON AC)", "Suite-Class AC (AC)", "Sleeper (AC)"];
@@ -181,7 +182,7 @@ export default function Buses() {
             {visibleBuses.map((b) => (
               <tr key={b.id}>
                 <td><div className="bus-fleet-cell"><BusIcon size={24} muted={b.status !== "active"} /><strong>{b.fleet_serial || "—"}</strong></div></td>
-                <td><strong>{b.source_bus_number || b.reg_number}</strong></td>
+                <td><strong>{busLabel(b)}</strong></td>
                 <td>{canEditFull ? <select className="bus-category-select" value={b.category || ""} onChange={(e) => handleCategoryChange(b.id, e.target.value)}><option value="">No category</option>{b.category && !busCategories.includes(b.category) && <option value={b.category}>{b.category} (legacy)</option>}{busCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select> : <strong>{b.category || "—"}</strong>}</td>
                 <td><strong>{b.capacity ?? "—"}</strong>{b.capacity_label && <small>{b.capacity_label}</small>}</td>
                 <td><strong>{b.manufacturer || b.model || "—"}</strong>{b.manufacturer_country && <small>{b.manufacturer_country}</small>}</td>

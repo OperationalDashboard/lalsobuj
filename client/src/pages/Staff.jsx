@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
 import { canUseFeature } from "../permissions.js";
+import { busLabel } from "../busLabel.js";
 
 const DESIGNATIONS = [
   { group: "Bus staff", options: ["driver", "supervisor", "bus_staff", "helper", "conductor", "mechanic"] },
@@ -105,7 +106,7 @@ export default function Staff() {
     }
   }
 
-  const busName = (id) => buses.find((b) => b.id === id)?.reg_number || "—";
+  const busName = (id) => busLabel(buses.find((b) => b.id === id));
   const counterName = (id) => counters.find((c) => c.id === id)?.name || "—";
 
   return (
@@ -142,7 +143,7 @@ export default function Staff() {
           ) : (
             <select value={form.assigned_bus_id} onChange={(e) => setForm({ ...form, assigned_bus_id: e.target.value })}>
               <option value="">{t("unassigned_bus")}</option>
-              {buses.map((b) => <option key={b.id} value={b.id}>{b.reg_number}</option>)}
+              {buses.map((b) => <option key={b.id} value={b.id}>{busLabel(b)}</option>)}
             </select>
           )}
           <button className="primary" type="submit">{t("add_staff")}</button>
@@ -163,7 +164,7 @@ export default function Staff() {
                   <td><select value={editForm.designation} onChange={(e) => setEditForm({ ...editForm, designation: e.target.value, assigned_bus_id: "", counter_id: "" })}>{DESIGNATIONS.map((group) => <optgroup key={group.group} label={group.group}>{group.options.map((option) => <option key={option} value={option}>{designationLabel(option)}</option>)}</optgroup>)}</select></td>
                   <td><input value={editForm.phone || ""} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></td>
                   <td><input value={editForm.nid_number || ""} onChange={(e) => setEditForm({ ...editForm, nid_number: e.target.value })} /></td>
-                  <td>{COUNTER_DESIGNATIONS.includes(editForm.designation) ? <select value={editForm.counter_id} onChange={(e) => setEditForm({ ...editForm, counter_id: e.target.value })}><option value="">No counter</option>{counters.map((counter) => <option key={counter.id} value={counter.id}>{counter.name}</option>)}</select> : <select value={editForm.assigned_bus_id} onChange={(e) => setEditForm({ ...editForm, assigned_bus_id: e.target.value })}><option value="">{t("unassigned_bus")}</option>{buses.map((bus) => <option key={bus.id} value={bus.id}>{bus.reg_number}</option>)}</select>}</td>
+                  <td>{COUNTER_DESIGNATIONS.includes(editForm.designation) ? <select value={editForm.counter_id} onChange={(e) => setEditForm({ ...editForm, counter_id: e.target.value })}><option value="">No counter</option>{counters.map((counter) => <option key={counter.id} value={counter.id}>{counter.name}</option>)}</select> : <select value={editForm.assigned_bus_id} onChange={(e) => setEditForm({ ...editForm, assigned_bus_id: e.target.value })}><option value="">{t("unassigned_bus")}</option>{buses.map((bus) => <option key={bus.id} value={bus.id}>{busLabel(bus)}</option>)}</select>}</td>
                   <td><select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}><option value="active">active</option><option value="on_leave">on_leave</option><option value="terminated">terminated</option></select></td>
                   <td><input type="date" value={editForm.joining_date} onChange={(e) => setEditForm({ ...editForm, joining_date: e.target.value })} /></td>
                   <td><button className="primary" onClick={saveEdit}>{t("save")}</button> <button className="link-danger" onClick={() => setEditingId(null)}>{t("cancel")}</button></td>
@@ -182,7 +183,7 @@ export default function Staff() {
                     ) : (
                       <select autoFocus defaultValue={s.assigned_bus_id || ""} onChange={(e) => handlePostedChange(s, e.target.value)} onBlur={() => setPostedEditId(null)}>
                         <option value="">{t("unassigned_bus")}</option>
-                        {buses.map((b) => <option key={b.id} value={b.id}>{b.reg_number}</option>)}
+                        {buses.map((b) => <option key={b.id} value={b.id}>{busLabel(b)}</option>)}
                       </select>
                     )
                   ) : (

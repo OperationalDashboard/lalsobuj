@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
+import { busLabel } from "../busLabel.js";
 
 export default function Trash() {
   const [items, setItems] = useState([]);
@@ -53,7 +54,7 @@ export default function Trash() {
           <div key={item.group_id} style={{ border: "1px solid var(--border)", borderRadius: 8, marginBottom: 12, padding: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
               <div>
-                <strong>{item.reg_number}</strong> — Rotation #{item.rotation_no} ({item.trip_date})
+                <strong>{busLabel(item)}</strong> — Rotation #{item.rotation_no} ({item.trip_date})
                 <div style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
                   Removed {new Date(item.deleted_at).toLocaleString()}{item.deleted_by_name ? ` by ${item.deleted_by_name}` : ""}
                 </div>

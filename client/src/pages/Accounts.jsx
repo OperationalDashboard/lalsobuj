@@ -3,6 +3,7 @@ import { api, getUser } from "../api.js";
 import { ROLES, isFullAccess } from "../roles.js";
 import { t } from "../i18n.js";
 import { canUseFeature } from "../permissions.js";
+import { busLabel } from "../busLabel.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const readableDate = (value) => value
@@ -27,12 +28,7 @@ const BUS_PAGE_SIZE = 10;
 // actual Bus Number in Accounts, while older/manual buses still need a safe
 // fallback when they do not have source_bus_number yet.
 function displayBusNumber(bus) {
-  const sourceNumber = String(bus?.source_bus_number ?? "").trim();
-  if (sourceNumber) return sourceNumber;
-
-  const internalKey = String(bus?.reg_number ?? "").trim();
-  const importedMatch = internalKey.match(/^FLEETS-\d+\s*\|\s*(.+)$/i);
-  return importedMatch?.[1]?.trim() || internalKey || "—";
+  return busLabel(bus);
 }
 
 function RotationDetails({ rows }) {

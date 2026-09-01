@@ -26,22 +26,22 @@ function requireActiveBus(busId, res) {
     return false;
   }
   const bus = db
-    .prepare(`SELECT b.id, b.reg_number, ${BUS_STATUS_SELECT} AS status FROM buses b WHERE b.id = ?`)
+    .prepare(`SELECT b.id, b.reg_number, b.source_bus_number, ${BUS_STATUS_SELECT} AS status FROM buses b WHERE b.id = ?`)
     .get(busId);
   if (!bus) {
     res.status(404).json({ error: "Bus not found" });
     return false;
   }
   if (bus.status === "maintenance") {
-    res.status(400).json({ error: `${bus.reg_number} is under maintenance and cannot be added to Rotation` });
+    res.status(400).json({ error: `${bus.source_bus_number || bus.reg_number.replace(/^FLEETS-\d+\s*\|\s*/i, "")} is under maintenance and cannot be added to Rotation` });
     return false;
   }
   if (bus.status === "retired") {
-    res.status(400).json({ error: `${bus.reg_number} is retired and cannot be added to Rotation` });
+    res.status(400).json({ error: `${bus.source_bus_number || bus.reg_number.replace(/^FLEETS-\d+\s*\|\s*/i, "")} is retired and cannot be added to Rotation` });
     return false;
   }
   if (bus.status === "unavailable") {
-    res.status(400).json({ error: `${bus.reg_number} is unavailable and cannot be added to Rotation` });
+    res.status(400).json({ error: `${bus.source_bus_number || bus.reg_number.replace(/^FLEETS-\d+\s*\|\s*/i, "")} is unavailable and cannot be added to Rotation` });
     return false;
   }
   return true;
@@ -74,7 +74,7 @@ function requireActiveRoute(req, res) {
 router.get("/", (req, res) => {
   const rows = db
     .prepare(
-      `SELECT r.*, b.reg_number, ${BUS_STATUS_SELECT} AS bus_status,
+      `SELECT r.*, b.reg_number, b.source_bus_number, ${BUS_STATUS_SELECT} AS bus_status,
               t.rotation_no as trip_rotation_no, t.status as trip_status,
               t.departure_time as trip_departure_time, t.arrival_time as trip_arrival_time
        FROM rotations r

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
 import { canUseFeature } from "../permissions.js";
+import { busLabel } from "../busLabel.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const empty = { bus_id: "", driver_id: "", helper_id: "", supervisor_id: "", coach_name: "", route: "", duty_date: today(), shift_start: "" };
@@ -79,7 +80,7 @@ export default function Rotation() {
   // that has gone into maintenance must disappear until the bus is active.
   const visibleRows = rows.filter((r) => r.trip_id || r.status !== "scheduled" || r.bus_status === "active");
   const hiddenUnavailableCount = rows.length - visibleRows.length;
-  const busName = (id) => buses.find((b) => b.id === id)?.reg_number || "—";
+  const busName = (id) => busLabel(buses.find((b) => b.id === id));
   const staffName = (id) => staff.find((s) => s.id === id)?.name || "—";
   const formLinkedRoute = linkedRouteFor(form.route);
 
@@ -100,7 +101,7 @@ export default function Rotation() {
         <form className="form-row" onSubmit={handleAdd}>
           <select value={form.bus_id} onChange={(e) => setForm({ ...form, bus_id: e.target.value })}>
             <option value="">{t("select_bus")}</option>
-            {activeBuses.map((b) => <option key={b.id} value={b.id}>{b.reg_number}</option>)}
+            {activeBuses.map((b) => <option key={b.id} value={b.id}>{busLabel(b)}</option>)}
           </select>
           <select value={form.driver_id} onChange={(e) => setForm({ ...form, driver_id: e.target.value })}>
             <option value="">{t("driver")}</option>
@@ -144,7 +145,7 @@ export default function Rotation() {
             {visibleRows.map((r) => (
               <tr key={r.id}>
                 <td>{r.duty_date}</td>
-                <td>{r.reg_number || busName(r.bus_id)}{r.rotation_no ? ` — #${r.rotation_no}` : ""}</td>
+                <td>{busLabel(r) || busName(r.bus_id)}{r.rotation_no ? ` — #${r.rotation_no}` : ""}</td>
                 <td>{staffName(r.driver_id)}</td>
                 <td>{staffName(r.helper_id)}</td>
                 <td>{staffName(r.supervisor_id)}</td>

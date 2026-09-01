@@ -124,7 +124,7 @@ router.get("/parts-report", (req, res) => {
   const params = bus_id ? [bus_id] : [];
   const rows = db
     .prepare(
-      `SELECT m.bus_id, b.reg_number, mp.part_name, MAX(mp.changed_date) as last_changed, SUM(mp.cost) as total_spent
+      `SELECT m.bus_id, b.reg_number, b.source_bus_number, mp.part_name, MAX(mp.changed_date) as last_changed, SUM(mp.cost) as total_spent
        FROM maintenance_parts mp
        JOIN maintenance m ON m.id = mp.maintenance_id
        JOIN buses b ON b.id = m.bus_id
@@ -145,7 +145,7 @@ router.get("/", (req, res) => {
   if (status) { clauses.push("status = ?"); params.push(status); }
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   const tickets = db
-    .prepare(`SELECT m.*, b.reg_number FROM maintenance m JOIN buses b ON b.id = m.bus_id ${where} ORDER BY m.reported_date DESC, m.id DESC`)
+    .prepare(`SELECT m.*, b.reg_number, b.source_bus_number FROM maintenance m JOIN buses b ON b.id = m.bus_id ${where} ORDER BY m.reported_date DESC, m.id DESC`)
     .all(...params);
   res.json(tickets.map(withParts));
 });
@@ -162,7 +162,7 @@ router.get("/summary", (req, res) => {
   ).get();
   const perBus = db
     .prepare(
-      `SELECT b.id as bus_id, b.reg_number,
+      `SELECT b.id as bus_id, b.reg_number, b.source_bus_number,
               COUNT(m.id) as ticket_count,
               SUM(CASE WHEN m.status = 'resolved' THEN 1 ELSE 0 END) as resolved_count,
               COALESCE((SELECT SUM(mp.cost) FROM maintenance_parts mp WHERE mp.maintenance_id IN (SELECT id FROM maintenance WHERE bus_id = b.id)), 0) as total_cost
