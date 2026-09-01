@@ -243,9 +243,12 @@ router.put("/staff-types", requireFeaturePermission("settings", "write"), (req, 
     const assigned = db.prepare("SELECT COUNT(*) AS count FROM staff WHERE designation = ?").get(currentKey).count;
     const next = types.filter((type) => type.key !== currentKey);
     if (!next.length) return res.status(400).json({ error: "Keep at least one staff type" });
-    const replacementKey = String(req.body.replacementKey || "");
+    let replacementKey = String(req.body.replacementKey || "");
+    // Older open browser tabs did not send a replacement key. Complete those
+    // removals safely as well, preferring another type in the same group.
+    // Newer tabs always let the administrator choose the destination.
     if (assigned && !next.some((type) => type.key === replacementKey)) {
-      return res.status(409).json({ error: "Move assigned staff to another type before removing this type", assigned_staff: assigned });
+      replacementKey = next.find((type) => type.group === types[index].group)?.key || next[0].key;
     }
     if (assigned) db.prepare("UPDATE staff SET designation = ? WHERE designation = ?").run(replacementKey, currentKey);
     saveSetting("staff_types", JSON.stringify(next));

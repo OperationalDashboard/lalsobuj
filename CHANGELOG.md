@@ -2,6 +2,10 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.18.3 — 2026-09-01
+
+- Fixed staff-type removal for open older browser tabs: confirming removal now completes safely even if that tab does not send a replacement type. Assigned staff move to another type in the same group when possible.
+
 ## 1.18.2 — 2026-09-01
 
 - Made staff-type removal explicit and reliable: choose a replacement staff type in Settings, then use **Move & remove**. Any assigned staff are moved in the same save, and the removed type disappears completely.
