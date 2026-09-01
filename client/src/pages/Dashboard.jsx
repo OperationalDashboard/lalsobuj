@@ -9,6 +9,7 @@ export default function Dashboard() {
   const [staff, setStaff] = useState([]);
   const [summary, setSummary] = useState({ income: 0, expense: 0, net: 0 });
   const [openIssues, setOpenIssues] = useState(0);
+  const [fleetPage, setFleetPage] = useState(1);
 
   useEffect(() => {
     api.get("/buses").then(setBuses).catch(() => {});
@@ -18,6 +19,10 @@ export default function Dashboard() {
   }, []);
 
   const activeBuses = buses.filter((b) => b.status === "active").length;
+  const FLEET_PAGE_SIZE = 15;
+  const fleetPageCount = Math.max(1, Math.ceil(buses.length / FLEET_PAGE_SIZE));
+  const currentFleetPage = Math.min(fleetPage, fleetPageCount);
+  const visibleFleet = buses.slice((currentFleetPage - 1) * FLEET_PAGE_SIZE, currentFleetPage * FLEET_PAGE_SIZE);
 
   return (
     <div>
@@ -57,7 +62,7 @@ export default function Dashboard() {
             <tr><th>{t("reg_number")}</th><th>{t("model")}</th><th>{t("route")}</th><th>{t("status")}</th></tr>
           </thead>
           <tbody>
-            {buses.map((b) => (
+            {visibleFleet.map((b) => (
               <tr key={b.id}>
                 <td>{busLabel(b)}</td>
                 <td>{b.model}</td>
@@ -68,6 +73,7 @@ export default function Dashboard() {
             {buses.length === 0 && <tr><td colSpan={4}>{t("no_buses_add_one")}</td></tr>}
           </tbody>
         </table>
+        {buses.length > FLEET_PAGE_SIZE && <div className="bus-pagination"><span>Showing {(currentFleetPage - 1) * FLEET_PAGE_SIZE + 1}–{Math.min(currentFleetPage * FLEET_PAGE_SIZE, buses.length)} of {buses.length} buses</span><div><button className="secondary" type="button" disabled={currentFleetPage === 1} onClick={() => setFleetPage((page) => Math.max(1, page - 1))}>Previous</button><strong>Page {currentFleetPage} of {fleetPageCount}</strong><button className="secondary" type="button" disabled={currentFleetPage === fleetPageCount} onClick={() => setFleetPage((page) => Math.min(fleetPageCount, page + 1))}>Next</button></div></div>}
       </div>
     </div>
   );

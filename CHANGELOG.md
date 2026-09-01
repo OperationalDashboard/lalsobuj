@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.17.0 — 2026-09-01
+
+- Limited the Dashboard fleet table to 15 buses per page, with clear Previous/Next paging and the visible range shown.
+- Replaced every Rotation assignment picker with a searchable selector: bus, driver, helper, supervisor, route, and linked/exception return route can all be found by typing.
+
 ## 1.16.1 — 2026-09-01
 
 - Applied one shared Bus Number display rule across Dashboard, Live Activity, Rotation, Staff, Maintenance, Reports, Trash, and Buses, so imported internal `FLEETS-### |` prefixes are never shown to users.

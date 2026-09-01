@@ -3,6 +3,7 @@ import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
 import { canUseFeature } from "../permissions.js";
 import { busLabel } from "../busLabel.js";
+import SearchableSelect from "../components/SearchableSelect.jsx";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const empty = { bus_id: "", driver_id: "", helper_id: "", supervisor_id: "", coach_name: "", route: "", duty_date: today(), shift_start: "" };
@@ -99,28 +100,13 @@ export default function Rotation() {
           Live Activity, its rotation appears below automatically — no need to add it again here.
         </p>
         <form className="form-row" onSubmit={handleAdd}>
-          <select value={form.bus_id} onChange={(e) => setForm({ ...form, bus_id: e.target.value })}>
-            <option value="">{t("select_bus")}</option>
-            {activeBuses.map((b) => <option key={b.id} value={b.id}>{busLabel(b)}</option>)}
-          </select>
-          <select value={form.driver_id} onChange={(e) => setForm({ ...form, driver_id: e.target.value })}>
-            <option value="">{t("driver")}</option>
-            {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          <select value={form.helper_id} onChange={(e) => setForm({ ...form, helper_id: e.target.value })}>
-            <option value="">{t("helper")}</option>
-            {helpers.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
-          </select>
-          <select value={form.supervisor_id} onChange={(e) => setForm({ ...form, supervisor_id: e.target.value })}>
-            <option value="">{t("supervisor")}</option>
-            {supervisors.map((sup) => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
-          </select>
+          <SearchableSelect id="rotation-bus" value={form.bus_id} onChange={(bus_id) => setForm({ ...form, bus_id })} options={activeBuses.map((b) => ({ value: b.id, label: busLabel(b) }))} placeholder="Search bus number" required />
+          <SearchableSelect id="rotation-driver" value={form.driver_id} onChange={(driver_id) => setForm({ ...form, driver_id })} options={drivers.map((driver) => ({ value: driver.id, label: driver.name }))} placeholder="Search driver (optional)" />
+          <SearchableSelect id="rotation-helper" value={form.helper_id} onChange={(helper_id) => setForm({ ...form, helper_id })} options={helpers.map((helper) => ({ value: helper.id, label: helper.name }))} placeholder="Search helper (optional)" />
+          <SearchableSelect id="rotation-supervisor" value={form.supervisor_id} onChange={(supervisor_id) => setForm({ ...form, supervisor_id })} options={supervisors.map((supervisor) => ({ value: supervisor.id, label: supervisor.name }))} placeholder="Search supervisor (optional)" />
           <input placeholder="Coach" value={form.coach_name}
             onChange={(e) => setForm({ ...form, coach_name: e.target.value })} />
-          <select value={form.route} required aria-label={t("select_route")} onChange={(e) => setForm({ ...form, route: e.target.value })}>
-            <option value="">{t("select_route")}</option>
-            {routesList.map((r) => <option key={r.id} value={r.name}>{r.name}</option>)}
-          </select>
+          <SearchableSelect id="rotation-route" value={form.route} onChange={(route) => setForm({ ...form, route })} options={routesList.map((route) => ({ value: route.name, label: route.name }))} placeholder="Search route" required />
           <span style={{ alignSelf: "center", color: "var(--muted)", fontSize: "0.85rem" }}>Linked trip: <strong>{formLinkedRoute?.name || "No linked route"}</strong></span>
           <input type="date" value={form.duty_date}
             onChange={(e) => setForm({ ...form, duty_date: e.target.value })} />
@@ -165,11 +151,7 @@ export default function Rotation() {
         <div className="card" style={{ position: "fixed", zIndex: 10, width: "min(560px, calc(100vw - 32px))", left: "50%", top: "25%", transform: "translateX(-50%)", boxShadow: "0 10px 35px #0005" }}>
           <h3 style={{ marginTop: 0 }}>Confirm linked trip</h3>
           <p>You are adding the next rotation for <strong>{busName(returnModal.bus_id)}</strong>. The configured linked route is shown first; choose another route only if this trip is an exception.</p>
-          <select value={returnRoute} onChange={(e) => setReturnRoute(e.target.value)} style={{ width: "100%", marginBottom: 12 }}>
-            <option value="">Choose linked or exceptional route</option>
-            {linkedRouteFor(returnModal.route) && <option value={linkedRouteFor(returnModal.route).name}>{linkedRouteFor(returnModal.route).name} (linked trip)</option>}
-            {routesList.filter((route) => route.name !== linkedRouteFor(returnModal.route)?.name).map((route) => <option key={route.id} value={route.name}>{route.name} (exception)</option>)}
-          </select>
+          <SearchableSelect id="rotation-return-route" value={returnRoute} onChange={setReturnRoute} className="rotation-return-picker" options={routesList.map((route) => ({ value: route.name, label: route.name === linkedRouteFor(returnModal.route)?.name ? `${route.name} (linked trip)` : `${route.name} (exception)` }))} placeholder="Search linked or exceptional route" />
           <div style={{ display: "flex", gap: 8 }}><button className="primary" onClick={confirmReturnRotation}>Confirm and add rotation</button><button className="link-danger" onClick={() => setReturnModal(null)}>{t("cancel")}</button></div>
         </div>
       )}

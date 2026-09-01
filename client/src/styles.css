@@ -1369,6 +1369,9 @@ table button { white-space: nowrap; }
 .permission-feature-row > div small { color: var(--muted); line-height: 1.4; }
 .permission-feature-row > label { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: .82rem; font-weight: 750; }
 .permission-feature-row input[type="checkbox"] { width: 19px; height: 19px; accent-color: var(--green); }
+.searchable-select { display: block; min-width: 0; }
+.searchable-select input { width: 100%; }
+.rotation-return-picker { width: 100%; margin-bottom: 12px; }
 
 @media (max-width: 620px) {
   .permission-feature-row { grid-template-columns: minmax(0, 1fr) auto auto; gap: 9px; padding: 12px; }
