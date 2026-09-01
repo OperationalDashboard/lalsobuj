@@ -1,7 +1,7 @@
 const express = require("express");
 const db = require("../db");
 const { requireAuth, requireFeaturePermission, requireAnyFeaturePermission } = require("../middleware/auth");
-const { BUS_DESIGNATIONS } = require("../designations");
+const { isBusStaffType } = require("../staffTypes");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -30,7 +30,7 @@ function today() {
 // security boundary.
 function isBusStaff(staffId) {
   const staff = db.prepare("SELECT designation FROM staff WHERE id = ?").get(staffId);
-  return staff && BUS_DESIGNATIONS.includes(staff.designation);
+  return staff && isBusStaffType(staff.designation);
 }
 function getStaffPlace(staffId) {
   return db.prepare(

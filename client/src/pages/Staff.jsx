@@ -5,22 +5,12 @@ import { t } from "../i18n.js";
 import { canUseFeature } from "../permissions.js";
 import { busLabel } from "../busLabel.js";
 
-const DESIGNATIONS = [
-  { group: "Bus staff", options: ["driver", "supervisor", "bus_staff", "helper", "conductor", "mechanic"] },
-  { group: "Counter staff", options: ["counter_manager", "assistant_counter_manager", "caller_man", "office"] },
-  { group: "Admin & office staff", options: ["fourman", "checker", "accounts", "store_manager", "general_manager"] },
+const DEFAULT_STAFF_TYPES = [
+  { key: "driver", label: "Driver", group: "bus" }, { key: "supervisor", label: "Supervisor", group: "bus" }, { key: "bus_staff", label: "Bus Staff", group: "bus" }, { key: "helper", label: "Helper", group: "bus" }, { key: "conductor", label: "Conductor", group: "bus" }, { key: "mechanic", label: "Mechanic", group: "bus" },
+  { key: "counter_manager", label: "Counter Manager", group: "counter" }, { key: "assistant_counter_manager", label: "Assistant Counter Manager", group: "counter" }, { key: "caller_man", label: "Caller Man", group: "counter" }, { key: "office", label: "Office", group: "counter" },
+  { key: "fourman", label: "Fourman", group: "office" }, { key: "checker", label: "Checker", group: "office" }, { key: "accounts", label: "Accounts", group: "office" }, { key: "store_manager", label: "Store Manager", group: "office" }, { key: "general_manager", label: "General Manager", group: "office" },
 ];
-const COUNTER_DESIGNATIONS = DESIGNATIONS[1].options;
-// Bus staff ride with the bus and are auto-checked-in/out from Live
-// Activity/Rotation instead of clocking in through Time Management — see
-// client/src/pages/Attendance.jsx.
-export const BUS_DESIGNATIONS = DESIGNATIONS[0].options;
-// Designations eligible to be put on a salary plan (Add Salary, per your
-// list: counter managers, fourman, checker, callerman, accounts, store
-// manager, GM). Anyone else can still be marked "No salary" explicitly.
-export const SALARY_ELIGIBLE_DESIGNATIONS = ["counter_manager", "fourman", "checker", "caller_man", "accounts", "store_manager", "general_manager"];
-
-const designationLabel = (d) => d.split("_").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+const GROUP_LABELS = { bus: "Bus staff", counter: "Counter staff", office: "Office staff", legacy: "Previous staff types" };
 
 const empty = { name: "", designation: "driver", phone: "", nid_number: "", joining_date: "", assigned_bus_id: "", counter_id: "", status: "active" };
 
@@ -35,15 +25,20 @@ export default function Staff() {
   const [postedEditId, setPostedEditId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(empty);
+  const [staffTypes, setStaffTypes] = useState(DEFAULT_STAFF_TYPES);
 
   function load() {
     api.get("/staff").then(setStaff).catch(() => {});
     api.get("/buses").then(setBuses).catch(() => {});
     api.get("/counters").then(setCounters).catch(() => {});
+    api.get("/settings").then((settings) => { try { const types = JSON.parse(settings.staff_types || "null"); if (Array.isArray(types) && types.length) setStaffTypes(types); } catch {} }).catch(() => {});
   }
   useEffect(load, []);
 
-  const isCounterDesignation = COUNTER_DESIGNATIONS.includes(form.designation);
+  const typeFor = (key) => staffTypes.find((type) => type.key === key) || { key, label: key?.split("_").map((word) => word[0]?.toUpperCase() + word.slice(1)).join(" ") || "Unspecified", group: "legacy" };
+  const designationLabel = (key) => typeFor(key).label;
+  const isCounterDesignation = typeFor(form.designation).group === "counter";
+  const typeGroups = ["bus", "counter", "office", "legacy"].map((group) => ({ group, options: staffTypes.filter((type) => type.group === group) }));
 
   async function handleAdd(e) {
     e.preventDefault();
@@ -97,7 +92,7 @@ export default function Staff() {
   async function handlePostedChange(staffMember, value) {
     setError("");
     try {
-      const isCounter = COUNTER_DESIGNATIONS.includes(staffMember.designation);
+      const isCounter = typeFor(staffMember.designation).group === "counter";
       await api.put(`/staff/${staffMember.id}`, isCounter ? { counter_id: value || null } : { assigned_bus_id: value || null });
       setPostedEditId(null);
       load();
@@ -123,9 +118,9 @@ export default function Staff() {
           <input placeholder={t("full_name")} value={form.name} required
             onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <select value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value, assigned_bus_id: "", counter_id: "" })}>
-            {DESIGNATIONS.map((g) => (
-              <optgroup key={g.group} label={g.group}>
-                {g.options.map((d) => <option key={d} value={d}>{designationLabel(d)}</option>)}
+            {typeGroups.filter((group) => group.options.length).map((group) => (
+              <optgroup key={group.group} label={GROUP_LABELS[group.group]}>
+                {group.options.map((type) => <option key={type.key} value={type.key}>{type.label}</option>)}
               </optgroup>
             ))}
           </select>
@@ -161,10 +156,10 @@ export default function Staff() {
               <tr key={s.id}>
                 {canWrite && editingId === s.id ? <>
                   <td><input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></td>
-                  <td><select value={editForm.designation} onChange={(e) => setEditForm({ ...editForm, designation: e.target.value, assigned_bus_id: "", counter_id: "" })}>{DESIGNATIONS.map((group) => <optgroup key={group.group} label={group.group}>{group.options.map((option) => <option key={option} value={option}>{designationLabel(option)}</option>)}</optgroup>)}</select></td>
+                  <td><select value={editForm.designation} onChange={(e) => setEditForm({ ...editForm, designation: e.target.value, assigned_bus_id: "", counter_id: "" })}>{typeGroups.filter((group) => group.options.length || group.group === "legacy").map((group) => <optgroup key={group.group} label={GROUP_LABELS[group.group]}>{group.options.map((type) => <option key={type.key} value={type.key}>{type.label}</option>)}{group.group === "legacy" && !group.options.some((type) => type.key === editForm.designation) && <option value={editForm.designation}>{designationLabel(editForm.designation)} (legacy)</option>}</optgroup>)}</select></td>
                   <td><input value={editForm.phone || ""} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></td>
                   <td><input value={editForm.nid_number || ""} onChange={(e) => setEditForm({ ...editForm, nid_number: e.target.value })} /></td>
-                  <td>{COUNTER_DESIGNATIONS.includes(editForm.designation) ? <select value={editForm.counter_id} onChange={(e) => setEditForm({ ...editForm, counter_id: e.target.value })}><option value="">No counter</option>{counters.map((counter) => <option key={counter.id} value={counter.id}>{counter.name}</option>)}</select> : <select value={editForm.assigned_bus_id} onChange={(e) => setEditForm({ ...editForm, assigned_bus_id: e.target.value })}><option value="">{t("unassigned_bus")}</option>{buses.map((bus) => <option key={bus.id} value={bus.id}>{busLabel(bus)}</option>)}</select>}</td>
+                  <td>{typeFor(editForm.designation).group === "counter" ? <select value={editForm.counter_id} onChange={(e) => setEditForm({ ...editForm, counter_id: e.target.value })}><option value="">No counter</option>{counters.map((counter) => <option key={counter.id} value={counter.id}>{counter.name}</option>)}</select> : <select value={editForm.assigned_bus_id} onChange={(e) => setEditForm({ ...editForm, assigned_bus_id: e.target.value })}><option value="">{t("unassigned_bus")}</option>{buses.map((bus) => <option key={bus.id} value={bus.id}>{busLabel(bus)}</option>)}</select>}</td>
                   <td><select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}><option value="active">active</option><option value="on_leave">on_leave</option><option value="terminated">terminated</option></select></td>
                   <td><input type="date" value={editForm.joining_date} onChange={(e) => setEditForm({ ...editForm, joining_date: e.target.value })} /></td>
                   <td><button className="primary" onClick={saveEdit}>{t("save")}</button> <button className="link-danger" onClick={() => setEditingId(null)}>{t("cancel")}</button></td>
@@ -175,7 +170,7 @@ export default function Staff() {
                 <td>{s.nid_number || "—"}</td>
                 <td>
                   {canWrite && postedEditId === s.id ? (
-                    COUNTER_DESIGNATIONS.includes(s.designation) ? (
+                    typeFor(s.designation).group === "counter" ? (
                       <select autoFocus defaultValue={s.counter_id || ""} onChange={(e) => handlePostedChange(s, e.target.value)} onBlur={() => setPostedEditId(null)}>
                         <option value="">{t("unassigned_bus")}</option>
                         {counters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -188,7 +183,7 @@ export default function Staff() {
                     )
                   ) : (
                     <span style={canWrite ? { cursor: "pointer" } : undefined} onClick={() => canWrite && setPostedEditId(s.id)} title={canWrite ? t("click_to_change") : undefined}>
-                      {COUNTER_DESIGNATIONS.includes(s.designation) ? (s.counter_name || counterName(s.counter_id)) : busName(s.assigned_bus_id)} {canWrite ? "✎" : ""}
+                      {typeFor(s.designation).group === "counter" ? (s.counter_name || counterName(s.counter_id)) : busName(s.assigned_bus_id)} {canWrite ? "✎" : ""}
                     </span>
                   )}
                 </td>

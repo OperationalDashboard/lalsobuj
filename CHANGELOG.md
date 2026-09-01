@@ -2,6 +2,12 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.18.0 — 2026-09-01
+
+- Added Settings-managed Staff Types: add, rename, group as Bus/Counter/Office staff, or remove old choices.
+- Staff Details now uses those live types, so an authorized user can move any staff member to a different type while preserving their staff ID and all linked history.
+- Made bus/counter attendance and posting follow the configured staff-type group rather than a fixed code list.
+
 ## 1.17.0 — 2026-09-01
 
 - Limited the Dashboard fleet table to 15 buses per page, with clear Previous/Next paging and the visible range shown.

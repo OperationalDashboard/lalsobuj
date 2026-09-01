@@ -92,9 +92,7 @@ export default function Counters() {
   }
 
   const staffAt = (counterId) => staff.filter((s) => s.counter_id === counterId);
-  const counterDesignationStaff = staff.filter((s) =>
-    ["counter_manager", "assistant_counter_manager", "caller_man", "office"].includes(s.designation)
-  );
+  const counterDesignationStaff = staff.filter((s) => s.staff_type_group === "counter");
 
   return (
     <div>

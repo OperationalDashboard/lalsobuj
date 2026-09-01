@@ -19,6 +19,8 @@ export default function Settings() {
   const [newBusClass, setNewBusClass] = useState("");
   const [busCategories, setBusCategories] = useState(DEFAULT_BUS_CATEGORIES);
   const [newBusCategory, setNewBusCategory] = useState("");
+  const [staffTypes, setStaffTypes] = useState([]);
+  const [newStaffType, setNewStaffType] = useState({ label: "", group: "office" });
 
   const [hotels, setHotels] = useState([]);
   const [newHotel, setNewHotel] = useState("");
@@ -58,6 +60,10 @@ export default function Settings() {
       } catch {
         setBusCategories(DEFAULT_BUS_CATEGORIES);
       }
+      try {
+        const parsed = JSON.parse(s.staff_types || "null");
+        setStaffTypes(Array.isArray(parsed) ? parsed : []);
+      } catch { setStaffTypes([]); }
     });
   }
   function loadHotels() { api.get("/hotels").then(setHotels); }
@@ -168,6 +174,30 @@ export default function Settings() {
     setBusCategories(result.bus_categories);
     setEditingItem(null);
     flashMessage(result.updated_buses ? `Bus category renamed on ${result.updated_buses} bus record(s).` : "Bus category renamed.");
+  }
+
+  async function addStaffType(e) {
+    e.preventDefault();
+    const label = newStaffType.label.trim();
+    if (!label) return;
+    const result = await api.put("/settings/staff-types", { action: "add", label, group: newStaffType.group });
+    setStaffTypes(result.staff_types);
+    setNewStaffType({ label: "", group: "office" });
+    flashMessage("Staff type added. You can now assign staff to it from Staff Details.");
+  }
+  async function saveStaffType(type) {
+    const label = editingItem?.value?.trim();
+    if (!label) return;
+    const result = await api.put("/settings/staff-types", { action: "rename", currentKey: type.key, label, group: editingItem.group });
+    setStaffTypes(result.staff_types);
+    setEditingItem(null);
+    flashMessage("Staff type updated. Existing staff keep their assignment.");
+  }
+  async function removeStaffType(type) {
+    if (!confirm(`Remove '${type.label}' from the staff type choices? Staff already assigned to it will keep their history until you move them to another type.`)) return;
+    const result = await api.put("/settings/staff-types", { action: "remove", currentKey: type.key });
+    setStaffTypes(result.staff_types);
+    flashMessage(result.assigned_staff ? `Type removed from choices. Move ${result.assigned_staff} existing staff member(s) from Staff Details when ready.` : "Staff type removed from choices.");
   }
 
   async function addHotel(e) {
@@ -430,6 +460,24 @@ export default function Settings() {
               </div>
             </div>)}
           {busCategories.length === 0 && <div className="settings-list-empty">No bus categories configured. Add one above.</div>}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="settings-card-heading">
+          <div><span className="settings-eyebrow">PEOPLE ORGANISATION</span><h3>Staff types</h3><p>Add the staff types you use, change their names, or remove old choices. The group decides whether that type is bus staff, counter staff, or office staff.</p></div>
+          <span className="settings-count-pill">{staffTypes.length} types</span>
+        </div>
+        <form className="settings-inline-create" onSubmit={addStaffType}>
+          <input placeholder="New staff type (e.g. Ticket Inspector)" value={newStaffType.label} onChange={(e) => setNewStaffType({ ...newStaffType, label: e.target.value })} />
+          <select value={newStaffType.group} onChange={(e) => setNewStaffType({ ...newStaffType, group: e.target.value })}><option value="bus">Bus staff</option><option value="counter">Counter staff</option><option value="office">Office staff</option></select>
+          <button className="primary" type="submit">Add staff type</button>
+        </form>
+        <div className="settings-managed-list">
+          {staffTypes.map((type) => editingItem?.type === "staffType" && editingItem.id === type.key
+            ? <div key={type.key} className="settings-managed-item editing"><input aria-label="Staff type name" value={editingItem.value} onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })} /><select value={editingItem.group} onChange={(e) => setEditingItem({ ...editingItem, group: e.target.value })}><option value="bus">Bus staff</option><option value="counter">Counter staff</option><option value="office">Office staff</option></select><div className="settings-item-actions"><button type="button" className="primary" onClick={() => saveStaffType(type)}>Save</button><button type="button" className="place-secondary-action" onClick={() => setEditingItem(null)}>Cancel</button></div></div>
+            : <div key={type.key} className="settings-managed-item"><div><strong>{type.label}</strong><small>{type.group === "bus" ? "Bus staff — auto-attendance with rotations" : type.group === "counter" ? "Counter staff — can be posted to a counter" : "Office staff"}</small></div><div className="settings-item-actions"><button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "staffType", id: type.key, value: type.label, group: type.group })}>Edit</button><button type="button" className="link-danger" onClick={() => removeStaffType(type)}>Remove</button></div></div>)}
+          {staffTypes.length === 0 && <div className="settings-list-empty">No staff types configured.</div>}
         </div>
       </div>
 

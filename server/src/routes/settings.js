@@ -2,6 +2,7 @@ const express = require("express");
 const db = require("../db");
 const { requireAuth, requireRole, requireFeaturePermission } = require("../middleware/auth");
 const { ROLES } = require("../roles");
+const { DEFAULT_STAFF_TYPES, getStaffTypes } = require("../staffTypes");
 
 const router = express.Router();
 
@@ -21,6 +22,7 @@ const DEFAULTS = {
   login_background_data: "",
   bus_class_types: JSON.stringify(["AC", "Non AC", "Sleeper"]),
   bus_categories: JSON.stringify(["Economy (AC)", "Economy (NON AC)", "Suite-Class AC (AC)", "Sleeper (AC)"]),
+  staff_types: JSON.stringify(DEFAULT_STAFF_TYPES),
   sidebar_nav_order: JSON.stringify(NAV_ROUTES),
 };
 
@@ -42,6 +44,10 @@ function getBusCategories() {
   } catch {
     return JSON.parse(DEFAULTS.bus_categories);
   }
+}
+
+function cleanStaffTypeKey(value) {
+  return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
 
 function saveSetting(key, value) {
@@ -193,6 +199,46 @@ router.put("/bus-categories", requireFeaturePermission("settings", "write"), (re
   }
 
   return res.status(400).json({ error: "Choose rename or remove" });
+});
+
+// Staff types are administrator-managed. Removing a type only removes it
+// from future choices; existing staff keep their stored type/history until
+// an administrator moves them to another type on the Staff page.
+router.put("/staff-types", requireFeaturePermission("settings", "write"), (req, res) => {
+  const types = getStaffTypes();
+  const { action } = req.body;
+  if (action === "add") {
+    const label = String(req.body.label || "").trim();
+    const group = ["bus", "counter", "office"].includes(req.body.group) ? req.body.group : "office";
+    const key = cleanStaffTypeKey(req.body.key || label);
+    if (!label || !key) return res.status(400).json({ error: "Staff type name required" });
+    if (types.some((type) => type.key === key || type.label.toLowerCase() === label.toLowerCase())) return res.status(400).json({ error: "That staff type already exists" });
+    const next = [...types, { key, label, group }];
+    saveSetting("staff_types", JSON.stringify(next));
+    return res.status(201).json({ staff_types: next });
+  }
+
+  const currentKey = String(req.body.currentKey || "");
+  const index = types.findIndex((type) => type.key === currentKey);
+  if (index < 0) return res.status(404).json({ error: "Staff type not found" });
+  if (action === "rename") {
+    const label = String(req.body.label || "").trim();
+    const group = ["bus", "counter", "office"].includes(req.body.group) ? req.body.group : types[index].group;
+    if (!label) return res.status(400).json({ error: "Staff type name required" });
+    if (types.some((type, typeIndex) => typeIndex !== index && type.label.toLowerCase() === label.toLowerCase())) return res.status(400).json({ error: "That staff type already exists" });
+    const next = [...types];
+    next[index] = { ...next[index], label, group };
+    saveSetting("staff_types", JSON.stringify(next));
+    return res.json({ staff_types: next });
+  }
+  if (action === "remove") {
+    const assigned = db.prepare("SELECT COUNT(*) AS count FROM staff WHERE designation = ?").get(currentKey).count;
+    const next = types.filter((type) => type.key !== currentKey);
+    if (!next.length) return res.status(400).json({ error: "Keep at least one staff type" });
+    saveSetting("staff_types", JSON.stringify(next));
+    return res.json({ staff_types: next, assigned_staff: assigned });
+  }
+  return res.status(400).json({ error: "Choose add, rename, or remove" });
 });
 
 // Only Admin/Super Admin can change appearance or the dedicated call contact.

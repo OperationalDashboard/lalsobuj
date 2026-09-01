@@ -4,7 +4,6 @@ import { t } from "../i18n.js";
 import { busLabel } from "../busLabel.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
-const BUS_DESIGNATIONS = ["Driver", "Supervisor", "Bus Staff", "Helper", "Conductor", "Mechanic"];
 const ROTATIONS_PER_PAGE = 25;
 const ROTATION_STAFF_FIELDS = [
   ["Driver", "driver_name", "D"],
@@ -78,7 +77,7 @@ export default function Reports() {
     api.get(`/trips/rotations?bus_id=${selectedBus}&from=${fromDate}&to=${toDate}`).then(setBusRotations).catch(() => {});
   }, [selectedBus, fromDate, toDate]);
 
-  const busStaffIds = new Set(staff.filter((s) => BUS_DESIGNATIONS.includes(s.designation)).map((s) => s.id));
+  const busStaffIds = new Set(staff.filter((s) => s.staff_type_group === "bus").map((s) => s.id));
   const attendanceFor = (status, group) => attendance.filter((a) => a.status === status && (group === "bus" ? busStaffIds.has(a.staff_id) : group === "other" ? !busStaffIds.has(a.staff_id) : true));
   const presentToday = attendanceFor("present", "all").length + attendanceFor("late", "all").length;
   const totalRotations = rotations.length;

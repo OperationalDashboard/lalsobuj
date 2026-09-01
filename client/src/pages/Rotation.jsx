@@ -73,9 +73,9 @@ export default function Rotation() {
     } catch (err) { setError(err.message); }
   }
 
-  const drivers = staff.filter((s) => s.designation === "driver");
-  const helpers = staff.filter((s) => s.designation === "helper");
-  const supervisors = staff.filter((s) => s.designation === "supervisor");
+  const drivers = staff.filter((s) => s.designation === "driver" || s.staff_type_group === "bus");
+  const helpers = staff.filter((s) => s.designation === "helper" || s.staff_type_group === "bus");
+  const supervisors = staff.filter((s) => s.designation === "supervisor" || s.staff_type_group === "bus");
   const activeBuses = buses.filter((b) => b.status === "active");
   // Keep completed/running history visible, but an unstarted duty for a bus
   // that has gone into maintenance must disappear until the bus is active.

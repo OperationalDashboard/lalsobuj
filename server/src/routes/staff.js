@@ -1,6 +1,7 @@
 const express = require("express");
 const db = require("../db");
 const { requireAuth, requireFeaturePermission } = require("../middleware/auth");
+const { staffTypeFor } = require("../staffTypes");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -9,15 +10,15 @@ const guardWrite = requireFeaturePermission("staff", "write");
 const WRITABLE = ["name", "designation", "phone", "nid_number", "joining_date", "assigned_bus_id", "counter_id", "status"];
 
 router.get("/", (req, res) => {
-  res.json(
+  const rows =
     db.prepare(
       `SELECT s.*, c.name AS counter_name, c.place_id, p.name AS place_name
        FROM staff s
        LEFT JOIN counters c ON c.id = s.counter_id
        LEFT JOIN expense_places p ON p.id = c.place_id
        ORDER BY s.name ASC`
-    ).all()
-  );
+    ).all();
+  res.json(rows.map((staff) => ({ ...staff, staff_type_group: staffTypeFor(staff.designation).group, staff_type_label: staffTypeFor(staff.designation).label })));
 });
 
 router.get("/:id", (req, res) => {

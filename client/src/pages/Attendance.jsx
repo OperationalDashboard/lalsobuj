@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
-import { BUS_DESIGNATIONS } from "./Staff.jsx";
 import { canUseFeature } from "../permissions.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -31,8 +30,8 @@ export default function Attendance() {
   // don't check in/out manually — they're checked in/out automatically the
   // moment their bus starts/finishes a rotation on Live Activity. Only
   // counter and office staff show up here for manual attendance.
-  const manualStaff = staff.filter((s) => !BUS_DESIGNATIONS.includes(s.designation));
-  const busStaff = staff.filter((s) => BUS_DESIGNATIONS.includes(s.designation));
+  const manualStaff = staff.filter((s) => s.staff_type_group !== "bus");
+  const busStaff = staff.filter((s) => s.staff_type_group === "bus");
 
   const todaysRows = rows.filter((r) => r.work_date === today());
   const staffName = (id) => staff.find((s) => s.id === id)?.name || "—";
