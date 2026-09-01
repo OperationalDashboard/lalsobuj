@@ -203,12 +203,13 @@ export default function Settings() {
       flashMessage("Staff type updated. Existing staff keep their assignment.");
     } catch (error) { showSettingsError(error); }
   }
-  async function removeStaffType(type, replacementKey) {
+  async function removeStaffType(type, replacementKey, deleteAssigned = false) {
+    if (deleteAssigned && !confirm(`Permanently delete ${type.label}, including every staff record assigned to it? This cannot be undone.`)) return;
     try {
-      const result = await api.put("/settings/staff-types", { action: "remove", currentKey: type.key, replacementKey });
+      const result = await api.put("/settings/staff-types", { action: "remove", currentKey: type.key, replacementKey, deleteAssigned });
       setStaffTypes(result.staff_types);
       setRemovingStaffType(null);
-      flashMessage(result.assigned_staff ? `${type.label} removed. ${result.assigned_staff} staff member(s) were moved to the selected type.` : "Staff type removed from choices.");
+      flashMessage(result.deleted_staff ? `${type.label} and ${result.deleted_staff} assigned staff record(s) were permanently deleted.` : result.assigned_staff ? `${type.label} removed. ${result.assigned_staff} staff member(s) were moved to the selected type.` : "Staff type removed from choices.");
     } catch (error) {
       showSettingsError(error);
     }
@@ -492,7 +493,7 @@ export default function Settings() {
           {staffTypes.map((type) => editingItem?.type === "staffType" && editingItem.id === type.key
             ? <div key={type.key} className="settings-managed-item editing"><input aria-label="Staff type name" value={editingItem.value} onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })} /><select value={editingItem.group} onChange={(e) => setEditingItem({ ...editingItem, group: e.target.value })}><option value="bus">Bus staff</option><option value="counter">Counter staff</option><option value="office">Office staff</option></select><div className="settings-item-actions"><button type="button" className="primary" onClick={() => saveStaffType(type)}>Save</button><button type="button" className="place-secondary-action" onClick={() => setEditingItem(null)}>Cancel</button></div></div>
             : removingStaffType?.key === type.key
-              ? <div key={type.key} className="settings-managed-item editing"><div><strong>Remove {type.label}</strong><small>Choose the staff type that will receive any staff currently assigned here.</small></div><select aria-label="Move staff to type" value={removingStaffType.replacementKey} onChange={(e) => setRemovingStaffType({ ...removingStaffType, replacementKey: e.target.value })}>{staffTypes.filter((candidate) => candidate.key !== type.key).map((candidate) => <option key={candidate.key} value={candidate.key}>{candidate.label}</option>)}</select><div className="settings-item-actions"><button type="button" className="link-danger" onClick={() => removeStaffType(type, removingStaffType.replacementKey)}>Move &amp; remove</button><button type="button" className="place-secondary-action" onClick={() => setRemovingStaffType(null)}>Cancel</button></div></div>
+              ? <div key={type.key} className="settings-managed-item editing"><div><strong>Remove {type.label}</strong><small>Move assigned staff to another type, or permanently delete the assigned staff records and this type.</small></div><select aria-label="Move staff to type" value={removingStaffType.replacementKey} onChange={(e) => setRemovingStaffType({ ...removingStaffType, replacementKey: e.target.value })}>{staffTypes.filter((candidate) => candidate.key !== type.key).map((candidate) => <option key={candidate.key} value={candidate.key}>{candidate.label}</option>)}</select><div className="settings-item-actions"><button type="button" className="primary" onClick={() => removeStaffType(type, removingStaffType.replacementKey)}>Move &amp; remove</button><button type="button" className="link-danger" onClick={() => removeStaffType(type, "", true)}>Delete staff &amp; type</button><button type="button" className="place-secondary-action" onClick={() => setRemovingStaffType(null)}>Cancel</button></div></div>
             : <div key={type.key} className="settings-managed-item"><div><strong>{type.label}</strong><small>{type.group === "bus" ? "Bus staff — auto-attendance with rotations" : type.group === "counter" ? "Counter staff — can be posted to a counter" : "Office staff"}</small></div><div className="settings-item-actions"><button type="button" className="settings-edit-button" onClick={() => setEditingItem({ type: "staffType", id: type.key, value: type.label, group: type.group })}>Edit</button><button type="button" className="link-danger" onClick={() => setRemovingStaffType({ key: type.key, replacementKey: staffTypes.find((candidate) => candidate.key !== type.key)?.key || "" })}>Remove</button></div></div>)}
           {staffTypes.length === 0 && <div className="settings-list-empty">No staff types configured.</div>}
         </div>

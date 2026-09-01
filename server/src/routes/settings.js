@@ -243,6 +243,15 @@ router.put("/staff-types", requireFeaturePermission("settings", "write"), (req, 
     const assigned = db.prepare("SELECT COUNT(*) AS count FROM staff WHERE designation = ?").get(currentKey).count;
     const next = types.filter((type) => type.key !== currentKey);
     if (!next.length) return res.status(400).json({ error: "Keep at least one staff type" });
+    const deleteAssigned = req.body.deleteAssigned === true;
+    if (deleteAssigned && assigned) {
+      // Foreign-key actions preserve rotation/history integrity: linked
+      // rotation staff slots become empty, while attendance and staff-linked
+      // logins are removed together with the permanently deleted staff.
+      db.prepare("DELETE FROM staff WHERE designation = ?").run(currentKey);
+      saveSetting("staff_types", JSON.stringify(next));
+      return res.json({ staff_types: next, assigned_staff: assigned, deleted_staff: assigned });
+    }
     let replacementKey = String(req.body.replacementKey || "");
     // Older open browser tabs did not send a replacement key. Complete those
     // removals safely as well, preferring another type in the same group.

@@ -2,6 +2,10 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.19.0 — 2026-09-01
+
+- Added an explicit irreversible **Delete staff & type** action for Staff Types. It permanently deletes the selected type and every staff record assigned to it after a final confirmation.
+
 ## 1.18.3 — 2026-09-01
 
 - Fixed staff-type removal for open older browser tabs: confirming removal now completes safely even if that tab does not send a replacement type. Assigned staff move to another type in the same group when possible.
