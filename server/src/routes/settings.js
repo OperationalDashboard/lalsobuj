@@ -102,6 +102,11 @@ router.get("/", (req, res) => {
   const rows = db.prepare("SELECT key, value FROM settings").all();
   const settings = { ...DEFAULTS };
   rows.forEach((r) => { settings[r.key] = r.value; });
+  const normalizedStaffTypes = JSON.stringify(getStaffTypes());
+  // Persist the compatible shape on the first settings read, so an existing
+  // installation's old staff type list gains IDs needed by Edit and Remove.
+  if (settings.staff_types !== normalizedStaffTypes) saveSetting("staff_types", normalizedStaffTypes);
+  settings.staff_types = normalizedStaffTypes;
   res.json(settings);
 });
 

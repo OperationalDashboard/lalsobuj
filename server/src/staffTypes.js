@@ -18,13 +18,32 @@ const DEFAULT_STAFF_TYPES = [
   { key: "general_manager", label: "General Manager", group: "office" },
 ];
 
+function cleanKey(value) {
+  return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+// Staff types were originally saved as simple names. Keep those existing
+// settings usable by upgrading each item into the current key/label/group
+// shape instead of making Edit and Remove operate on an undefined key.
+function normalizeStaffTypes(value) {
+  if (!Array.isArray(value)) return DEFAULT_STAFF_TYPES;
+  const used = new Set();
+  const normalized = value.flatMap((item) => {
+    const source = typeof item === "string" ? { label: item } : (item || {});
+    const label = String(source.label || source.name || source.key || "").trim();
+    const key = cleanKey(source.key || label);
+    if (!label || !key || used.has(key)) return [];
+    const known = DEFAULT_STAFF_TYPES.find((type) => type.key === key || type.label.toLowerCase() === label.toLowerCase());
+    const group = ["bus", "counter", "office"].includes(source.group) ? source.group : (known?.group || "office");
+    used.add(key);
+    return [{ key, label, group }];
+  });
+  return normalized.length ? normalized : DEFAULT_STAFF_TYPES;
+}
+
 function getStaffTypes() {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'staff_types'").get();
-  try {
-    const types = JSON.parse(row?.value || "null");
-    if (Array.isArray(types) && types.length && types.every((type) => type?.key && type?.label && type?.group)) return types;
-  } catch { /* use defaults */ }
-  return DEFAULT_STAFF_TYPES;
+  try { return normalizeStaffTypes(JSON.parse(row?.value || "null")); } catch { return DEFAULT_STAFF_TYPES; }
 }
 
 function staffTypeFor(key) {
@@ -35,4 +54,4 @@ function isBusStaffType(key) {
   return staffTypeFor(key).group === "bus";
 }
 
-module.exports = { DEFAULT_STAFF_TYPES, getStaffTypes, staffTypeFor, isBusStaffType };
+module.exports = { DEFAULT_STAFF_TYPES, getStaffTypes, normalizeStaffTypes, staffTypeFor, isBusStaffType };

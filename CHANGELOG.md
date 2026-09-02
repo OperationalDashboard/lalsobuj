@@ -2,6 +2,10 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.19.1 — 2026-09-01
+
+- Fixed existing staff-type settings saved in the older format. They are now automatically upgraded with valid IDs and groups, restoring both Edit and Remove for every previous staff type.
+
 ## 1.19.0 — 2026-09-01
 
 - Added an explicit irreversible **Delete staff & type** action for Staff Types. It permanently deletes the selected type and every staff record assigned to it after a final confirmation.
