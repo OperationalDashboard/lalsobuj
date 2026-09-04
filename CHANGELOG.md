@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.20.3 — 2026-09-04
+
+- Fixed Namecheap cPanel dependency installation by keeping the already-built frontend separate from cPanel's Node virtual-environment install directory.
+- The Namecheap runtime now installs only the server packages it needs; frontend production assets remain prebuilt and versioned with the release.
+
 ## 1.20.2 — 2026-09-04
 
 - Added a cPanel-compatible application entry point and one-command dependency/build setup for migration from Render to Namecheap Shared Hosting.

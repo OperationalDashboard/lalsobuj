@@ -1,12 +1,11 @@
 {
   "name": "lal-sabuj-paribahan",
-  "version": "1.20.2",
+  "version": "1.20.3",
   "private": true,
   "description": "Lal Sabuj Paribahan management system cPanel application",
   "main": "app.js",
   "scripts": {
     "build": "npm --prefix client ci && npm --prefix client run build",
-    "postinstall": "npm run build",
     "start": "node app.js"
   },
   "engines": {
