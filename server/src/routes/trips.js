@@ -296,6 +296,10 @@ router.post("/", requireFeaturePermission("live_activity", "write"), (req, res) 
 
   const bus = db.prepare("SELECT * FROM buses WHERE id = ?").get(bus_id);
   if (!bus) return res.status(404).json({ error: "Bus not found" });
+  const runningTrip = db.prepare(
+    "SELECT id, route FROM trips WHERE bus_id = ? AND status = 'running' AND deleted_at IS NULL LIMIT 1"
+  ).get(bus_id);
+  if (runningTrip) return res.status(409).json({ error: `This bus is already running on ${runningTrip.route || "another route"}. Complete that trip before starting another rotation.` });
   const { openCount } = db.prepare("SELECT COUNT(*) as openCount FROM maintenance WHERE bus_id = ? AND status != 'resolved'").get(bus_id);
   // A bus that's under maintenance or retired can't start a trip.
   if (bus.status === "retired") return res.status(400).json({ error: "This bus is retired and can't start a trip" });

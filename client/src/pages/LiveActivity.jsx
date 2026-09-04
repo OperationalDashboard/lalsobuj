@@ -273,7 +273,7 @@ export default function LiveActivity() {
             <select value={startForm.rotation_id} onChange={(e) => setStartForm({ ...startForm, rotation_id: e.target.value })}>
               <option value="">Select open rotation</option>
               {openRotations.filter((r) => ![ROLES.DRIVER, ROLES.HELPER].includes(role) || String(r.bus_id) === String(myAssignedBus?.assigned_bus_id)).map((r) => (
-                <option key={r.id} value={r.id}>{busLabel(r)} — {r.route || "no route"} — {r.duty_date}</option>
+                <option key={r.id} value={r.id}>{busLabel(r)} — {r.route || "no route"} — {r.duty_date} — Start {r.shift_start || "not set"}</option>
               ))}
             </select>
             <input type="time" value={startForm.departure_time} title={t("departure_time")} required
@@ -320,7 +320,7 @@ export default function LiveActivity() {
           <div key={trip.id} style={{ border: "1px solid var(--border)", borderRadius: 8, marginBottom: 12, padding: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
               <div>
-                <strong>{busLabel(trip)}</strong> — Rotation #{trip.rotation_no} ({trip.leg_no === 2 ? t("leg2") : t("leg1")}) — {trip.route || "no route set"}
+                <strong>{busLabel(trip)}</strong> — Rotation #{trip.rotation_no} ({trip.leg_no === 2 ? t("leg2") : t("leg1")}) — {trip.route || "no route set"} — {trip.trip_date} — Start {trip.departure_time || "—"}
                 {trip.price_per_seat ? ` — ৳${trip.price_per_seat}/seat` : ""}
                 <div style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
                   {editingTripTimeId === trip.id ? (

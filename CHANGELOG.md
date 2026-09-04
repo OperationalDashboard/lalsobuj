@@ -2,6 +2,12 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.20.0 — 2026-09-04
+
+- Prevented the same bus from being scheduled more than once for the same route and date.
+- Prevented a bus from starting another rotation while it already has a trip on the road.
+- Added the scheduled start time to open-rotation choices and made each live trip show its rotation number, date, and actual start time together.
+
 ## 1.19.2 — 2026-09-04
 
 - Limited the Live Activity **Today's rotations** bus table to 15 rows per page, with Previous/Next controls and a visible bus count.

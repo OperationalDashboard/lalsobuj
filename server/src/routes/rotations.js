@@ -62,6 +62,27 @@ function requireActiveRoute(req, res) {
   return true;
 }
 
+function requireUniqueBusRoute(rotation, res, excludeId = null) {
+  if (!rotation.bus_id || !rotation.route || !rotation.duty_date) return true;
+  const params = [rotation.bus_id, rotation.route, rotation.duty_date];
+  let excludeClause = "";
+  if (excludeId) {
+    excludeClause = " AND id != ?";
+    params.push(excludeId);
+  }
+  const duplicate = db.prepare(
+    `SELECT id FROM rotations
+     WHERE bus_id = ? AND lower(route) = lower(?) AND duty_date = ?
+       AND status != 'cancelled'${excludeClause}
+     LIMIT 1`
+  ).get(...params);
+  if (duplicate) {
+    res.status(409).json({ error: "This bus already has a rotation for this route on the selected date" });
+    return false;
+  }
+  return true;
+}
+
 // Duty roster, with the linked Trip's live status/times folded in when
 // present — that's what keeps this page from getting stuck on "scheduled"
 // after the bus has actually completed its run. A row with a trip_id was
@@ -99,6 +120,7 @@ router.get("/", (req, res) => {
 router.post("/", guardWrite, (req, res) => {
   if (!requireActiveBus(req.body.bus_id, res)) return;
   if (!requireActiveRoute(req, res)) return;
+  if (!requireUniqueBusRoute(req.body, res)) return;
   const present = WRITABLE.filter((c) => req.body[c] !== undefined);
   if (!present.length) return res.status(400).json({ error: "No valid fields provided" });
   const placeholders = present.map(() => "?").join(",");
@@ -108,8 +130,11 @@ router.post("/", guardWrite, (req, res) => {
 });
 
 router.put("/:id", guardWrite, (req, res) => {
+  const current = db.prepare("SELECT * FROM rotations WHERE id = ?").get(req.params.id);
+  if (!current) return res.status(404).json({ error: "Not found" });
   if (req.body.bus_id !== undefined && !requireActiveBus(req.body.bus_id, res)) return;
   if (req.body.route !== undefined && !requireActiveRoute(req, res)) return;
+  if (!requireUniqueBusRoute({ ...current, ...req.body }, res, req.params.id)) return;
   const present = WRITABLE.filter((c) => req.body[c] !== undefined);
   if (!present.length) return res.status(400).json({ error: "No valid fields provided" });
   const setClause = present.map((c) => `${c} = ?`).join(", ");
