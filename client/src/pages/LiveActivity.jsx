@@ -7,6 +7,7 @@ import { t } from "../i18n.js";
 const today = () => new Date().toISOString().slice(0, 10);
 
 const startEmpty = { rotation_id: "", departure_time: "", price_per_seat: "" };
+const ROTATION_PAGE_SIZE = 15;
 
 // Which checkpoint event types each role is allowed to log — must match
 // the backend's EVENT_ROLE_MAP in server/src/routes/activityLogs.js.
@@ -79,6 +80,7 @@ export default function LiveActivity() {
   const [myAssignedBus, setMyAssignedBus] = useState(null);
   const [liveTrips, setLiveTrips] = useState([]);
   const [rotationCounts, setRotationCounts] = useState([]);
+  const [rotationPage, setRotationPage] = useState(1);
   const [startForm, setStartForm] = useState(startEmpty);
   const [error, setError] = useState("");
 
@@ -121,6 +123,13 @@ export default function LiveActivity() {
     const interval = setInterval(load, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  const rotationPageCount = Math.max(1, Math.ceil(rotationCounts.length / ROTATION_PAGE_SIZE));
+  const currentRotationPage = Math.min(rotationPage, rotationPageCount);
+  const visibleRotationCounts = rotationCounts.slice(
+    (currentRotationPage - 1) * ROTATION_PAGE_SIZE,
+    currentRotationPage * ROTATION_PAGE_SIZE,
+  );
 
   async function handleStartTrip(e) {
     e.preventDefault();
@@ -285,7 +294,7 @@ export default function LiveActivity() {
         <table>
           <thead><tr><th>{t("bus")}</th><th>{t("rotations_today")}</th><th>{t("running_now")}</th></tr></thead>
           <tbody>
-            {rotationCounts.map((r) => (
+            {visibleRotationCounts.map((r) => (
               <tr key={r.bus_id}>
                 <td>{busLabel(r)}</td>
                 <td>{r.rotations}</td>
@@ -294,6 +303,14 @@ export default function LiveActivity() {
             ))}
           </tbody>
         </table>
+        {rotationCounts.length > ROTATION_PAGE_SIZE && <div className="bus-pagination">
+          <span>Showing {(currentRotationPage - 1) * ROTATION_PAGE_SIZE + 1}–{Math.min(currentRotationPage * ROTATION_PAGE_SIZE, rotationCounts.length)} of {rotationCounts.length} buses</span>
+          <div>
+            <button className="secondary" type="button" disabled={currentRotationPage === 1} onClick={() => setRotationPage((page) => Math.max(1, page - 1))}>Previous</button>
+            <strong>Page {currentRotationPage} of {rotationPageCount}</strong>
+            <button className="secondary" type="button" disabled={currentRotationPage === rotationPageCount} onClick={() => setRotationPage((page) => Math.min(rotationPageCount, page + 1))}>Next</button>
+          </div>
+        </div>}
       </div>
 
       <div className="card">

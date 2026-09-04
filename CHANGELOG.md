@@ -2,6 +2,10 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.19.2 — 2026-09-04
+
+- Limited the Live Activity **Today's rotations** bus table to 15 rows per page, with Previous/Next controls and a visible bus count.
+
 ## 1.19.1 — 2026-09-01
 
 - Fixed existing staff-type settings saved in the older format. They are now automatically upgraded with valid IDs and groups, restoring both Edit and Remove for every previous staff type.
