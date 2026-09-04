@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.20.1 — 2026-09-04
+
+- Allowed a bus to use the same route again on the same date after its previous outbound and linked return trips are both completed.
+- Kept duplicate scheduling blocked only while that bus still has an unfinished rotation for the same route.
+
 ## 1.20.0 — 2026-09-04
 
 - Prevented the same bus from being scheduled more than once for the same route and date.

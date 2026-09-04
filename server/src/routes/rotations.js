@@ -67,17 +67,27 @@ function requireUniqueBusRoute(rotation, res, excludeId = null) {
   const params = [rotation.bus_id, rotation.route, rotation.duty_date];
   let excludeClause = "";
   if (excludeId) {
-    excludeClause = " AND id != ?";
+    excludeClause = " AND r.id != ?";
     params.push(excludeId);
   }
   const duplicate = db.prepare(
-    `SELECT id FROM rotations
-     WHERE bus_id = ? AND lower(route) = lower(?) AND duty_date = ?
-       AND status != 'cancelled'${excludeClause}
+    `SELECT r.id FROM rotations r
+     LEFT JOIN trips t ON t.id = r.trip_id
+     WHERE r.bus_id = ? AND lower(r.route) = lower(?) AND r.duty_date = ?
+       AND r.status != 'cancelled'${excludeClause}
+       AND (
+         r.trip_id IS NULL
+         OR t.status != 'completed'
+         OR NOT EXISTS (
+           SELECT 1 FROM trips linked
+           WHERE linked.group_id = t.group_id AND linked.leg_no = 2
+             AND linked.status = 'completed' AND linked.deleted_at IS NULL
+         )
+       )
      LIMIT 1`
   ).get(...params);
   if (duplicate) {
-    res.status(409).json({ error: "This bus already has a rotation for this route on the selected date" });
+    res.status(409).json({ error: "This bus already has an unfinished rotation for this route. Complete its linked return trip before adding the same route again." });
     return false;
   }
   return true;
