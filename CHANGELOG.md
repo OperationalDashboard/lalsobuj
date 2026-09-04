@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.20.2 — 2026-09-04
+
+- Added a cPanel-compatible application entry point and one-command dependency/build setup for migration from Render to Namecheap Shared Hosting.
+- Kept the same Express server, React client, and Turso database connection so no operational data is copied or reset during the hosting move.
+
 ## 1.20.1 — 2026-09-04
 
 - Allowed a bus to use the same route again on the same date after its previous outbound and linked return trips are both completed.
