@@ -82,6 +82,7 @@ export default function LiveActivity() {
   const [rotationCounts, setRotationCounts] = useState([]);
   const [rotationPage, setRotationPage] = useState(1);
   const [startForm, setStartForm] = useState(startEmpty);
+  const [startingTrip, setStartingTrip] = useState(false);
   const [error, setError] = useState("");
 
   const [openTripId, setOpenTripId] = useState(null);
@@ -100,13 +101,10 @@ export default function LiveActivity() {
   const [editingTripTimeId, setEditingTripTimeId] = useState(null);
   const [editTripDeparture, setEditTripDeparture] = useState("");
 
-  function load() {
+  function loadReferenceData() {
     api.get("/buses").then(setBuses).catch(() => {});
     api.get("/hotels").then(setHotels).catch(() => {});
     api.get("/routes?active=1").then(setRoutesList).catch(() => {});
-    api.get("/rotations").then((rows) => setOpenRotations(rows.filter((r) => !r.trip_id && r.status === "scheduled" && r.bus_status === "active"))).catch(() => {});
-    api.get("/trips/live").then(setLiveTrips).catch(() => {});
-    api.get(`/trips/rotation-counts?date=${today()}`).then((r) => setRotationCounts(r.buses)).catch(() => {});
     if (placeIsAutoFilled) {
       api.get("/auth/me").then((r) => setMyCounterName(r.staff?.counter_name || "")).catch(() => {});
     }
@@ -118,9 +116,23 @@ export default function LiveActivity() {
     }
   }
 
+  // Only live trip data needs frequent polling. Fleet, route, hotel, place,
+  // and profile data stay unchanged while this page is open, so repeatedly
+  // downloading them made Live Activity needlessly slow on shared hosting.
+  function loadActivityData() {
+    api.get("/rotations").then((rows) => setOpenRotations(rows.filter((r) => !r.trip_id && r.status === "scheduled" && r.bus_status === "active"))).catch(() => {});
+    api.get("/trips/live").then(setLiveTrips).catch(() => {});
+    api.get(`/trips/rotation-counts?date=${today()}`).then((r) => setRotationCounts(r.buses)).catch(() => {});
+  }
+
+  function load() {
+    loadReferenceData();
+    loadActivityData();
+  }
+
   useEffect(() => {
     load();
-    const interval = setInterval(load, 15000);
+    const interval = setInterval(loadActivityData, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -136,16 +148,27 @@ export default function LiveActivity() {
     setError("");
     if (!startForm.rotation_id) { setError("Select an open rotation"); return; }
     if (!startForm.departure_time) { setError("Departure time is required to start a trip"); return; }
+    setStartingTrip(true);
     try {
-      await api.post("/trips", {
+      const startedTrip = await api.post("/trips", {
         ...startForm,
         trip_date: today(),
         price_per_seat: startForm.price_per_seat ? Number(startForm.price_per_seat) : null,
       });
+      // The create endpoint returns the same display-ready record as /trips/live.
+      // Put it on screen immediately instead of waiting for a full page refresh.
+      setLiveTrips((rows) => [startedTrip, ...rows.filter((trip) => Number(trip.id) !== Number(startedTrip.id))]);
+      setOpenRotations((rows) => rows.filter((rotation) => Number(rotation.id) !== Number(startedTrip.rotation_id)));
+      setRotationCounts((rows) => rows.map((bus) => Number(bus.bus_id) === Number(startedTrip.bus_id) ? {
+        ...bus,
+        rotations: Number(bus.rotations || 0) + (Number(startedTrip.leg_no) === 1 ? 1 : 0),
+        running_now: Number(bus.running_now || 0) + 1,
+      } : bus));
       setStartForm(startEmpty);
-      load();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setStartingTrip(false);
     }
   }
 
@@ -280,7 +303,12 @@ export default function LiveActivity() {
               onChange={(e) => setStartForm({ ...startForm, departure_time: e.target.value })} />
             <input placeholder={t("price_per_seat")} type="number" value={startForm.price_per_seat}
               onChange={(e) => setStartForm({ ...startForm, price_per_seat: e.target.value })} />
-            <button className="primary" type="submit">{t("bus_left_counter")}</button>
+            <button className="primary" type="submit" disabled={startingTrip} aria-busy={startingTrip}>
+              <span className="online-button-content">
+                {startingTrip && <span className="online-button-spinner" aria-hidden="true" />}
+                {startingTrip ? "Starting trip…" : t("bus_left_counter")}
+              </span>
+            </button>
           </form>
           <p style={{ color: "var(--muted)", fontSize: "0.8rem", margin: "6px 0 0" }}>
             {t("price_used_by_accounts")}

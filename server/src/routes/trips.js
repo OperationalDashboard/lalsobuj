@@ -375,7 +375,19 @@ router.post("/", requireFeaturePermission("live_activity", "write"), (req, res) 
   // departure time.
   autoCheckIn([selectedRotation.driver_id, selectedRotation.helper_id, selectedRotation.supervisor_id, selectedRotation.coach_id], trip_date, departure_time);
 
-  res.status(201).json(trip);
+  // Return the same display-ready shape as GET /trips/live so the client can
+  // show the newly started trip immediately without reloading every list.
+  const liveTrip = db.prepare(
+    `SELECT t.*, b.reg_number, b.source_bus_number,
+            ? AS rotation_id,
+            'left_counter' AS last_event,
+            NULL AS last_location,
+            (SELECT recorded_at FROM activity_logs WHERE trip_id = t.id ORDER BY recorded_at DESC LIMIT 1) AS last_update
+     FROM trips t JOIN buses b ON b.id = t.bus_id
+     WHERE t.id = ?`
+  ).get(selectedRotation.id, trip.id);
+
+  res.status(201).json(liveTrip);
 });
 
 // Admin/Accounts-only override: correct which two trips form a rotation,

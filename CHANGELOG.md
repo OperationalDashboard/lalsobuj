@@ -2,6 +2,12 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.20.5 — 2026-09-05
+
+- Made **Bus left counter** show its new trip immediately in **Trips currently on the road**, without waiting for a full Live Activity reload.
+- Added a clear loading spinner and disabled the start button while the trip is being created, preventing accidental duplicate clicks.
+- Reduced Live Activity background traffic by refreshing only rotations and live-trip data every 15 seconds instead of repeatedly downloading unchanged fleet, route, hotel, place, and profile data.
+
 ## 1.20.4 — 2026-09-05
 
 - Made the login and first page load smaller by loading each management page only when it is opened.
