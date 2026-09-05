@@ -76,8 +76,14 @@ app.use("/api", (req, res) => res.status(404).json({ error: "Not found" }));
 // Serve the built React frontend (client/dist) and let client-side routing
 // handle any non-API path. Build it first with `npm run build` in client/.
 const clientDist = path.join(__dirname, "../../client/dist");
-app.use(express.static(clientDist));
-app.get(/^\/(?!api\/).*/, (req, res) => res.sendFile(path.join(clientDist, "index.html")));
+app.use("/assets", express.static(path.join(clientDist, "assets"), {
+  immutable: true,
+  maxAge: "1y",
+}));
+app.use(express.static(clientDist, { index: false, maxAge: "1h" }));
+app.get(/^\/(?!api\/).*/, (req, res) => res.sendFile(path.join(clientDist, "index.html"), {
+  headers: { "Cache-Control": "no-cache" },
+}));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {

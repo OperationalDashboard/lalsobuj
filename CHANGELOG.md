@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.20.4 — 2026-09-05
+
+- Made the login and first page load smaller by loading each management page only when it is opened.
+- Added long-lived browser caching for versioned frontend assets while keeping the main application document update-safe.
+- Started web-font connections earlier so the interface can render without waiting on a CSS import chain.
+- Removed the duplicate profile request after sign-in and reduced background permission-refresh traffic without delaying permission updates for restricted roles.
+
 ## 1.20.3 — 2026-09-04
 
 - Fixed Namecheap cPanel dependency installation by keeping the already-built frontend separate from cPanel's Node virtual-environment install directory.

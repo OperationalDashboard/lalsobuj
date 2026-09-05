@@ -1,6 +1,6 @@
 {
   "name": "lal-sabuj-paribahan",
-  "version": "1.20.3",
+  "version": "1.20.4",
   "private": true,
   "description": "Lal Sabuj Paribahan management system cPanel application",
   "main": "app.js",

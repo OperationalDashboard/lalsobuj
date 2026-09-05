@@ -91,9 +91,10 @@ router.post("/login", loginRateLimit, (req, res) => {
   updatePresence(req, sessionId, user.id, true);
   const token = signToken(user, sessionId);
   attempts.delete(req.ip || "unknown");
+  const permissions = FULL_ACCESS.includes(user.role) ? null : permissionsForRole(db, user.role);
   res.json({
     token,
-    user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role, staff_id: user.staff_id },
+    user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role, staff_id: user.staff_id, permissions },
   });
 });
 

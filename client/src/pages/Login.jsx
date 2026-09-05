@@ -34,11 +34,7 @@ export default function Login() {
         return;
       }
       setToken(data.token);
-      let signedInUser = data.user;
-      try {
-        const me = await api.get("/auth/me");
-        if (me.permissions) signedInUser = { ...data.user, permissions: me.permissions };
-      } catch { /* full-access users and temporary network failures still use a safe landing page */ }
+      const signedInUser = data.user;
       setUser(signedInUser);
       navigate(firstPermittedRoute(signedInUser));
     } catch (err) { setError(err.message); } finally { setLoading(false); }

@@ -4,6 +4,7 @@ import Sidebar from "./Sidebar.jsx";
 import BusIcon from "./BusIcon.jsx";
 import { api, getUser, setUser } from "../api.js";
 import { getLanguage } from "../i18n.js";
+import { isFullAccess } from "../roles.js";
 
 // Every page reads its text via t(...) at render time, but a plain function
 // call doesn't make a component re-render when the language changes —
@@ -57,13 +58,14 @@ export default function Layout() {
   useEffect(() => {
     let active = true;
     const refreshPermissions = async () => {
-      if (!active || document.visibilityState === "hidden" || !getUser()) return;
+      const currentUser = getUser();
+      if (!active || document.visibilityState === "hidden" || !currentUser || isFullAccess(currentUser.role)) return;
       try {
         const profile = await api.get("/auth/me");
         if (!active) return;
-        const currentUser = getUser();
-        if (!currentUser) return;
-        const nextUser = { ...currentUser, permissions: profile.permissions ?? null };
+        const latestUser = getUser();
+        if (!latestUser) return;
+        const nextUser = { ...latestUser, permissions: profile.permissions ?? null };
         setUser(nextUser);
         setSessionUser(nextUser);
       } catch {
@@ -71,8 +73,9 @@ export default function Layout() {
       }
     };
 
-    refreshPermissions();
-    const interval = window.setInterval(refreshPermissions, 30_000);
+    const currentUser = getUser();
+    if (currentUser && !isFullAccess(currentUser.role) && !("permissions" in currentUser)) refreshPermissions();
+    const interval = window.setInterval(refreshPermissions, 60_000);
     const onFocus = () => refreshPermissions();
     const onVisibility = () => {
       if (document.visibilityState === "visible") refreshPermissions();
