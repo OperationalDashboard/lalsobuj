@@ -1,6 +1,6 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireFeaturePermission, requireAnyFeaturePermission } = require("../middleware/auth");
+const { requireAuth, requireRole, requireFeaturePermission, requireAnyFeaturePermission } = require("../middleware/auth");
 const { ROLES, FULL_ACCESS, OWN_BUS_ROLES } = require("../roles");
 const { autoCheckIn, autoCheckOut } = require("../autoAttendance");
 
@@ -254,6 +254,24 @@ router.post("/:id/restore", requireFeaturePermission("trash", "write"), (req, re
   }
 
   res.json({ restored: true });
+});
+
+// Reports can remove a completed or running rotation without destroying its
+// history. This always moves both trip legs to Trash and is deliberately
+// restricted to Admin/Super Admin even when another role can edit reports.
+router.delete("/:id/trash", requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), (req, res) => {
+  const trip = db.prepare("SELECT id, group_id FROM trips WHERE id = ? AND deleted_at IS NULL").get(req.params.id);
+  if (!trip) return res.status(404).json({ error: "Rotation not found" });
+
+  const tripIds = db.prepare("SELECT id FROM trips WHERE group_id = ?").all(trip.group_id).map((row) => row.id);
+  db.prepare("UPDATE trips SET deleted_at = datetime('now'), deleted_by = ? WHERE group_id = ?")
+    .run(req.user.id, trip.group_id);
+  if (tripIds.length) {
+    const placeholders = tripIds.map(() => "?").join(",");
+    db.prepare(`DELETE FROM rotations WHERE trip_id IN (${placeholders})`).run(...tripIds);
+  }
+
+  res.status(204).end();
 });
 
 // Start a trip = bus leaves the Control Counter. Control Counter, Driver,

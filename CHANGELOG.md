@@ -2,6 +2,12 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.21.0 — 2026-09-05
+
+- Added an Admin/Super Admin-only **Move to Trash** action beside every bus rotation in Reports; both trip legs are removed together and remain recoverable from Trash.
+- Redesigned report staff details to group bus staff under the bus they actually worked on, with assigned bus as a fallback.
+- Added each counter/office staff member's dedicated counter and a clear Workplace column to attendance details.
+
 ## 1.20.5 — 2026-09-05
 
 - Made **Bus left counter** show its new trip immediately in **Trips currently on the road**, without waiting for a full Live Activity reload.

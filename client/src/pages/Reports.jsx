@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useState } from "react";
-import { api } from "../api.js";
+import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
 import { busLabel } from "../busLabel.js";
+import { isFullAccess } from "../roles.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const ROTATIONS_PER_PAGE = 25;
@@ -29,7 +30,23 @@ function RotationStaffDetails({ legs, compact = false }) {
   </div>;
 }
 
+function WorkplaceGroups({ groups, type }) {
+  if (!groups.length) return <span className="rotation-staff-empty">No staff recorded</span>;
+  return <div className="report-workplace-list">
+    {groups.map((group) => (
+      <span className={`report-workplace-group ${type}`} key={group.workplace}>
+        <span className="report-workplace-icon" aria-hidden="true">{type === "bus" ? "BUS" : "CTR"}</span>
+        <span>
+          <strong>{group.workplace}</strong>
+          <small>({group.names.join(", ")})</small>
+        </span>
+      </span>
+    ))}
+  </div>;
+}
+
 export default function Reports() {
+  const canRemoveRotations = isFullAccess(getUser()?.role);
   const [fromDate, setFromDate] = useState(today());
   const [toDate, setToDate] = useState(today());
 
@@ -47,6 +64,8 @@ export default function Reports() {
   const [rotationPage, setRotationPage] = useState(1);
   const [placeFinance, setPlaceFinance] = useState([]);
   const [openPlaceFinance, setOpenPlaceFinance] = useState("");
+  const [removingGroupId, setRemovingGroupId] = useState(null);
+  const [reportError, setReportError] = useState("");
 
   // Bus-wise report — toggle a bus to see its rotations across the date range.
   const [selectedBus, setSelectedBus] = useState("");
@@ -88,15 +107,75 @@ export default function Reports() {
   const busName = (id) => busLabel(buses.find((b) => b.id === id)) || `Bus #${id}`;
   const rangeLabel = fromDate === toDate ? fromDate : `${fromDate} → ${toDate}`;
   const financialLabel = fromDate === toDate ? `Daily totals — ${fromDate}` : `Totals for ${rangeLabel}`;
+  const staffById = new Map(staff.map((member) => [Number(member.id), member]));
+  const busesById = new Map(buses.map((bus) => [Number(bus.id), bus]));
+  const rotationBusAssignments = new Map();
+  for (const rotation of rotations) {
+    const workingBus = busLabel(rotation);
+    for (const leg of rotation.legs) {
+      for (const staffId of [leg.driver_id, leg.helper_id, leg.supervisor_id, leg.coach_id].filter(Boolean)) {
+        const key = Number(staffId);
+        if (!rotationBusAssignments.has(key)) rotationBusAssignments.set(key, new Set());
+        rotationBusAssignments.get(key).add(workingBus);
+      }
+    }
+  }
 
   const staffByStatus = (status, group = "all") => {
-    const staffIdsWithStatus = attendanceFor(status, group).map((a) => a.staff_id);
-    return staff.filter((s) => staffIdsWithStatus.includes(s.id)).map((s) => s.name);
+    const staffIdsWithStatus = new Set(attendanceFor(status, group).map((a) => Number(a.staff_id)));
+    return staff.filter((s) => staffIdsWithStatus.has(Number(s.id)));
   };
 
-  const staffName = (id) => staff.find((s) => s.id === id)?.name || "—";
+  const staffRecord = (id) => staffById.get(Number(id));
+  const staffName = (id) => staffRecord(id)?.name || "—";
   const maxMaintenanceCost = Math.max(1, ...maintenanceSummary.perBus.map((b) => b.total_cost));
   const busRotationPassengers = busRotations.reduce((s, g) => s + (g.passengers || 0), 0);
+
+  const rotationBusesForStaff = (staffId) => [...(rotationBusAssignments.get(Number(staffId)) || [])].filter(Boolean);
+
+  const workplacesForStaff = (member) => {
+    if (!member) return [];
+    if (member.staff_type_group === "bus") {
+      const rotationBuses = rotationBusesForStaff(member.id);
+      if (rotationBuses.length) return rotationBuses;
+      const assignedBus = busesById.get(Number(member.assigned_bus_id));
+      return [assignedBus ? busLabel(assignedBus) : "Bus not assigned"];
+    }
+    return [member.counter_name || "Counter not assigned"];
+  };
+
+  const workplaceGroupsFor = (status, group) => {
+    const grouped = new Map();
+    for (const member of staffByStatus(status, group)) {
+      for (const workplace of workplacesForStaff(member)) {
+        if (!grouped.has(workplace)) grouped.set(workplace, new Set());
+        grouped.get(workplace).add(member.name);
+      }
+    }
+    return [...grouped.entries()].map(([workplace, names]) => ({ workplace, names: [...names].sort() }))
+      .sort((left, right) => left.workplace.localeCompare(right.workplace));
+  };
+
+  async function removeRotationFromReport(rotation, event) {
+    event.stopPropagation();
+    const label = `${busLabel(rotation)} — Rotation #${rotation.rotation_no}`;
+    if (!confirm(`Move ${label} to Trash?\n\nBoth trip legs will be removed from Accounts and Reports. Admin or Super Admin can restore it from Trash.`)) return;
+    setReportError("");
+    setRemovingGroupId(rotation.group_id);
+    try {
+      await api.del(`/trips/${rotation.legs[0].id}/trash`);
+      setRotations((rows) => rows.filter((row) => Number(row.group_id) !== Number(rotation.group_id)));
+      setOpenGroupId(null);
+      setOpenExpenseGroupId(null);
+      if (String(selectedBus) === String(rotation.bus_id)) {
+        setBusRotations((rows) => rows.filter((row) => Number(row.group_id) !== Number(rotation.group_id)));
+      }
+    } catch (err) {
+      setReportError(err.message);
+    } finally {
+      setRemovingGroupId(null);
+    }
+  }
 
   useEffect(() => {
     setRotationPage((page) => Math.min(page, totalRotationPages));
@@ -155,8 +234,9 @@ export default function Reports() {
               <button type="button" disabled={rotationPage === totalRotationPages} onClick={() => changeRotationPage(rotationPage + 1)}>Next</button>
             </div>}
           </div>
+          {reportError && <p className="error-text report-action-error">{reportError}</p>}
           <table>
-            <thead><tr><th>{t("bus")}</th><th>{t("rotation_details")}</th><th>Bus staff</th><th>Passengers</th><th>{t("income")}</th><th>{t("expense")}</th><th>{t("net")}</th><th>{t("running_now")}</th></tr></thead>
+            <thead><tr><th>{t("bus")}</th><th>{t("rotation_details")}</th><th>Bus staff</th><th>Passengers</th><th>{t("income")}</th><th>{t("expense")}</th><th>{t("net")}</th><th>{t("running_now")}</th>{canRemoveRotations && <th>Action</th>}</tr></thead>
             <tbody>
               {visibleRotations.map((g) => (
                 <Fragment key={g.group_id}>
@@ -169,10 +249,15 @@ export default function Reports() {
                     <td style={{ color: "var(--red)" }}>৳{g.expense.toLocaleString()}</td>
                     <td style={{ color: g.net >= 0 ? "var(--green)" : "var(--red)" }}>৳{g.net.toLocaleString()}</td>
                     <td>{g.legs.some((l) => l.status === "running") ? <span className="badge maintenance">{t("on_the_road")}</span> : <span className="badge active">{t("idle")}</span>}</td>
+                    {canRemoveRotations && <td>
+                      <button className="report-remove-rotation" type="button" disabled={removingGroupId === g.group_id} aria-busy={removingGroupId === g.group_id} onClick={(event) => removeRotationFromReport(g, event)}>
+                        {removingGroupId === g.group_id ? "Moving…" : "Move to Trash"}
+                      </button>
+                    </td>}
                   </tr>
                   {openGroupId === g.group_id && (
                     <tr>
-                      <td colSpan={8} style={{ background: "var(--bg-soft, #f7f7f7)" }}>
+                      <td colSpan={canRemoveRotations ? 9 : 8} style={{ background: "var(--bg-soft, #f7f7f7)" }}>
                         <table>
                           <thead><tr><th>Leg</th><th>{t("route")}</th><th>Bus staff</th><th>{t("departure_time")}</th><th>Arrival</th><th>Passengers</th><th>{t("income")}</th></tr></thead>
                           <tbody>
@@ -209,11 +294,11 @@ export default function Reports() {
                   )}
                 </Fragment>
               ))}
-              {rotations.length === 0 && <tr><td colSpan={8}>{t("no_rotation_today")}</td></tr>}
+              {rotations.length === 0 && <tr><td colSpan={canRemoveRotations ? 9 : 8}>{t("no_rotation_today")}</td></tr>}
             </tbody>
             {rotations.length > 0 && (
               <tfoot>
-                <tr><td colSpan={3} style={{ textAlign: "right" }}><strong>Total</strong></td><td><strong>{totalPassengers}</strong></td><td style={{ color: "var(--green)" }}><strong>৳{rotations.reduce((sum, row) => sum + row.income, 0).toLocaleString()}</strong></td><td style={{ color: "var(--red)" }}><strong>৳{rotations.reduce((sum, row) => sum + row.expense, 0).toLocaleString()}</strong></td><td colSpan={2}></td></tr>
+                <tr><td colSpan={3} style={{ textAlign: "right" }}><strong>Total</strong></td><td><strong>{totalPassengers}</strong></td><td style={{ color: "var(--green)" }}><strong>৳{rotations.reduce((sum, row) => sum + row.income, 0).toLocaleString()}</strong></td><td style={{ color: "var(--red)" }}><strong>৳{rotations.reduce((sum, row) => sum + row.expense, 0).toLocaleString()}</strong></td><td colSpan={canRemoveRotations ? 3 : 2}></td></tr>
               </tfoot>
             )}
           </table>
@@ -240,23 +325,30 @@ export default function Reports() {
             </tbody>
           </table>
           {openStatus && (
-            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)", fontSize: "0.85rem" }}>
-              <strong>{t(openStatus)} — Bus staff:</strong> {staffByStatus(openStatus, "bus").join(", ") || "—"}<br />
-              <strong>{t(openStatus)} — Counter / office:</strong> {staffByStatus(openStatus, "other").join(", ") || "—"}
+            <div className="report-staff-workplaces">
+              <section>
+                <h4>{t(openStatus)} — Bus staff by working bus</h4>
+                <WorkplaceGroups groups={workplaceGroupsFor(openStatus, "bus")} type="bus" />
+              </section>
+              <section>
+                <h4>{t(openStatus)} — Counter / office staff</h4>
+                <WorkplaceGroups groups={workplaceGroupsFor(openStatus, "other")} type="counter" />
+              </section>
             </div>
           )}
           <table style={{ marginTop: 14 }}>
-            <thead><tr><th>{t("date")}</th><th>Staff</th><th>{t("check_in")}</th><th>{t("check_out")}</th></tr></thead>
+            <thead><tr><th>{t("date")}</th><th>Staff</th><th>Workplace</th><th>{t("check_in")}</th><th>{t("check_out")}</th></tr></thead>
             <tbody>
               {attendance.filter((a) => a.check_in).map((a) => (
                 <tr key={a.id}>
                   <td>{a.work_date}</td>
                   <td>{staffName(a.staff_id)}</td>
+                  <td><div className="attendance-workplace-cell">{workplacesForStaff(staffRecord(a.staff_id)).map((workplace) => <span key={workplace}>{workplace}</span>)}</div></td>
                   <td>{a.check_in || "—"}</td>
                   <td>{a.check_out || "—"}</td>
                 </tr>
               ))}
-              {attendance.filter((a) => a.check_in).length === 0 && <tr><td colSpan={4}>{t("no_data")}</td></tr>}
+              {attendance.filter((a) => a.check_in).length === 0 && <tr><td colSpan={5}>{t("no_data")}</td></tr>}
             </tbody>
           </table>
         </div>

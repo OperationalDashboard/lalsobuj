@@ -1261,10 +1261,27 @@ table button { white-space: nowrap; }
 .rotation-staff-list small { min-width: 62px; color: var(--muted); font-size: .58rem; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; }
 .rotation-staff-list strong { overflow-wrap: anywhere; color: var(--ink); font-size: .7rem; font-weight: 750; }
 .rotation-staff-empty { color: var(--muted); font-size: .67rem; font-style: italic; }
+.report-remove-rotation { min-width: 104px; padding: 6px 9px; color: var(--red); background: color-mix(in srgb, var(--red) 7%, var(--card)); border: 1px solid color-mix(in srgb, var(--red) 24%, var(--border)); border-radius: 8px; box-shadow: none; font-size: .64rem; font-weight: 800; white-space: nowrap; }
+.report-remove-rotation:hover:not(:disabled) { color: #fff; background: var(--red); border-color: var(--red); transform: translateY(-1px); }
+.report-action-error { margin: 0 0 10px; }
+.report-staff-workplaces { margin-top: 12px; padding-top: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; border-top: 1px solid var(--border); }
+.report-staff-workplaces section { min-width: 0; }
+.report-staff-workplaces h4 { margin: 0 0 8px; color: var(--ink); font: 800 .7rem "Manrope", sans-serif; }
+.report-workplace-list { display: grid; gap: 7px; }
+.report-workplace-group { min-width: 0; padding: 8px 10px; display: flex; align-items: center; gap: 9px; background: color-mix(in srgb, var(--green) 5%, var(--card)); border: 1px solid color-mix(in srgb, var(--green) 17%, var(--border)); border-radius: 9px; }
+.report-workplace-group.counter { background: color-mix(in srgb, var(--blue, #3b82f6) 5%, var(--card)); border-color: color-mix(in srgb, var(--blue, #3b82f6) 17%, var(--border)); }
+.report-workplace-icon { width: 34px; height: 24px; flex: 0 0 auto; display: grid; place-items: center; color: #fff; background: var(--green); border-radius: 6px; font-size: .5rem; font-weight: 900; letter-spacing: .05em; }
+.report-workplace-group.counter .report-workplace-icon { background: var(--blue, #3b82f6); }
+.report-workplace-group > span:last-child { min-width: 0; display: grid; gap: 2px; }
+.report-workplace-group strong { overflow: hidden; color: var(--ink); font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
+.report-workplace-group small { overflow-wrap: anywhere; color: var(--muted); font-size: .63rem; }
+.attendance-workplace-cell { display: flex; gap: 5px; flex-wrap: wrap; }
+.attendance-workplace-cell span { padding: 4px 7px; color: var(--green); background: color-mix(in srgb, var(--green) 7%, var(--card)); border: 1px solid color-mix(in srgb, var(--green) 20%, var(--border)); border-radius: 999px; font-size: .62rem; font-weight: 800; white-space: nowrap; }
 
 @media (max-width: 760px) {
   .rotation-report-heading { align-items: stretch; flex-direction: column; }
   .rotation-report-pagination { justify-content: space-between; }
+  .report-staff-workplaces { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Place-wise Accounts date controls */
