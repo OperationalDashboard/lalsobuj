@@ -1407,6 +1407,65 @@ table button { white-space: nowrap; }
 .searchable-select input { width: 100%; }
 .rotation-return-picker { width: 100%; margin-bottom: 12px; }
 
+/* Live Activity: readable timing summaries and a chronological journey log. */
+.live-start-form { display: grid; grid-template-columns: minmax(220px, 2fr) minmax(140px, 1fr) minmax(130px, 1fr) auto; gap: 14px; align-items: end; }
+.live-field { display: grid; gap: 6px; min-width: 0; font-size: .8rem; font-weight: 700; }
+.live-field input { width: 100%; min-width: 0; }
+.live-field small { color: var(--muted); font-size: .73rem; font-weight: 400; }
+.live-trip-card { border: 1px solid var(--border); border-radius: 16px; margin: 16px 0; padding: 20px; background: var(--card); }
+.live-trip-heading { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; }
+.live-trip-identity { min-width: 0; flex: 1 1 240px; }
+.live-trip-title { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.live-trip-title > strong { font-size: 1.2rem; overflow-wrap: anywhere; }
+.live-trip-identity p { margin: 8px 0; overflow-wrap: anywhere; }
+.live-trip-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .77rem; color: var(--muted); }
+.live-trip-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.live-trip-actions button { font-size: .78rem; }
+.live-timing-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-top: 18px; background: var(--surface-soft); }
+.live-timing-item { padding: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-width: 0; border-left: 1px solid var(--border); }
+.live-timing-item:first-child { border-left: 0; }
+.live-timing-label { text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-size: .66rem; font-weight: 800; }
+.live-timing-item > strong { font-size: 1.02rem; font-variant-numeric: tabular-nums; }
+.live-timing-item small { color: var(--muted); font-size: .76rem; line-height: 1.5; overflow-wrap: anywhere; }
+button.live-time-edit { padding: 3px 0; border: 0; background: transparent; color: var(--green); font-size: .75rem; font-weight: 700; box-shadow: none; text-decoration: underline; text-underline-offset: 3px; }
+.live-time-editor { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; padding: 14px; margin-top: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-soft); }
+.live-time-editor .live-field { flex: 1 1 190px; max-width: 280px; }
+.live-timeline-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 22px 0 8px; }
+.live-timeline-heading h4 { margin: 0; font-size: .95rem; }
+.live-timeline-heading > span { font-size: .74rem; color: var(--muted); }
+.live-timeline { list-style: none; margin: 0; padding: 0; }
+.live-timeline-entry { display: grid; grid-template-columns: 115px minmax(0, 1fr); gap: 18px; padding: 0; margin: 0; }
+.live-timeline-clock { padding: 18px 0; display: flex; flex-direction: column; gap: 5px; font-variant-numeric: tabular-nums; }
+.live-timeline-clock strong { font-size: .88rem; }
+.live-timeline-clock small { font-size: .7rem; color: var(--muted); }
+.live-timeline-detail { position: relative; border-left: 2px solid var(--border); padding: 16px 0 18px 24px; min-width: 0; }
+.live-timeline-detail::before { content: ""; position: absolute; left: -6px; top: 21px; width: 10px; height: 10px; border-radius: 50%; background: var(--green); outline: 4px solid var(--card); }
+.live-timeline-entry:last-child .live-timeline-detail { border-left-color: transparent; }
+.live-timeline-event { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.live-timeline-event strong { font-size: .9rem; }
+.live-timeline-detail p { margin: 6px 0; font-size: .82rem; overflow-wrap: anywhere; }
+.live-checkpoint-facts { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--muted); font-size: .76rem; line-height: 1.6; overflow-wrap: anywhere; }
+.live-timeline-empty { color: var(--muted); padding: 16px 0; font-size: .85rem; }
+@media (max-width: 1100px) {
+  .live-start-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .live-rotation-field { grid-column: 1 / -1; }
+  .live-timing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .live-timing-item:nth-child(3) { border-left: 0; }
+  .live-timing-item:nth-child(n+3) { border-top: 1px solid var(--border); }
+}
+@media (max-width: 520px) {
+  .live-trip-card { padding: 12px; border-radius: 12px; }
+  .live-start-form { grid-template-columns: minmax(0, 1fr); }
+  .live-trip-actions { width: 100%; }
+  .live-timing-item { padding: 12px; }
+  .live-timing-item > strong { font-size: .9rem; }
+  .live-timeline-entry { grid-template-columns: 80px minmax(0, 1fr); gap: 8px; }
+  .live-timeline-detail { padding-left: 15px; }
+  .live-timeline-clock strong { font-size: .8rem; }
+  .live-timeline-clock small { font-size: .62rem; }
+  .live-time-editor { padding: 10px; }
+}
+
 @media (max-width: 620px) {
   .permission-feature-row { grid-template-columns: minmax(0, 1fr) auto auto; gap: 9px; padding: 12px; }
   .permission-feature-row > label span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

@@ -3,6 +3,8 @@ import { api, getUser } from "../api.js";
 import { ROLES, isFullAccess } from "../roles.js";
 import { busLabel } from "../busLabel.js";
 import { t } from "../i18n.js";
+import { activityClock, activityDay, activityInput, chronologicalLogs } from "../activityTime.js";
+import SearchableSelect from "../components/SearchableSelect.jsx";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -215,7 +217,7 @@ export default function LiveActivity() {
     setLogForm({ event_type: eventOptions[0]?.value || "note", location_name: "", other_place: "", passengers_count: "", fuel_liters: "", fuel_cost: "", note: "", recorded_at: "" });
     api.get(`/activity-logs?trip_id=${tripId}`).then((rows) =>
       setLogsByTrip((prev) => ({ ...prev, [tripId]: rows }))
-    );
+    ).catch((err) => setError(err.message));
   }
 
   async function handleAddLog(e, trip) {
@@ -232,7 +234,7 @@ export default function LiveActivity() {
         fuel_liters: logForm.fuel_liters ? Number(logForm.fuel_liters) : null,
         fuel_cost: logForm.fuel_cost ? Number(logForm.fuel_cost) : null,
         note: logForm.note || null,
-        recorded_at: isAdmin && logForm.recorded_at ? logForm.recorded_at : undefined,
+        recorded_at: isAdmin && logForm.recorded_at ? logForm.recorded_at.replace("T", " ") + ":00" : undefined,
       });
       setLogForm({ ...logForm, location_name: "", other_place: "", passengers_count: "", fuel_liters: "", fuel_cost: "", note: "", recorded_at: "" });
       const rows = await api.get(`/activity-logs?trip_id=${trip.id}`);
@@ -244,17 +246,18 @@ export default function LiveActivity() {
   }
 
   // Admin/Super Admin only: edit the recorded time of any past checkpoint entry.
-  function startEditLogTime(log) {
+  function startEditLogTime(log, trip) {
     setEditingLogId(log.id);
-    setEditLogTime(new Date(log.recorded_at).toTimeString().slice(0, 5));
+    setEditLogTime(activityInput(log.recorded_at, trip.trip_date));
   }
   async function saveLogTime(trip, log) {
+    if (!editLogTime) { setError("Choose the checkpoint date and time"); return; }
     try {
-      const datePart = log.recorded_at.slice(0, 10);
-      await api.put(`/activity-logs/${log.id}`, { recorded_at: `${datePart} ${editLogTime}:00` });
+      await api.put(`/activity-logs/${log.id}`, { recorded_at: editLogTime.replace("T", " ") + ":00" });
       setEditingLogId(null);
       const rows = await api.get(`/activity-logs?trip_id=${trip.id}`);
       setLogsByTrip((prev) => ({ ...prev, [trip.id]: rows }));
+      loadActivityData();
     } catch (err) {
       setError(err.message);
     }
@@ -292,17 +295,16 @@ export default function LiveActivity() {
       {canStartTrip && (
         <div className="card" style={{ marginBottom: 20 }}>
           <h3 style={{ marginTop: 0 }}>{t("start_a_trip")}</h3>
-          <form className="form-row" onSubmit={handleStartTrip}>
-            <select value={startForm.rotation_id} onChange={(e) => setStartForm({ ...startForm, rotation_id: e.target.value })}>
-              <option value="">Select open rotation</option>
-              {openRotations.filter((r) => ![ROLES.DRIVER, ROLES.HELPER].includes(role) || String(r.bus_id) === String(myAssignedBus?.assigned_bus_id)).map((r) => (
-                <option key={r.id} value={r.id}>{busLabel(r)} — {r.route || "no route"} — {r.duty_date} — Start {r.shift_start || "not set"}</option>
-              ))}
-            </select>
-            <input type="time" value={startForm.departure_time} title={t("departure_time")} required
-              onChange={(e) => setStartForm({ ...startForm, departure_time: e.target.value })} />
-            <input placeholder={t("price_per_seat")} type="number" value={startForm.price_per_seat}
-              onChange={(e) => setStartForm({ ...startForm, price_per_seat: e.target.value })} />
+          <form className="live-start-form" onSubmit={handleStartTrip}>
+            <label className="live-field live-rotation-field"><span>Open rotation</span>
+              <SearchableSelect id="live-start-rotation" value={startForm.rotation_id} onChange={(rotation_id) => setStartForm({ ...startForm, rotation_id })} required placeholder="Search bus or route" options={openRotations.filter((r) => ![ROLES.DRIVER, ROLES.HELPER].includes(role) || String(r.bus_id) === String(myAssignedBus?.assigned_bus_id)).map((r) => ({ value: r.id, label: `${busLabel(r)} — ${r.route || "no route"} — ${r.duty_date} — ${r.shift_start ? activityClock(r.shift_start, r.duty_date) : "Time not set"}` }))} />
+            </label>
+            <label className="live-field"><span>{t("departure_time")}</span>
+              <input type="time" value={startForm.departure_time} required onChange={(e) => setStartForm({ ...startForm, departure_time: e.target.value })} />
+            </label>
+            <label className="live-field"><span>{t("price_per_seat")}</span>
+              <input placeholder="৳ Optional" type="number" value={startForm.price_per_seat} onChange={(e) => setStartForm({ ...startForm, price_per_seat: e.target.value })} />
+            </label>
             <button className="primary" type="submit" disabled={startingTrip} aria-busy={startingTrip}>
               <span className="online-button-content">
                 {startingTrip && <span className="online-button-spinner" aria-hidden="true" />}
@@ -345,28 +347,14 @@ export default function LiveActivity() {
         <h3 style={{ marginTop: 0 }}>{t("trips_on_the_road")}</h3>
         {liveTrips.length === 0 && <p style={{ color: "var(--muted)" }}>{t("no_trips_running")}</p>}
         {liveTrips.map((trip) => (
-          <div key={trip.id} style={{ border: "1px solid var(--border)", borderRadius: 8, marginBottom: 12, padding: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-              <div>
-                <strong>{busLabel(trip)}</strong> — Rotation #{trip.rotation_no} ({trip.leg_no === 2 ? t("leg2") : t("leg1")}) — {trip.route || "no route set"} — {trip.trip_date} — Start {trip.departure_time || "—"}
-                {trip.price_per_seat ? ` — ৳${trip.price_per_seat}/seat` : ""}
-                <div style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
-                  {editingTripTimeId === trip.id ? (
-                    <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                      Departed <input type="time" value={editTripDeparture} onChange={(e) => setEditTripDeparture(e.target.value)} />
-                      <button className="primary" style={{ padding: "2px 8px" }} onClick={() => saveTripTime(trip)}>{t("save")}</button>
-                      <button className="link-danger" style={{ padding: "2px 8px" }} onClick={() => setEditingTripTimeId(null)}>{t("cancel")}</button>
-                    </span>
-                  ) : (
-                    <>
-                      Departed {trip.departure_time || "—"}
-                      {isAdmin && <button className="link-danger" style={{ marginLeft: 6, fontSize: "0.78rem" }} onClick={() => openTripTimeEdit(trip)}>✎ edit time</button>}
-                    </>
-                  )}
-                  {" "}· Last update: {trip.last_event ? `${eventLabel[trip.last_event]}${trip.last_location ? " @ " + trip.last_location : ""}` : "—"}
-                </div>
+          <article key={trip.id} className="live-trip-card">
+            <div className="live-trip-heading">
+              <div className="live-trip-identity">
+                <div className="live-trip-title"><strong>{busLabel(trip)}</strong><span className="badge running">On the road</span></div>
+                <p>{trip.route || "No route set"}</p>
+                <div className="live-trip-meta"><span>Rotation #{trip.rotation_no}</span><span>{trip.leg_no === 2 ? t("leg2") : t("leg1")}</span>{trip.price_per_seat ? <span>৳{trip.price_per_seat}/seat</span> : null}</div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div className="live-trip-actions">
                 {isAdmin && <button className="link-danger" onClick={() => removeLiveTrip(trip)}>Remove trip</button>}
                 {canLogAnything && (
                   <button className="primary" onClick={() => toggleTrip(trip.id)}>
@@ -379,9 +367,21 @@ export default function LiveActivity() {
               </div>
             </div>
 
+            <div className="live-timing-grid" aria-label="Trip timing">
+              <div className="live-timing-item"><span className="live-timing-label">Trip date</span><strong>{activityDay(`${trip.trip_date}T12:00:00`)}</strong><small>{trip.leg_no === 2 ? "Return journey" : "Outbound journey"}</small></div>
+              <div className="live-timing-item"><span className="live-timing-label">Departure</span><strong>{activityClock(trip.departure_time, trip.trip_date)}</strong>{isAdmin && <button className="live-time-edit" onClick={() => openTripTimeEdit(trip)}>Edit departure</button>}</div>
+              <div className="live-timing-item"><span className="live-timing-label">Latest checkpoint</span><strong>{activityClock(trip.last_update, trip.trip_date)}</strong><small>{trip.last_event ? `${eventLabel[trip.last_event] || trip.last_event}${trip.last_location ? ` · ${trip.last_location}` : ""}` : "No checkpoint yet"}</small>{trip.last_update && <small>{activityDay(trip.last_update, trip.trip_date)}</small>}</div>
+              <div className="live-timing-item"><span className="live-timing-label">Arrival</span><strong>{trip.arrival_time ? activityClock(trip.arrival_time, trip.trip_date) : "Pending"}</strong><small>{trip.arrival_time ? "Recorded arrival" : "Awaiting completion"}</small></div>
+            </div>
+
+            {editingTripTimeId === trip.id && <form className="live-time-editor" onSubmit={(e) => { e.preventDefault(); saveTripTime(trip); }}>
+              <label className="live-field"><span>Departure time</span><input type="time" value={editTripDeparture} onChange={(e) => setEditTripDeparture(e.target.value)} /></label>
+              <button className="primary" type="submit">{t("save")}</button><button className="secondary" type="button" onClick={() => setEditingTripTimeId(null)}>{t("cancel")}</button>
+            </form>}
+
             {completingId === trip.id && (
-              <form className="form-row" onSubmit={(e) => submitComplete(e, trip)} style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
-                <input type="time" value={completeTime} onChange={(e) => setCompleteTime(e.target.value)} />
+              <form className="live-time-editor" onSubmit={(e) => submitComplete(e, trip)}>
+                <label className="live-field"><span>Arrival time</span><input type="time" value={completeTime} onChange={(e) => setCompleteTime(e.target.value)} /></label>
                 <button className="primary" type="submit">{t("confirm_arrival")}</button>
                 <button type="button" className="link-danger" onClick={() => setCompletingId(null)}>{t("cancel")}</button>
               </form>
@@ -438,46 +438,36 @@ export default function LiveActivity() {
                       onChange={(e) => setLogForm({ ...logForm, note: e.target.value })} />
                   )}
                   {isAdmin && (
-                    <input type="time" title="Set a specific time for this entry (optional — defaults to now)" value={logForm.recorded_at}
-                      onChange={(e) => setLogForm({ ...logForm, recorded_at: e.target.value })} />
+                    <label className="live-field"><span>Checkpoint date &amp; time</span><input type="datetime-local" value={logForm.recorded_at} onChange={(e) => setLogForm({ ...logForm, recorded_at: e.target.value })} /><small>Optional · leave blank to record now</small></label>
                   )}
                   <button className="primary" type="submit">Add entry</button>
                 </form>
                 {error && <p className="error-text">{error}</p>}
 
-                <table>
-                  <thead><tr><th>Time</th><th>Event</th><th>Details</th>{isAdmin && <th></th>}</tr></thead>
-                  <tbody>
-                    {(logsByTrip[trip.id] || []).map((l) => (
-                      <tr key={l.id}>
-                        <td>
+                <div className="live-timeline-heading"><h4>Journey timeline</h4><span>Earliest to latest · {(logsByTrip[trip.id] || []).length} checkpoints</span></div>
+                <ol className="live-timeline" aria-label="Journey checkpoints in time order">
+                    {chronologicalLogs(logsByTrip[trip.id] || [], trip.trip_date).map((l) => (
+                      <li key={l.id} className="live-timeline-entry">
+                        <div className="live-timeline-clock"><strong>{activityClock(l.recorded_at, trip.trip_date)}</strong><small>{activityDay(l.recorded_at, trip.trip_date)}</small></div>
+                        <div className="live-timeline-detail">
+                          <div className="live-timeline-event"><strong>{eventLabel[l.event_type] || l.event_type}</strong>{isAdmin && editingLogId !== l.id && <button className="live-time-edit" onClick={() => startEditLogTime(l, trip)}>Edit time</button>}</div>
+                          {l.location_name && <p>{l.location_name}</p>}
+                          <div className="live-checkpoint-facts">{l.fuel_liters != null && <span>{l.fuel_liters} L · ৳{l.fuel_cost || 0}</span>}{l.passengers_count != null && <span>{l.passengers_count} passengers</span>}{l.note && <span>{l.note}</span>}</div>
                           {editingLogId === l.id ? (
-                            <span style={{ display: "inline-flex", gap: 6 }}>
-                              <input type="time" value={editLogTime} onChange={(e) => setEditLogTime(e.target.value)} />
-                              <button className="primary" style={{ padding: "2px 8px" }} onClick={() => saveLogTime(trip, l)}>{t("save")}</button>
-                              <button className="link-danger" style={{ padding: "2px 8px" }} onClick={() => setEditingLogId(null)}>{t("cancel")}</button>
-                            </span>
-                          ) : (
-                            <>
-                              {new Date(l.recorded_at).toLocaleTimeString()}
-                              {isAdmin && <button className="link-danger" style={{ marginLeft: 6, fontSize: "0.78rem" }} onClick={() => startEditLogTime(l)}>✎</button>}
-                            </>
-                          )}
-                        </td>
-                        <td>{eventLabel[l.event_type]}</td>
-                        <td>
-                          {l.location_name && `${l.location_name} `}
-                          {l.fuel_liters ? `${l.fuel_liters}L / ৳${l.fuel_cost || 0} ` : ""}
-                          {l.passengers_count ? `${l.passengers_count} passengers ` : ""}
-                          {l.note}
-                        </td>
-                      </tr>
+                            <form className="live-time-editor" onSubmit={(e) => { e.preventDefault(); saveLogTime(trip, l); }}>
+                              <label className="live-field"><span>Checkpoint date &amp; time</span><input type="datetime-local" required value={editLogTime} onChange={(e) => setEditLogTime(e.target.value)} /></label>
+                              <button className="primary" type="submit">{t("save")}</button>
+                              <button className="secondary" type="button" onClick={() => setEditingLogId(null)}>{t("cancel")}</button>
+                            </form>
+                          ) : null}
+                        </div>
+                      </li>
                     ))}
-                  </tbody>
-                </table>
+                </ol>
+                {!logsByTrip[trip.id]?.length && <p className="live-timeline-empty">No checkpoints recorded yet.</p>}
               </div>
             )}
-          </div>
+          </article>
         ))}
       </div>
     </div>

@@ -63,6 +63,19 @@ function requireActiveRoute(req, res) {
   return true;
 }
 
+function requireMatchingCrew(body, res) {
+  for (const designation of ["driver", "helper", "supervisor"]) {
+    const staffId = body[`${designation}_id`];
+    if (staffId === undefined || staffId === null || staffId === "") continue;
+    const member = db.prepare("SELECT designation FROM staff WHERE id = ?").get(staffId);
+    if (!member || String(member.designation).trim().toLowerCase() !== designation) {
+      res.status(400).json({ error: `Choose a staff member designated as ${designation} for the ${designation} field` });
+      return false;
+    }
+  }
+  return true;
+}
+
 function requireUniqueBusRoute(rotation, res, excludeId = null) {
   if (!rotation.bus_id || !rotation.route || !rotation.duty_date) return true;
   const params = [rotation.bus_id, rotation.route, rotation.duty_date];
@@ -130,6 +143,7 @@ router.get("/", (req, res) => {
 });
 
 router.post("/", guardWrite, (req, res) => {
+  if (!requireMatchingCrew(req.body, res)) return;
   if (!requireActiveBus(req.body.bus_id, res)) return;
   if (!requireActiveRoute(req, res)) return;
   if (!requireUniqueBusRoute(req.body, res)) return;
@@ -144,6 +158,7 @@ router.post("/", guardWrite, (req, res) => {
 router.put("/:id", guardWrite, (req, res) => {
   const current = db.prepare("SELECT * FROM rotations WHERE id = ?").get(req.params.id);
   if (!current) return res.status(404).json({ error: "Not found" });
+  if (!requireMatchingCrew(req.body, res)) return;
   if (req.body.bus_id !== undefined && !requireActiveBus(req.body.bus_id, res)) return;
   if (req.body.route !== undefined && !requireActiveRoute(req, res)) return;
   if (!requireUniqueBusRoute({ ...current, ...req.body }, res, req.params.id)) return;

@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.21.2 — 2026-09-06
+
+- Rotation crew selectors now show only matching Driver, Helper, and Supervisor designations, with the same validation applied when saving.
+- Organized Live Activity into clear trip date, departure, latest checkpoint, and arrival panels with consistent AM/PM times.
+- Replaced the checkpoint table with a chronological journey timeline and labeled date/time editors that also support older time-only entries.
+- Made open rotation selection searchable and improved timing controls for mobile screens.
+
 ## 1.21.1 — 2026-09-06
 
 - Moving a rotation to Trash now preserves the original crew, coach, shifts, and both trip legs for restoration.

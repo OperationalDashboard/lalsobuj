@@ -118,3 +118,15 @@ test("legacy missing roster is rebuilt for both legs without duplicating existin
   await request("/trips/10/restore", { method: "POST" });
   assert.equal(db.prepare("SELECT count(*) AS count FROM rotations").get().count, 2);
 });
+
+test("crew selections must match their designation on create and edit", async () => {
+  db.exec("INSERT INTO staff(id, name, designation) VALUES(3, 'Helper', 'helper'), (4, 'Supervisor', 'supervisor'), (5, 'Mechanic', 'mechanic')");
+  const body = { bus_id: 1, route: "Test route", duty_date: "2026-09-07", driver_id: 1, helper_id: 3, supervisor_id: 4 };
+  for (const field of ["driver_id", "helper_id", "supervisor_id"]) {
+    assert.equal((await request("/rotations", { method: "POST", body: { ...body, [field]: 5 } })).status, 400);
+    assert.equal((await request("/rotations/20", { method: "PUT", body: { [field]: 5 } })).status, 400);
+  }
+  assert.equal((await request("/rotations", { method: "POST", body })).status, 201);
+  assert.equal((await request("/rotations/20", { method: "PUT", body: { helper_id: 3, supervisor_id: 4 } })).status, 200);
+  assert.equal((await request("/rotations/20", { method: "PUT", body: { driver_id: null } })).status, 200);
+});
