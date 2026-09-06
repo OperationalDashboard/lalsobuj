@@ -2,6 +2,11 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.21.3 — 2026-09-07
+
+- Added transparent response compression for API and frontend payloads to reduce load time on shared hosting and mobile connections.
+- Kept all animations, routes, polling, and application workflows unchanged.
+
 ## 1.21.2 — 2026-09-06
 
 - Rotation crew selectors now show only matching Driver, Helper, and Supervisor designations, with the same validation applied when saving.

@@ -3,6 +3,7 @@ const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
+const compression = require("compression");
 
 const authRoutes = require("./routes/auth");
 const busesRoutes = require("./routes/buses");
@@ -26,6 +27,11 @@ const onlineAccountsRoutes = require("./routes/onlineAccounts");
 const app = express();
 const allowedOrigin = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 app.disable("x-powered-by");
+// Keep the UI and API behavior unchanged while reducing transfer time on
+// shared hosting and mobile connections. Static assets remain cacheable and
+// the API keeps its existing no-store policy; compression only changes the
+// wire representation of responses.
+app.use(compression({ threshold: 1024 }));
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
