@@ -240,16 +240,16 @@ router.post("/:id/restore", requireFeaturePermission("trash", "write"), (req, re
     .run(req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: "Not found" });
 
-  // The duty-roster (Rotation page) row was removed when this was trashed —
-  // recreate it pointing at leg 1, same as when the trip first started.
-  const leg1 = db.prepare("SELECT * FROM trips WHERE group_id = (SELECT group_id FROM trips WHERE id = ?) AND leg_no = 1").get(req.params.id);
-  if (leg1) {
-    const existingRotation = db.prepare("SELECT id FROM rotations WHERE trip_id = ?").get(leg1.id);
+  // Current removals retain the original roster and crew. Recreate missing
+  // rows only for older removals, which discarded the roster before v1.21.1.
+  const legs = db.prepare("SELECT * FROM trips WHERE group_id = (SELECT group_id FROM trips WHERE id = ?)").all(req.params.id);
+  for (const leg of legs) {
+    const existingRotation = db.prepare("SELECT id FROM rotations WHERE trip_id = ?").get(leg.id);
     if (!existingRotation) {
       db.prepare(
         `INSERT INTO rotations (bus_id, route, duty_date, shift_start, shift_end, status, trip_id)
          VALUES (?,?,?,?,?,?,?)`
-      ).run(leg1.bus_id, leg1.route || null, leg1.trip_date, leg1.departure_time, leg1.arrival_time, leg1.status === "completed" ? "completed" : "running", leg1.id);
+      ).run(leg.bus_id, leg.route || null, leg.trip_date, leg.departure_time, leg.arrival_time, leg.status === "completed" ? "completed" : "running", leg.id);
     }
   }
 
@@ -263,13 +263,10 @@ router.delete("/:id/trash", requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), (req, r
   const trip = db.prepare("SELECT id, group_id FROM trips WHERE id = ? AND deleted_at IS NULL").get(req.params.id);
   if (!trip) return res.status(404).json({ error: "Rotation not found" });
 
-  const tripIds = db.prepare("SELECT id FROM trips WHERE group_id = ?").all(trip.group_id).map((row) => row.id);
   db.prepare("UPDATE trips SET deleted_at = datetime('now'), deleted_by = ? WHERE group_id = ?")
     .run(req.user.id, trip.group_id);
-  if (tripIds.length) {
-    const placeholders = tripIds.map(() => "?").join(",");
-    db.prepare(`DELETE FROM rotations WHERE trip_id IN (${placeholders})`).run(...tripIds);
-  }
+  // Roster queries already hide trashed trips. Keep their rows so restoring
+  // the rotation also restores its original crew, coach, and shift details.
 
   res.status(204).end();
 });

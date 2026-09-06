@@ -11,6 +11,10 @@ const guardPlaceRead = requireAnyFeaturePermission(["accounts_place", "reports"]
 const guardBusWrite = requireFeaturePermission("accounts_bus", "write");
 const guardPlaceWrite = requireAnyFeaturePermission(["accounts_place", "settings"], "write");
 
+// Archived trips remain available through an explicit trip report in Trash,
+// but must not contribute to current lists or totals. Unlinked entries stay.
+const activeTransaction = (alias) => `NOT EXISTS (SELECT 1 FROM trips archived_trip WHERE archived_trip.id = ${alias}.trip_id AND archived_trip.deleted_at IS NOT NULL)`;
+
 function guardNewTransaction(req, res, next) {
   const isPlaceEntry = !req.body.bus_id && (req.body.place_name || ["place_income", "place_expense"].includes(req.body.category));
   return (isPlaceEntry ? guardPlaceWrite : guardBusWrite)(req, res, next);
@@ -85,7 +89,7 @@ router.delete("/expense-types/:id", guardPlaceWrite, (req, res) => {
 // "place_expense".
 router.get("/place-finance", guardPlaceRead, (req, res) => {
   const { from, to } = req.query;
-  const clauses = ["place_name IS NOT NULL", "place_name != ''"];
+  const clauses = ["place_name IS NOT NULL", "place_name != ''", activeTransaction("tx")];
   const params = [];
   if (from) { clauses.push("txn_date >= ?"); params.push(from); }
   if (to) { clauses.push("txn_date <= ?"); params.push(to); }
@@ -96,7 +100,7 @@ router.get("/place-finance", guardPlaceRead, (req, res) => {
 // GET /api/accounts?bus_id=3&from=2026-08-01&to=2026-08-31&trip_id=
 router.get("/", guardBusRead, (req, res) => {
   const { bus_id, from, to, type, trip_id } = req.query;
-  const clauses = [];
+  const clauses = trip_id ? [] : [activeTransaction("transactions")];
   const params = [];
   if (bus_id) { clauses.push("bus_id = ?"); params.push(bus_id); }
   if (trip_id) { clauses.push("trip_id = ?"); params.push(trip_id); }
@@ -116,7 +120,7 @@ router.get("/by-bus", guardBusRead, (req, res) => {
       `SELECT b.id as bus_id, b.reg_number, b.source_bus_number,
               COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END), 0) as income,
               COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) as expense
-       FROM buses b LEFT JOIN transactions t ON t.bus_id = b.id
+       FROM buses b LEFT JOIN transactions t ON t.bus_id = b.id AND ${activeTransaction("t")}
        GROUP BY b.id
        ORDER BY COALESCE(NULLIF(TRIM(b.source_bus_number), ''), b.reg_number) COLLATE NOCASE ASC`
     )
@@ -129,7 +133,7 @@ router.get("/by-bus", guardBusRead, (req, res) => {
 // an optional date range (defaults to all time when no range given).
 router.get("/summary", guardBusRead, (req, res) => {
   const { bus_id, from, to } = req.query;
-  const clauses = [];
+  const clauses = [activeTransaction("transactions")];
   const params = [];
   if (bus_id) { clauses.push("bus_id = ?"); params.push(bus_id); }
   if (from) { clauses.push("txn_date >= ?"); params.push(from); }

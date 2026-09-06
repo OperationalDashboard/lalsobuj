@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.21.1 — 2026-09-06
+
+- Moving a rotation to Trash now preserves the original crew, coach, shifts, and both trip legs for restoration.
+- Removed rotations no longer contribute to Accounts totals or place-wise reports; their transactions remain available in Trash.
+- Report totals refresh immediately after removal, and a trashed rotation no longer blocks scheduling the bus again.
+- Enforced Admin/Super Admin-only removal of rotations that have run from the Rotation page as well as Reports.
+
 ## 1.21.0 — 2026-09-05
 
 - Added an Admin/Super Admin-only **Move to Trash** action beside every bus rotation in Reports; both trip legs are removed together and remain recoverable from Trash.

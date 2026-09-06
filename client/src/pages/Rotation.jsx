@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
 import { canUseFeature } from "../permissions.js";
+import { isFullAccess } from "../roles.js";
 import { busLabel } from "../busLabel.js";
 import SearchableSelect from "../components/SearchableSelect.jsx";
 
@@ -10,6 +11,7 @@ const empty = { bus_id: "", driver_id: "", helper_id: "", supervisor_id: "", coa
 
 export default function Rotation() {
   const canWrite = canUseFeature(getUser(), "rotations", "write");
+  const canRemoveLinked = isFullAccess(getUser()?.role);
   const [rows, setRows] = useState([]);
   const [buses, setBuses] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -46,9 +48,15 @@ export default function Rotation() {
     }
   }
 
-  async function handleDelete(id) {
-    await api.del(`/rotations/${id}`);
-    load();
+  async function handleDelete(row) {
+    if (row.trip_id && !confirm(`Move ${busLabel(row)} — Rotation #${row.rotation_no} to Trash? Both trip legs will be removed together and can be restored from Trash.`)) return;
+    setError("");
+    try {
+      await api.del(`/rotations/${row.id}`);
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   const linkedRouteFor = (routeName) => {
@@ -140,7 +148,7 @@ export default function Rotation() {
                 <td>{linkedRouteFor(r.route)?.name || "—"}</td>
                 <td>{r.shift_start || "—"} – {r.shift_end || "—"}{r.trip_id ? " (from trip)" : ""}</td>
                 <td><span className={`badge ${r.status}`}>{r.status}</span></td>
-                <td>{canWrite && <><button className="primary" onClick={() => openReturnModal(r)} disabled={!linkedRouteFor(r.route) || r.bus_status !== "active"} title={r.bus_status !== "active" ? "This bus is unavailable" : ""}>Start linked trip</button> <button className="link-danger" onClick={() => handleDelete(r.id)}>{t("remove")}</button></>}</td>
+                <td>{canWrite && <><button className="primary" onClick={() => openReturnModal(r)} disabled={!linkedRouteFor(r.route) || r.bus_status !== "active"} title={r.bus_status !== "active" ? "This bus is unavailable" : ""}>Start linked trip</button> {(!r.trip_id || canRemoveLinked) && <button className="link-danger" onClick={() => handleDelete(r)}>{t("remove")}</button>}</>}</td>
               </tr>
             ))}
             {visibleRows.length === 0 && <tr><td colSpan={11}>{t("no_rotations_yet")}</td></tr>}

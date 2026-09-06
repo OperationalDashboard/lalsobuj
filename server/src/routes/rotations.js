@@ -1,6 +1,7 @@
 const express = require("express");
 const db = require("../db");
 const { requireAuth, requireFeaturePermission } = require("../middleware/auth");
+const { FULL_ACCESS } = require("../roles");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -75,6 +76,7 @@ function requireUniqueBusRoute(rotation, res, excludeId = null) {
      LEFT JOIN trips t ON t.id = r.trip_id
      WHERE r.bus_id = ? AND lower(r.route) = lower(?) AND r.duty_date = ?
        AND r.status != 'cancelled'${excludeClause}
+       AND (r.trip_id IS NULL OR t.deleted_at IS NULL)
        AND (
          r.trip_id IS NULL
          OR t.status != 'completed'
@@ -165,9 +167,13 @@ router.delete("/:id", guardWrite, (req, res) => {
   if (!row) return res.status(404).json({ error: "Not found" });
 
   if (row.trip_id) {
+    if (!FULL_ACCESS.includes(req.user.role)) {
+      return res.status(403).json({ error: "Only Admin or Super Admin can remove a rotation that has run" });
+    }
     db.prepare(
       "UPDATE trips SET deleted_at = datetime('now'), deleted_by = ? WHERE group_id = (SELECT group_id FROM trips WHERE id = ?)"
     ).run(req.user.id, row.trip_id);
+    return res.status(204).end();
   }
 
   db.prepare("DELETE FROM rotations WHERE id = ?").run(req.params.id);

@@ -66,6 +66,7 @@ export default function Reports() {
   const [openPlaceFinance, setOpenPlaceFinance] = useState("");
   const [removingGroupId, setRemovingGroupId] = useState(null);
   const [reportError, setReportError] = useState("");
+  const [reportRevision, setReportRevision] = useState(0);
 
   // Bus-wise report — toggle a bus to see its rotations across the date range.
   const [selectedBus, setSelectedBus] = useState("");
@@ -87,14 +88,14 @@ export default function Reports() {
     // Same selected date range as the main financial cards; automatic
     // counter salary rows use their actual posting date so they appear here.
     api.get(`/accounts/place-finance?from=${fromDate}&to=${toDate}`).then(setPlaceFinance).catch(() => {});
-  }, [fromDate, toDate]);
+  }, [fromDate, toDate, reportRevision]);
 
   useEffect(() => {
     if (!selectedBus) { setBusSummary({ income: 0, expense: 0, net: 0 }); setBusTransactions([]); setBusRotations([]); return; }
     api.get(`/accounts/summary?bus_id=${selectedBus}&from=${fromDate}&to=${toDate}`).then(setBusSummary).catch(() => {});
     api.get(`/accounts?bus_id=${selectedBus}&from=${fromDate}&to=${toDate}`).then(setBusTransactions).catch(() => {});
     api.get(`/trips/rotations?bus_id=${selectedBus}&from=${fromDate}&to=${toDate}`).then(setBusRotations).catch(() => {});
-  }, [selectedBus, fromDate, toDate]);
+  }, [selectedBus, fromDate, toDate, reportRevision]);
 
   const busStaffIds = new Set(staff.filter((s) => s.staff_type_group === "bus").map((s) => s.id));
   const attendanceFor = (status, group) => attendance.filter((a) => a.status === status && (group === "bus" ? busStaffIds.has(a.staff_id) : group === "other" ? !busStaffIds.has(a.staff_id) : true));
@@ -170,6 +171,7 @@ export default function Reports() {
       if (String(selectedBus) === String(rotation.bus_id)) {
         setBusRotations((rows) => rows.filter((row) => Number(row.group_id) !== Number(rotation.group_id)));
       }
+      setReportRevision((revision) => revision + 1);
     } catch (err) {
       setReportError(err.message);
     } finally {
