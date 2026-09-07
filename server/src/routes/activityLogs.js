@@ -21,6 +21,7 @@ const EVENT_ROLE_MAP = {
   hotel_break: [ROLES.HOTEL],
   fuel: [ROLES.PUMP_MANAGER, ROLES.ACCOUNTS],
   passenger_count: [ROLES.PASSENGER_CHECKER],
+  exceptional_passenger_count: [ROLES.PASSENGER_CHECKER],
   note: [ROLES.CONTROL_COUNTER, ROLES.COUNTER],
 };
 
@@ -28,6 +29,14 @@ function canLogEvent(role, eventType) {
   if (FULL_ACCESS.includes(role)) return true;
   const allowed = EVENT_ROLE_MAP[eventType];
   return Boolean(allowed && allowed.includes(role));
+}
+
+function exceptionalError(entry) {
+  if (entry.event_type !== "exceptional_passenger_count") return null;
+  if (!Number.isInteger(Number(entry.passengers_count)) || Number(entry.passengers_count) <= 0) return "Exceptional passenger count must be a positive whole number";
+  if (entry.price_per_seat == null || entry.price_per_seat === "" || !Number.isFinite(Number(entry.price_per_seat)) || Number(entry.price_per_seat) < 0) return "Enter a valid exceptional passenger price";
+  if (typeof entry.note !== "string" || !entry.note.trim()) return "A description is required for exceptional passengers";
+  return null;
 }
 
 // GET /api/activity-logs?trip_id=5  -- open to any logged-in role
@@ -93,10 +102,16 @@ router.post("/", requireFeaturePermission("live_activity", "write"), (req, res) 
   if (!canLogEvent(req.user.role, event_type)) {
     return res.status(403).json({ error: `Your role cannot log a '${event_type}' entry` });
   }
+  const validationError = exceptionalError(req.body);
+  if (validationError) return res.status(400).json({ error: validationError });
   const location_name = resolveLocationName(req, event_type, req.body.location_name);
   const isFullAccess = FULL_ACCESS.includes(req.user.role);
   const columns = ["trip_id", "bus_id", "event_type", "location_name", "passengers_count", "fuel_liters", "fuel_cost", "note", "recorded_by"];
   const values = [trip_id, bus_id, event_type, location_name, passengers_count ?? null, fuel_liters ?? null, fuel_cost ?? null, note || null, req.user.id];
+  if (event_type === "exceptional_passenger_count") {
+    columns.push("price_per_seat");
+    values.push(Number(req.body.price_per_seat));
+  }
   if (isFullAccess && recorded_at) {
     columns.push("recorded_at");
     values.push(recorded_at);
@@ -110,7 +125,11 @@ router.post("/", requireFeaturePermission("live_activity", "write"), (req, res) 
 // Admin/Super Admin can edit any part of any checkpoint entry after the
 // fact — including giving/correcting its time.
 router.put("/:id", requireFeaturePermission("live_activity", "write"), (req, res) => {
-  const fields = ["location_name", "passengers_count", "fuel_liters", "fuel_cost", "note", "recorded_at"];
+  const existing = db.prepare("SELECT * FROM activity_logs WHERE id = ?").get(req.params.id);
+  if (!existing) return res.status(404).json({ error: "Not found" });
+  const validationError = exceptionalError({ ...existing, ...req.body, event_type: existing.event_type });
+  if (validationError) return res.status(400).json({ error: validationError });
+  const fields = ["location_name", "passengers_count", "price_per_seat", "fuel_liters", "fuel_cost", "note", "recorded_at"];
   const present = fields.filter((f) => req.body[f] !== undefined);
   if (!present.length) return res.status(400).json({ error: "No valid fields" });
   const setClause = present.map((f) => `${f} = ?`).join(", ");

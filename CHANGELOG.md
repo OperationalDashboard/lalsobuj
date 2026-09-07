@@ -2,6 +2,13 @@
 
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
+## 1.22.0 — 2026-09-07
+
+- Added separate exceptional passenger checkpoints with count, price, required description and administrator editing.
+- Salary entered for both legs now creates one whole-rotation expense; existing historical transactions are unchanged.
+- Accounts shows recorded fuel litres and route names, with clearer rotation labels.
+- Kept normal passenger entries and animations unchanged.
+
 ## 1.21.3 — 2026-09-07
 
 - Added transparent response compression for API and frontend payloads to reduce load time on shared hosting and mobile connections.

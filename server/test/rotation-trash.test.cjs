@@ -15,6 +15,8 @@ assert.ok(!schema.includes("${"), "Base schema must be literal SQL");
 db.exec(schema);
 // This report column is added by the existing schema migration.
 db.exec("ALTER TABLE transactions ADD COLUMN counter_id INTEGER REFERENCES counters(id) ON DELETE SET NULL");
+db.exec("ALTER TABLE activity_logs ADD COLUMN price_per_seat REAL");
+db.exec("ALTER TABLE transactions ADD COLUMN leg_scope TEXT");
 require.cache[dbModule] = { id: dbModule, filename: dbModule, loaded: true, exports: db };
 process.env.JWT_SECRET = "isolated-rotation-test-secret";
 const app = express();
@@ -22,6 +24,7 @@ app.use(express.json());
 app.use("/trips", require("../src/routes/trips"));
 app.use("/rotations", require("../src/routes/rotations"));
 app.use("/accounts", require("../src/routes/accounts"));
+app.use("/activity-logs", require("../src/routes/activityLogs"));
 let server;
 let base;
 const clean = (value) => JSON.parse(JSON.stringify(value, (key, item) => key === "_metadata" ? undefined : item));
@@ -36,7 +39,7 @@ after(async () => {
 });
 beforeEach(() => {
   db.exec(`
-    DELETE FROM transactions; DELETE FROM rotations; DELETE FROM trips;
+    DELETE FROM activity_logs; DELETE FROM transactions; DELETE FROM rotations; DELETE FROM trips;
     DELETE FROM staff; DELETE FROM buses; DELETE FROM counters;
     DELETE FROM users; DELETE FROM routes; DELETE FROM role_permissions;
     INSERT INTO users(id, username, password_hash, full_name, role)
@@ -68,6 +71,31 @@ async function request(path, { method = "GET", role = "admin", body } = {}) {
   });
   return { status: res.status, data: res.status === 204 ? null : await res.json() };
 }
+test("salary for both legs is one whole-rotation expense, while fuel remains per leg", async () => {
+  const body = { bus_id: 1, trip_id: 11, type: "expense", category: "salary", amount: 600, txn_date: "2026-09-06", apply_to_both: true };
+  const salary = await request("/accounts", { method: "POST", body });
+  assert.equal(salary.status, 201);
+  const rows = db.prepare("SELECT * FROM transactions WHERE category='salary'").all();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].amount, 600);
+  assert.equal(rows[0].leg_scope, "both");
+  assert.equal(rows[0].trip_id, 10);
+  const fuel = await request("/accounts", { method: "POST", body: { ...body, category: "fuel", both_leg_amounts: { 10: 40, 11: 60 } } });
+  assert.equal(fuel.status, 201);
+  assert.equal(db.prepare("SELECT SUM(amount) AS total FROM transactions WHERE category='fuel'").get().total, 200);
+});
+
+test("exceptional passengers require a description and preserve normal counts", async () => {
+  const body = { trip_id: 10, bus_id: 1, event_type: "exceptional_passenger_count", passengers_count: 3, price_per_seat: 200 };
+  assert.equal((await request("/activity-logs", { method: "POST", body })).status, 400);
+  const created = await request("/activity-logs", { method: "POST", body: { ...body, note: "Special fare" } });
+  assert.equal(created.status, 201);
+  assert.equal(created.data.price_per_seat, 200);
+  assert.equal((await request(`/activity-logs/${created.data.id}`, { method: "PUT", body: { note: " " } })).status, 400);
+  assert.equal((await request(`/activity-logs/${created.data.id}`, { method: "PUT", body: { passengers_count: 4, note: "Updated fare" } })).status, 200);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM activity_logs WHERE event_type='passenger_count'").get().count, 0);
+});
+
 test("both administrator roles can remove and restore both legs with identical roster data", async () => {
   const originalRoster = clean(db.prepare("SELECT * FROM rotations ORDER BY id").all());
   for (const role of ["admin", "super_admin"]) {

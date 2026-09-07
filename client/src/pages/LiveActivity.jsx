@@ -37,6 +37,7 @@ const EVENT_OPTIONS_BY_ROLE = {
   ],
   [ROLES.PASSENGER_CHECKER]: [
     { value: "passenger_count", label: "Passenger count" },
+    { value: "exceptional_passenger_count", label: "Exceptional passenger count" },
   ],
   [ROLES.ADMIN]: [
     { value: "stop_arrival", label: "Arrived at stop" },
@@ -45,6 +46,7 @@ const EVENT_OPTIONS_BY_ROLE = {
     { value: "fuel", label: "Fuel taken" },
     { value: "passenger_count", label: "Passenger count" },
     { value: "note", label: "Note" },
+    { value: "exceptional_passenger_count", label: "Exceptional passenger count" },
   ],
 };
 EVENT_OPTIONS_BY_ROLE[ROLES.SUPER_ADMIN] = EVENT_OPTIONS_BY_ROLE[ROLES.ADMIN];
@@ -56,6 +58,7 @@ const eventLabel = {
   hotel_break: "Hotel break",
   fuel: "Fuel taken",
   passenger_count: "Passenger count",
+  exceptional_passenger_count: "Exceptional passenger count",
   note: "Note",
 };
 
@@ -95,6 +98,7 @@ export default function LiveActivity() {
   const [logsByTrip, setLogsByTrip] = useState({});
   const [editingLogId, setEditingLogId] = useState(null);
   const [editLogTime, setEditLogTime] = useState("");
+  const [editExceptional, setEditExceptional] = useState({});
 
   // Inline "mark completed" time picker state, replacing a browser prompt()
   // so the arrival time is always chosen with a proper clock control.
@@ -231,6 +235,7 @@ export default function LiveActivity() {
         event_type: logForm.event_type,
         location_name: location_name || null,
         passengers_count: logForm.passengers_count ? Number(logForm.passengers_count) : null,
+        price_per_seat: logForm.event_type === "exceptional_passenger_count" ? Number(logForm.price_per_seat) : undefined,
         fuel_liters: logForm.fuel_liters ? Number(logForm.fuel_liters) : null,
         fuel_cost: logForm.fuel_cost ? Number(logForm.fuel_cost) : null,
         note: logForm.note || null,
@@ -247,13 +252,14 @@ export default function LiveActivity() {
 
   // Admin/Super Admin only: edit the recorded time of any past checkpoint entry.
   function startEditLogTime(log, trip) {
+    setEditExceptional({ passengers_count: log.passengers_count ?? "", price_per_seat: log.price_per_seat ?? "", note: log.note || "" });
     setEditingLogId(log.id);
     setEditLogTime(activityInput(log.recorded_at, trip.trip_date));
   }
   async function saveLogTime(trip, log) {
     if (!editLogTime) { setError("Choose the checkpoint date and time"); return; }
     try {
-      await api.put(`/activity-logs/${log.id}`, { recorded_at: editLogTime.replace("T", " ") + ":00" });
+      await api.put(`/activity-logs/${log.id}`, { recorded_at: editLogTime.replace("T", " ") + ":00", ...(log.event_type === "exceptional_passenger_count" ? editExceptional : {}) });
       setEditingLogId(null);
       const rows = await api.get(`/activity-logs?trip_id=${trip.id}`);
       setLogsByTrip((prev) => ({ ...prev, [trip.id]: rows }));
@@ -352,7 +358,7 @@ export default function LiveActivity() {
               <div className="live-trip-identity">
                 <div className="live-trip-title"><strong>{busLabel(trip)}</strong><span className="badge running">On the road</span></div>
                 <p>{trip.route || "No route set"}</p>
-                <div className="live-trip-meta"><span>Rotation #{trip.rotation_no}</span><span>{trip.leg_no === 2 ? t("leg2") : t("leg1")}</span>{trip.price_per_seat ? <span>৳{trip.price_per_seat}/seat</span> : null}</div>
+                <div className="live-trip-meta"><span>Rotation {trip.rotation_no} · {trip.trip_date}</span><span>{trip.route || (trip.leg_no === 2 ? t("leg2") : t("leg1"))}</span>{trip.price_per_seat ? <span>৳{trip.price_per_seat}/seat</span> : null}</div>
               </div>
               <div className="live-trip-actions">
                 {isAdmin && <button className="link-danger" onClick={() => removeLiveTrip(trip)}>Remove trip</button>}
@@ -437,6 +443,12 @@ export default function LiveActivity() {
                     <input placeholder="Note" value={logForm.note}
                       onChange={(e) => setLogForm({ ...logForm, note: e.target.value })} />
                   )}
+                  {logForm.event_type === "exceptional_passenger_count" && <>
+                    <label className="live-field"><span>Exceptional passengers</span><input required min="1" step="1" type="number" value={logForm.passengers_count} onChange={(e) => setLogForm({ ...logForm, passengers_count: e.target.value })} /></label>
+                    <label className="live-field"><span>Price per passenger (৳)</span><input required min="0" step="0.01" type="number" value={logForm.price_per_seat ?? ""} onChange={(e) => setLogForm({ ...logForm, price_per_seat: e.target.value })} /></label>
+                    <label className="live-field"><span>Description / passenger type</span><input required value={logForm.note} onChange={(e) => setLogForm({ ...logForm, note: e.target.value })} /></label>
+                    <span>Total: ৳{(Number(logForm.passengers_count || 0) * Number(logForm.price_per_seat || 0)).toLocaleString()}</span>
+                  </>}
                   {isAdmin && (
                     <label className="live-field"><span>Checkpoint date &amp; time</span><input type="datetime-local" value={logForm.recorded_at} onChange={(e) => setLogForm({ ...logForm, recorded_at: e.target.value })} /><small>Optional · leave blank to record now</small></label>
                   )}
@@ -450,12 +462,18 @@ export default function LiveActivity() {
                       <li key={l.id} className="live-timeline-entry">
                         <div className="live-timeline-clock"><strong>{activityClock(l.recorded_at, trip.trip_date)}</strong><small>{activityDay(l.recorded_at, trip.trip_date)}</small></div>
                         <div className="live-timeline-detail">
-                          <div className="live-timeline-event"><strong>{eventLabel[l.event_type] || l.event_type}</strong>{isAdmin && editingLogId !== l.id && <button className="live-time-edit" onClick={() => startEditLogTime(l, trip)}>Edit time</button>}</div>
+                          <div className="live-timeline-event"><strong>{eventLabel[l.event_type] || l.event_type}</strong>{isAdmin && editingLogId !== l.id && <button className="live-time-edit" onClick={() => startEditLogTime(l, trip)}>{l.event_type === "exceptional_passenger_count" ? "Edit entry" : "Edit time"}</button>}</div>
                           {l.location_name && <p>{l.location_name}</p>}
+                          {l.event_type === "exceptional_passenger_count" && <p>৳{Number(l.price_per_seat).toLocaleString()} per passenger · Total ৳{(Number(l.passengers_count) * Number(l.price_per_seat)).toLocaleString()}</p>}
                           <div className="live-checkpoint-facts">{l.fuel_liters != null && <span>{l.fuel_liters} L · ৳{l.fuel_cost || 0}</span>}{l.passengers_count != null && <span>{l.passengers_count} passengers</span>}{l.note && <span>{l.note}</span>}</div>
                           {editingLogId === l.id ? (
                             <form className="live-time-editor" onSubmit={(e) => { e.preventDefault(); saveLogTime(trip, l); }}>
                               <label className="live-field"><span>Checkpoint date &amp; time</span><input type="datetime-local" required value={editLogTime} onChange={(e) => setEditLogTime(e.target.value)} /></label>
+                              {l.event_type === "exceptional_passenger_count" && <>
+                                <label className="live-field"><span>Passengers</span><input required type="number" min="1" step="1" value={editExceptional.passengers_count} onChange={(e) => setEditExceptional({ ...editExceptional, passengers_count: e.target.value })} /></label>
+                                <label className="live-field"><span>Price per passenger (৳)</span><input required type="number" min="0" step="0.01" value={editExceptional.price_per_seat} onChange={(e) => setEditExceptional({ ...editExceptional, price_per_seat: e.target.value })} /></label>
+                                <label className="live-field"><span>Description</span><input required value={editExceptional.note} onChange={(e) => setEditExceptional({ ...editExceptional, note: e.target.value })} /></label>
+                              </>}
                               <button className="primary" type="submit">{t("save")}</button>
                               <button className="secondary" type="button" onClick={() => setEditingLogId(null)}>{t("cancel")}</button>
                             </form>

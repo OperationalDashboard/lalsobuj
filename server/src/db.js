@@ -529,6 +529,7 @@ function addColumnIfMissing(table, columnName, columnDef) {
   }
 }
 
+addColumnIfMissing("activity_logs", "price_per_seat", "REAL");
 addColumnIfMissing("staff", "status_changed_at", "TEXT NOT NULL DEFAULT (datetime('now'))");
 addColumnIfMissing("staff", "counter_id", "INTEGER REFERENCES counters(id) ON DELETE SET NULL");
 addColumnIfMissing("buses", "class_type", "TEXT");

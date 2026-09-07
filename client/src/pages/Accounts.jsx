@@ -34,7 +34,7 @@ function displayBusNumber(bus) {
 function RotationDetails({ rows }) {
   const income = rows.filter((tx) => tx.type === "income").reduce((sum, tx) => sum + tx.amount, 0);
   const expense = rows.filter((tx) => tx.type === "expense").reduce((sum, tx) => sum + tx.amount, 0);
-  return <div style={{ padding: 8 }}><strong>Transaction details</strong><table style={{ marginTop: 6 }}><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Place</th><th>Counter</th><th>Amount</th><th>Description</th></tr></thead><tbody>{rows.map((tx) => <tr key={tx.id}><td>{tx.txn_date}</td><td>{tx.type}</td><td>{tx.category}</td><td>{tx.place_name || "—"}</td><td>{tx.counter_name || "Whole place"}</td><td>৳{tx.amount.toLocaleString()}</td><td>{tx.description || "—"}</td></tr>)}{rows.length === 0 && <tr><td colSpan={7}>No transactions.</td></tr>}</tbody>{rows.length > 0 && <tfoot><tr style={{ fontWeight: 700 }}><td colSpan={5}>Total</td><td colSpan={2}>Income ৳{income.toLocaleString()} · Expense ৳{expense.toLocaleString()} · Net <span style={{ color: income - expense >= 0 ? "var(--green)" : "var(--red)" }}>৳{(income - expense).toLocaleString()}</span></td></tr></tfoot>}</table></div>;
+  return <div style={{ padding: 8 }}><strong>Transaction details</strong><table style={{ marginTop: 6 }}><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Place</th><th>Counter</th><th>Amount</th><th>Description</th></tr></thead><tbody>{rows.map((tx) => <tr key={tx.id}><td>{tx.txn_date}</td><td>{tx.type}</td><td>{tx.category}{tx.leg_scope === "both" && <small> · Whole rotation</small>}</td><td>{tx.place_name || "—"}</td><td>{tx.counter_name || "Whole place"}</td><td>৳{tx.amount.toLocaleString()}</td><td>{tx.description || "—"}</td></tr>)}{rows.length === 0 && <tr><td colSpan={7}>No transactions.</td></tr>}</tbody>{rows.length > 0 && <tfoot><tr style={{ fontWeight: 700 }}><td colSpan={5}>Total</td><td colSpan={2}>Income ৳{income.toLocaleString()} · Expense ৳{expense.toLocaleString()} · Net <span style={{ color: income - expense >= 0 ? "var(--green)" : "var(--red)" }}>৳{(income - expense).toLocaleString()}</span></td></tr></tfoot>}</table></div>;
 }
 
 export default function Accounts() {
@@ -514,12 +514,12 @@ export default function Accounts() {
                     explicit rather than picking one leg somewhat arbitrarily. */}
                 {!isIncome && rotationGroups.filter((g) => g.legs.length === 2 && g.legs.every((l) => l.accounts_status === "open")).map((g) => (
                   <option key={`both-${g.group_id}`} value={`both:${g.group_id}`}>
-                    {busName(g.legs[0].bus_id || selectedBus, g.legs[0])} — Rotation #{g.rotation_no} — Both outbound and return leg
+                    {busName(g.legs[0].bus_id || selectedBus, g.legs[0])} — Rotation {g.rotation_no} · {g.trip_date} — Whole rotation ({g.legs.map((leg) => leg.route || "Route not set").join(" / ")})
                   </option>
                 ))}
                 {openLegsForEntry.map((tr) => (
                   <option key={tr.id} value={tr.id}>
-                    {busName(tr.bus_id || selectedBus, tr)} — Rotation #{tr.rotation_no} {tr.leg_no === 2 ? `(${t("leg2")})` : `(${t("leg1")})`}
+                    {busName(tr.bus_id || selectedBus, tr)} — Rotation {tr.rotation_no} · {tr.trip_date} — {tr.route || "Route not set"}
                   </option>
                 ))}
               </select>
@@ -545,7 +545,7 @@ export default function Accounts() {
                 </>
               ) : (
                 <>
-                  <input placeholder={t("amount")} type="number" value={entryForm.amount}
+                  <input placeholder={entryForm.category === "salary" && entryForm.apply_to_both ? "Salary for whole rotation (৳)" : t("amount")} type="number" value={entryForm.amount}
                     onChange={(e) => setEntryForm({ ...entryForm, amount: e.target.value })} />
                   {entryForm.category === "fuel" && (
                     <span style={{ alignSelf: "center", fontSize: "0.8rem", color: "var(--muted)" }}>
@@ -576,9 +576,9 @@ export default function Accounts() {
                   <>
                   <tr key={g.group_id}>
                     <td>{canWriteBus && <input type="checkbox" checked={closingGroupIds.includes(g.group_id)} onChange={() => toggleClosingGroup(g.group_id)} />}</td>
-                    <td>{busName(g.legs[0].bus_id || selectedBus, g.legs[0])} — #{g.rotation_no}</td>
+                    <td>{busName(g.legs[0].bus_id || selectedBus, g.legs[0])} — Rotation {g.rotation_no}</td>
                     <td>{g.trip_date}</td>
-                    <td>{g.legs.length === 2 ? `${t("leg1")} + ${t("leg2")}` : t("leg1")}</td>
+                    <td>{g.legs.map((leg) => leg.route || "Route not set").join(" / ")}<small style={{ display: "block", color: "var(--muted)" }}>Fuel recorded: {g.legs.reduce((sum, leg) => sum + Number(leg.logged_fuel_liters || 0), 0).toLocaleString()} L</small></td>
                     <td><span className="badge active">{t("open")}</span></td>
                     <td><button className="link-danger" onClick={() => setOpenGroupId(openGroupId === g.group_id ? null : g.group_id)}>Details</button>{canRemoveRotations && <> <button className="link-danger" onClick={() => handleRemoveRotation(g)}>Remove rotation</button></>}</td>
                   </tr>
@@ -589,9 +589,9 @@ export default function Accounts() {
                   <>
                   <tr key={g.group_id}>
                     <td></td>
-                    <td>{busName(g.legs[0].bus_id || selectedBus, g.legs[0])} — #{g.rotation_no}</td>
+                    <td>{busName(g.legs[0].bus_id || selectedBus, g.legs[0])} — Rotation {g.rotation_no}</td>
                     <td>{g.trip_date}</td>
-                    <td>{g.legs.length === 2 ? `${t("leg1")} + ${t("leg2")}` : t("leg1")}</td>
+                    <td>{g.legs.map((leg) => leg.route || "Route not set").join(" / ")}<small style={{ display: "block", color: "var(--muted)" }}>Fuel recorded: {g.legs.reduce((sum, leg) => sum + Number(leg.logged_fuel_liters || 0), 0).toLocaleString()} L</small></td>
                     <td><span className="badge maintenance">{t("done")}</span></td>
                     <td><button className="link-danger" onClick={() => setOpenGroupId(openGroupId === g.group_id ? null : g.group_id)}>Details</button>{canWriteBus && <> <button className="link-danger" onClick={() => handleReopen(g.group_id)}>{t("reopen_admin")}</button></>}{canRemoveRotations && <> <button className="link-danger" onClick={() => handleRemoveRotation(g)}>Remove rotation</button></>}</td>
                   </tr>
@@ -612,11 +612,11 @@ export default function Accounts() {
                 <div className="form-row">
                   <select value={pairA} onChange={(e) => setPairA(e.target.value)}>
                     <option value="">Leg A</option>
-                    {unpairedLegs.map((l) => <option key={l.id} value={l.id}>#{l.rotation_no} — {l.route || "no route"} ({l.trip_date})</option>)}
+                    {unpairedLegs.map((l) => <option key={l.id} value={l.id}>Rotation {l.rotation_no} — {l.route || "no route"} ({l.trip_date})</option>)}
                   </select>
                   <select value={pairB} onChange={(e) => setPairB(e.target.value)}>
                     <option value="">{t("pair_with")}</option>
-                    {unpairedLegs.filter((l) => String(l.id) !== String(pairA)).map((l) => <option key={l.id} value={l.id}>#{l.rotation_no} — {l.route || "no route"} ({l.trip_date})</option>)}
+                    {unpairedLegs.filter((l) => String(l.id) !== String(pairA)).map((l) => <option key={l.id} value={l.id}>Rotation {l.rotation_no} — {l.route || "no route"} ({l.trip_date})</option>)}
                   </select>
                   <button className="primary" onClick={handleFixPairing}>{t("fix_pairing")}</button>
                 </div>

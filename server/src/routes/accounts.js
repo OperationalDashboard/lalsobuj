@@ -207,7 +207,7 @@ router.post("/", guardNewTransaction, (req, res) => {
       `INSERT INTO transactions
         (bus_id, trip_id, type, category, amount, passengers_count, price_per_seat, deduction_type, deduction_amount, deducted_passengers, description, txn_date, leg_scope, place_name, counter_id, attachment_name, attachment_data, created_by)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-  const add = (targetTripId, entryAmount = amount) => insert.run(bus_id || null, targetTripId || null,
+  const add = (targetTripId, entryAmount = amount, scope = leg_scope) => insert.run(bus_id || null, targetTripId || null,
       type,
       category,
       entryAmount,
@@ -218,15 +218,20 @@ router.post("/", guardNewTransaction, (req, res) => {
       deducted_passengers ?? null,
       description || null,
       txn_date,
-      leg_scope || null, place_name || null, counter_id || null, attachment_name || null, attachment_data || null,
+      scope || null, place_name || null, counter_id || null, attachment_name || null, attachment_data || null,
       req.user.id
     );
   let info;
   if (apply_to_both && trip_id) {
-    const legs = db.prepare("SELECT id FROM trips WHERE group_id = (SELECT group_id FROM trips WHERE id = ?)").all(trip_id);
+    const legs = db.prepare("SELECT id FROM trips WHERE group_id = (SELECT group_id FROM trips WHERE id = ?) ORDER BY leg_no, id").all(trip_id);
     if (legs.length !== 2) return res.status(400).json({ error: "Both legs are not available for this rotation" });
-    const results = legs.map((leg) => add(leg.id, both_leg_amounts?.[leg.id] ?? amount));
-    info = results[0];
+    if (type === "expense" && category === "salary") {
+      // The entered salary covers the rotation, not each individual leg.
+      info = add(legs[0].id, amount, "both");
+    } else {
+      const results = legs.map((leg) => add(leg.id, both_leg_amounts?.[leg.id] ?? amount));
+      info = results[0];
+    }
   } else info = add(trip_id);
   res.status(201).json(db.prepare("SELECT * FROM transactions WHERE id = ?").get(info.lastInsertRowid));
 });
