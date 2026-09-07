@@ -12,7 +12,7 @@ const readableDate = (value) => value
 const entryEmpty = {
   type: "income", category: "ticket_sales", amount: "",
   passengers_count: "", price_per_seat: "", deduction_type: "", deducted_passengers: "",
-  description: "", txn_date: today(), trip_id: "", apply_to_both: false, both_leg_amounts: null, place_name: "", attachment_name: "", attachment_data: "",
+  description: "", txn_date: today(), trip_id: "", apply_to_both: false, both_leg_amounts: null, both_leg_liters: null, fuel_liters: "", place_name: "", attachment_name: "", attachment_data: "",
 };
 
 // Income can only ever be one of these two — everything else is an expense.
@@ -198,13 +198,15 @@ export default function Accounts() {
       price_per_seat: trip?.price_per_seat || f.price_per_seat,
       passengers_count: isTicketSales && trip?.logged_passengers ? String(trip.logged_passengers) : f.passengers_count,
       amount: f.type === "expense" && f.category === "fuel" && trip?.logged_fuel_cost ? String(trip.logged_fuel_cost) : f.amount,
+      fuel_liters: f.type === "expense" && f.category === "fuel" && trip?.logged_fuel_liters ? String(trip.logged_fuel_liters) : f.fuel_liters,
     }));
   }
   function handleBothPick(groupId) {
     const legs = busTrips.filter((trip) => String(trip.group_id) === String(groupId));
     const amounts = Object.fromEntries(legs.map((leg) => [leg.id, Number(leg.logged_fuel_cost || 0)]));
+    const liters = Object.fromEntries(legs.map((leg) => [leg.id, Number(leg.logged_fuel_liters || 0)]));
     const total = Object.values(amounts).reduce((sum, value) => sum + value, 0);
-    setEntryForm((f) => ({ ...f, trip_id: groupId, apply_to_both: true, both_leg_amounts: f.type === "expense" && f.category === "fuel" && total ? amounts : null, amount: f.type === "expense" && f.category === "fuel" && total ? String(total) : f.amount }));
+    setEntryForm((f) => ({ ...f, trip_id: groupId, apply_to_both: true, both_leg_amounts: f.type === "expense" && f.category === "fuel" && total ? amounts : null, both_leg_liters: f.type === "expense" && f.category === "fuel" ? liters : null, fuel_liters: f.type === "expense" && f.category === "fuel" ? String(Object.values(liters).reduce((sum, value) => sum + value, 0)) : f.fuel_liters, amount: f.type === "expense" && f.category === "fuel" && total ? String(total) : f.amount }));
   }
   async function handleAttachment(file) {
     if (!file) return;
@@ -233,6 +235,7 @@ export default function Accounts() {
         amount: entryForm.amount !== "" ? Number(entryForm.amount) : undefined,
         passengers_count: isTicketSales ? Number(entryForm.passengers_count) : null,
         price_per_seat: isTicketSales ? Number(entryForm.price_per_seat) : null,
+        fuel_liters: entryForm.category === "fuel" && entryForm.fuel_liters !== "" ? Number(entryForm.fuel_liters) : null,
         deduction_type: entryForm.deduction_type || null,
         deducted_passengers: entryForm.deducted_passengers ? Number(entryForm.deducted_passengers) : null,
       });
@@ -658,7 +661,7 @@ export default function Accounts() {
                   <tr key={tx.id}>
                     <td>{tx.txn_date}</td>
                     <td><span className={`badge ${tx.type === "income" ? "active" : "maintenance"}`}>{tx.type}</span></td>
-                    <td>{tx.category}{tx.passengers_count ? ` (${tx.passengers_count} pax × ৳${tx.price_per_seat}${tx.deduction_amount ? ` − ৳${tx.deduction_amount} (${tx.deducted_passengers} pax ${tx.deduction_type || ""})` : ""})` : ""}</td>
+                    <td>{tx.category}{tx.fuel_liters != null ? ` (${tx.fuel_liters} L)` : ""}{tx.passengers_count ? ` (${tx.passengers_count} pax × ৳${tx.price_per_seat}${tx.deduction_amount ? ` − ৳${tx.deduction_amount} (${tx.deducted_passengers} pax ${tx.deduction_type || ""})` : ""})` : ""}</td>
                     <td>
                       {canWriteBus && editingId === tx.id ? (
                         <input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} style={{ width: 90 }} />

@@ -17,6 +17,7 @@ db.exec(schema);
 db.exec("ALTER TABLE transactions ADD COLUMN counter_id INTEGER REFERENCES counters(id) ON DELETE SET NULL");
 db.exec("ALTER TABLE activity_logs ADD COLUMN price_per_seat REAL");
 db.exec("ALTER TABLE transactions ADD COLUMN leg_scope TEXT");
+db.exec("ALTER TABLE transactions ADD COLUMN fuel_liters REAL");
 require.cache[dbModule] = { id: dbModule, filename: dbModule, loaded: true, exports: db };
 process.env.JWT_SECRET = "isolated-rotation-test-secret";
 const app = express();

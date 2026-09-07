@@ -185,7 +185,7 @@ function validateCategory(type, category, description) {
 }
 
 router.post("/", guardNewTransaction, (req, res) => {
-  const { bus_id, trip_id, type, category, description, txn_date, passengers_count, price_per_seat, deduction_type, deducted_passengers, leg_scope, place_name, counter_id, attachment_name, attachment_data, apply_to_both, both_leg_amounts } = req.body;
+  const { bus_id, trip_id, type, category, description, txn_date, passengers_count, price_per_seat, fuel_liters, deduction_type, deducted_passengers, leg_scope, place_name, counter_id, attachment_name, attachment_data, apply_to_both, both_leg_amounts, both_leg_liters } = req.body;
   const amount = computeAmount(req.body);
   if (!type || !category || amount === undefined || amount === null || !txn_date) {
     return res.status(400).json({ error: "type, category, amount (or passengers_count+price_per_seat), txn_date required" });
@@ -205,14 +205,15 @@ router.post("/", guardNewTransaction, (req, res) => {
   const deduction_amount = computeDeductionAmount(req.body);
   const insert = db.prepare(
       `INSERT INTO transactions
-        (bus_id, trip_id, type, category, amount, passengers_count, price_per_seat, deduction_type, deduction_amount, deducted_passengers, description, txn_date, leg_scope, place_name, counter_id, attachment_name, attachment_data, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-  const add = (targetTripId, entryAmount = amount, scope = leg_scope) => insert.run(bus_id || null, targetTripId || null,
+        (bus_id, trip_id, type, category, amount, passengers_count, price_per_seat, fuel_liters, deduction_type, deduction_amount, deducted_passengers, description, txn_date, leg_scope, place_name, counter_id, attachment_name, attachment_data, created_by)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  const add = (targetTripId, entryAmount = amount, scope = leg_scope, entryFuelLiters = fuel_liters) => insert.run(bus_id || null, targetTripId || null,
       type,
       category,
       entryAmount,
       passengers_count ?? null,
       price_per_seat ?? null,
+      entryFuelLiters ?? null,
       deduction_type || null,
       deduction_amount,
       deducted_passengers ?? null,
@@ -229,7 +230,7 @@ router.post("/", guardNewTransaction, (req, res) => {
       // The entered salary covers the rotation, not each individual leg.
       info = add(legs[0].id, amount, "both");
     } else {
-      const results = legs.map((leg) => add(leg.id, both_leg_amounts?.[leg.id] ?? amount));
+      const results = legs.map((leg) => add(leg.id, both_leg_amounts?.[leg.id] ?? amount, leg_scope, both_leg_liters?.[leg.id] ?? null));
       info = results[0];
     }
   } else info = add(trip_id);

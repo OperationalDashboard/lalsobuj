@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.22.1 — 2026-09-07
+
+- Fuel expenses now retain and display the recorded litre quantity for each leg and whole-rotation entry.
+
 Every production update is recorded here. The version shown in the website also includes the short Git build ID, which identifies the exact deployed code.
 
 ## 1.22.0 — 2026-09-07

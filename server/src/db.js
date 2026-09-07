@@ -544,6 +544,7 @@ addColumnIfMissing("buses", "registration_date", "TEXT");
 addColumnIfMissing("buses", "source_note", "TEXT");
 addColumnIfMissing("users", "staff_id", "INTEGER REFERENCES staff(id) ON DELETE SET NULL");
 addColumnIfMissing("transactions", "passengers_count", "INTEGER");
+addColumnIfMissing("transactions", "fuel_liters", "REAL");
 addColumnIfMissing("transactions", "price_per_seat", "REAL");
 addColumnIfMissing("transactions", "linked_maintenance_id", "INTEGER REFERENCES maintenance(id) ON DELETE SET NULL");
 addColumnIfMissing("transactions", "trip_id", "INTEGER REFERENCES trips(id) ON DELETE SET NULL");
