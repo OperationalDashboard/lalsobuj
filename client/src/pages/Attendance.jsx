@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
 import { canUseFeature } from "../permissions.js";
+import { isFullAccess } from "../roles.js";
+import PdfExportButton from "../components/PdfExportButton.jsx";
+import { downloadReportPdf } from "../utils/reportPdf.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const STATUS_CYCLE = ["present", "late", "absent", "leave"];
@@ -112,6 +115,15 @@ export default function Attendance() {
     }
   }
 
+  async function removeRecord(row) {
+    if (!confirm(`Remove ${staffName(row.staff_id)}'s attendance for ${row.work_date}? This may change computed payroll. Posted account expenses are kept.`)) return;
+    try { await api.del(`/attendance/${row.id}`); setEditingId(null); load(); } catch (err) { setError(err.message); }
+  }
+  async function exportAttendance() {
+    const records = await api.get("/attendance");
+    await downloadReportPdf({ filename: "attendance-records", title: "Attendance records", subtitle: "All recorded days", sections: [{ title: "Staff attendance", columns: ["Date", "Staff", "Workplace", "Covering for", "Check in", "Check out", "Status"], rows: records.map((r) => [r.work_date, staffName(r.staff_id), staffLocation(staff.find((s) => s.id === r.staff_id) || {}), r.representing_staff_id ? staffName(r.representing_staff_id) : "", r.check_in, r.check_out, r.status]) }] });
+  }
+
   // Admin/Super Admin only: click a status badge to cycle it to the next
   // value — present -> late -> absent -> leave -> present. Only Admin/Super
   // Admin can change the TIME of a record too (see the Edit button below).
@@ -134,6 +146,7 @@ export default function Attendance() {
           <h1>{t("attendance_title")}</h1>
           <p>{t("attendance_subtitle")} Only Admin/Super Admin can change a record's time or status afterward.</p>
         </div>
+        <PdfExportButton onExport={exportAttendance} />
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
@@ -265,7 +278,7 @@ export default function Attendance() {
                         {t(r.status)}
                       </span>
                     </td>
-                    <td>{canEditTimeAndStatus && <><button className="link-danger" onClick={() => startEdit(r)}>{t("edit")}</button>{!r.check_in && <button className="link-danger" onClick={() => reopenAttendance(r.id, "checkin")}> Reopen check-in</button>}{r.check_in && r.check_out && <button className="link-danger" onClick={() => reopenAttendance(r.id, "checkout")}> Reopen check-out</button>}</>}</td>
+                    <td>{canEditTimeAndStatus && <><button className="settings-edit-button" onClick={() => startEdit(r)}>{t("edit")}</button>{!r.check_in && <button className="link-danger" onClick={() => reopenAttendance(r.id, "checkin")}> Reopen check-in</button>}{r.check_in && r.check_out && <button className="link-danger" onClick={() => reopenAttendance(r.id, "checkout")}> Reopen check-out</button>}</>} {isFullAccess(me?.role) && <button className="link-danger" onClick={() => removeRecord(r)}>Remove</button>}</td>
                   </>
                 )}
               </tr>

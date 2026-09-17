@@ -193,7 +193,8 @@ router.get("/for-accounts", requireFeaturePermission("accounts_bus", "read"), (r
     .prepare(
       `SELECT t.*, b.reg_number, b.source_bus_number,
               (SELECT r.id FROM rotations r WHERE r.trip_id = t.id LIMIT 1) AS rotation_id,
-              (SELECT SUM(passengers_count) FROM activity_logs WHERE trip_id = t.id AND event_type = 'passenger_count') as logged_passengers,
+              (SELECT SUM(passengers_count) FROM activity_logs WHERE trip_id = t.id AND event_type IN ('passenger_count', 'additional_passenger_count', 'exceptional_passenger_count')) as logged_passengers,
+              (SELECT SUM(CASE WHEN event_type = 'passenger_count' THEN passengers_count * COALESCE(t.price_per_seat, 0) ELSE passengers_count * COALESCE(price_per_seat, 0) END) FROM activity_logs WHERE trip_id = t.id AND event_type IN ('passenger_count', 'additional_passenger_count', 'exceptional_passenger_count')) as logged_passenger_amount,
               (SELECT SUM(fuel_cost) FROM activity_logs WHERE trip_id = t.id AND event_type = 'fuel') as logged_fuel_cost,
               (SELECT SUM(fuel_liters) FROM activity_logs WHERE trip_id = t.id AND event_type = 'fuel') as logged_fuel_liters
        FROM trips t JOIN buses b ON b.id = t.bus_id
@@ -457,15 +458,24 @@ router.put(
 
 // Admin/Super Admin can give or edit the departure/arrival time for ANY
 // trip, at any point — not just while starting or completing it.
-router.put("/:id/time", requireFeaturePermission("live_activity", "write"), (req, res) => {
-  const { departure_time, arrival_time } = req.body;
+router.put("/:id/time", requireRole(...FULL_ACCESS), (req, res) => {
+  const { departure_time, arrival_time, price_per_seat } = req.body;
+  const trip = db.prepare("SELECT * FROM trips WHERE id = ?").get(req.params.id);
+  if (!trip) return res.status(404).json({ error: "Trip not found" });
+  for (const time of [departure_time, arrival_time]) {
+    if (time != null && time !== "" && !/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(time)) return res.status(400).json({ error: "Use a valid time (HH:MM)" });
+  }
+  if (price_per_seat !== undefined && price_per_seat !== null && (price_per_seat === "" || !Number.isFinite(Number(price_per_seat)) || Number(price_per_seat) < 0)) return res.status(400).json({ error: "Seat price must be a non-negative amount" });
   const present = [];
   const values = [];
   if (departure_time !== undefined) { present.push("departure_time = ?"); values.push(departure_time); }
   if (arrival_time !== undefined) { present.push("arrival_time = ?"); values.push(arrival_time); }
-  if (!present.length) return res.status(400).json({ error: "departure_time or arrival_time required" });
+  if (price_per_seat !== undefined) { present.push("price_per_seat = ?"); values.push(price_per_seat === null ? null : Number(price_per_seat)); }
+  if (!present.length) return res.status(400).json({ error: "A time or seat price is required" });
   const info = db.prepare(`UPDATE trips SET ${present.join(", ")} WHERE id = ?`).run(...values, req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: "Not found" });
+  if (departure_time !== undefined) db.prepare("UPDATE rotations SET shift_start = ? WHERE trip_id = ?").run(departure_time || null, trip.id);
+  if (arrival_time !== undefined) db.prepare("UPDATE rotations SET shift_end = ? WHERE trip_id = ?").run(arrival_time || null, trip.id);
   res.json(db.prepare("SELECT * FROM trips WHERE id = ?").get(req.params.id));
 });
 

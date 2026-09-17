@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { api, getUser } from "../api.js";
 import { canUseFeature } from "../permissions.js";
+import { isFullAccess } from "../roles.js";
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+  const [error, setError] = useState("");
   const [callContact, setCallContact] = useState(null);
   const bottomRef = useRef(null);
   const me = getUser();
@@ -30,9 +32,14 @@ export default function Chat() {
   async function handleSend(e) {
     e.preventDefault();
     if (!text.trim()) return;
-    await api.post("/chat", { message: text.trim() });
-    setText("");
-    load();
+    try { await api.post("/chat", { message: text.trim() }); setText(""); setError(""); load(); }
+    catch (err) { setError(err.message); }
+  }
+
+  async function removeMessage(message) {
+    if (!confirm("Permanently remove this chat message?")) return;
+    try { await api.del(`/chat/${message.id}`); setMessages((rows) => rows.filter((row) => row.id !== message.id)); setError(""); }
+    catch (err) { setError(err.message); }
   }
 
   return (
@@ -51,11 +58,13 @@ export default function Chat() {
       </div>
 
       <div className="card chat-box">
+        {error && <p className="error-text" role="alert">{error}</p>}
         <div className="chat-messages">
           {messages.map((m) => (
             <div key={m.id} className="chat-msg">
               <div className="sender">{m.sender_id === me?.id ? "You" : m.sender_name} · {new Date(m.created_at).toLocaleTimeString()}</div>
               <div className="bubble">{m.message}</div>
+              {isFullAccess(me?.role) && <button type="button" className="link-danger" onClick={() => removeMessage(m)}>Remove message</button>}
             </div>
           ))}
           <div ref={bottomRef} />

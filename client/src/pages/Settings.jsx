@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getUser } from "../api.js";
 import { APP_RELEASE, APP_REVISION, APP_VERSION, clearAppCacheAndRefresh } from "../version.js";
 import { canUseFeature } from "../permissions.js";
+
+const Maintenance3DPreview = import.meta.env.VITE_MAINTENANCE_3D_PREVIEW === "1"
+  ? lazy(() => import("../components/maintenance3d/Maintenance3DPreview.jsx")) : null;
 
 const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
 const DEFAULT_BUS_CATEGORIES = ["Economy (AC)", "Economy (NON AC)", "Suite-Class AC (AC)", "Sleeper (AC)"];
@@ -361,6 +364,7 @@ export default function Settings() {
 
       {savedMsg && <p style={{ color: "var(--green)", fontWeight: 600 }}>{savedMsg}</p>}
       {settingsError && <p role="alert" style={{ color: "var(--red)", fontWeight: 700 }}>{settingsError}</p>}
+      {Maintenance3DPreview && <Suspense fallback={<div className="card">Loading bus template…</div>}><Maintenance3DPreview editor canEdit={canWrite} /></Suspense>}
       {canWrite && <div className="super-admin-control-note">
         <span aria-hidden="true">◆</span>
         <div><strong>Super Admin editing enabled</strong><p>You can rename every Settings list item. Linked records are updated automatically so reports keep their data.</p></div>

@@ -21,11 +21,16 @@ export function activityDay(value, fallbackDate = "") {
   return date ? date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 }
 
-export function activityInput(value, fallbackDate = "") {
+export function activityInput(value, fallbackDate = "", includeSeconds = false) {
   const date = activityDate(value, fallbackDate);
   if (!date) return "";
   const pad = (part) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}${includeSeconds ? `:${pad(date.getSeconds())}` : ""}`;
+}
+
+export function activityTimestamp(value) {
+  const normalized = String(value || "").replace("T", " ");
+  return normalized.length === 16 ? `${normalized}:00` : normalized;
 }
 
 export function chronologicalLogs(rows, tripDate) {

@@ -1,0 +1,324 @@
+{
+  "templates": [
+    {
+      "id": "eicher-1090",
+      "name": "Eicher 10.90L / 1090"
+    },
+    {
+      "id": "isuzu-mt",
+      "name": "Isuzu MT"
+    },
+    {
+      "id": "al-160",
+      "name": "Ashok Leyland 160"
+    },
+    {
+      "id": "al-1818",
+      "name": "Ashok Leyland 1818"
+    },
+    {
+      "id": "air-225",
+      "name": "225 Air Suspension"
+    },
+    {
+      "id": "air-180",
+      "name": "180 Air Suspension"
+    },
+    {
+      "id": "tata-1680",
+      "name": "Tata 1680"
+    },
+    {
+      "id": "eicher-1060",
+      "name": "Eicher 10.60G"
+    },
+    {
+      "id": "eicher-2015m",
+      "name": "Eicher Skyline 20.15M"
+    },
+    {
+      "id": "eicher-2015n",
+      "name": "Eicher Skyline 20.15N"
+    },
+    {
+      "id": "hino-1j-160",
+      "name": "Hino 1J · 160 HP (reported)"
+    },
+    {
+      "id": "hino-1j-205",
+      "name": "Hino 1J · 205 HP (reported)"
+    },
+    {
+      "id": "paper-12-1834",
+      "name": "12-1834 · Ashok Leyland"
+    },
+    {
+      "id": "paper-15-8092",
+      "name": "15-8092 · Ashok Leyland"
+    },
+    {
+      "id": "paper-12-1833",
+      "name": "12-1833 · Ashok Leyland"
+    },
+    {
+      "id": "paper-12-2557",
+      "name": "12-2557 · Ashok Leyland"
+    },
+    {
+      "id": "paper-15-5217",
+      "name": "15-5217 · Isuzu"
+    },
+    {
+      "id": "paper-14-6184",
+      "name": "14-6184 · Hino"
+    },
+    {
+      "id": "paper-14-6183",
+      "name": "14-6183 · Hino-family reading"
+    },
+    {
+      "id": "paper-15-8505",
+      "name": "15-8505 · Make / model unconfirmed"
+    }
+  ],
+  "parts": [
+    {
+      "id": "piston",
+      "system": "engine"
+    },
+    {
+      "id": "rings",
+      "system": "engine"
+    },
+    {
+      "id": "pin",
+      "system": "engine"
+    },
+    {
+      "id": "rod",
+      "system": "engine"
+    },
+    {
+      "id": "liner",
+      "system": "engine"
+    },
+    {
+      "id": "bearings",
+      "system": "engine"
+    },
+    {
+      "id": "crankshaft",
+      "system": "engine"
+    },
+    {
+      "id": "block",
+      "system": "engine"
+    },
+    {
+      "id": "head",
+      "system": "engine"
+    },
+    {
+      "id": "gasket",
+      "system": "engine"
+    },
+    {
+      "id": "valves",
+      "system": "engine"
+    },
+    {
+      "id": "camshaft",
+      "system": "engine"
+    },
+    {
+      "id": "timing",
+      "system": "engine"
+    },
+    {
+      "id": "injector",
+      "system": "engine"
+    },
+    {
+      "id": "injection-pump",
+      "system": "engine"
+    },
+    {
+      "id": "common-rail",
+      "system": "engine"
+    },
+    {
+      "id": "air-filter",
+      "system": "engine"
+    },
+    {
+      "id": "fuel-filter",
+      "system": "engine"
+    },
+    {
+      "id": "turbo",
+      "system": "engine"
+    },
+    {
+      "id": "intercooler",
+      "system": "engine"
+    },
+    {
+      "id": "oil-pump",
+      "system": "engine"
+    },
+    {
+      "id": "oil-filter",
+      "system": "engine"
+    },
+    {
+      "id": "oil-cooler",
+      "system": "engine"
+    },
+    {
+      "id": "sump",
+      "system": "engine"
+    },
+    {
+      "id": "radiator",
+      "system": "cooling"
+    },
+    {
+      "id": "water-pump",
+      "system": "cooling"
+    },
+    {
+      "id": "thermostat",
+      "system": "cooling"
+    },
+    {
+      "id": "fan",
+      "system": "cooling"
+    },
+    {
+      "id": "clutch",
+      "system": "driveline"
+    },
+    {
+      "id": "gearbox",
+      "system": "driveline"
+    },
+    {
+      "id": "propshaft",
+      "system": "driveline"
+    },
+    {
+      "id": "differential",
+      "system": "driveline"
+    },
+    {
+      "id": "steering",
+      "system": "driveline"
+    },
+    {
+      "id": "compressor",
+      "system": "brakes"
+    },
+    {
+      "id": "air-dryer",
+      "system": "brakes"
+    },
+    {
+      "id": "reservoir",
+      "system": "brakes"
+    },
+    {
+      "id": "brake-chamber",
+      "system": "brakes"
+    },
+    {
+      "id": "brake-friction",
+      "system": "brakes"
+    },
+    {
+      "id": "leaf-spring",
+      "system": "suspension"
+    },
+    {
+      "id": "air-spring",
+      "system": "suspension"
+    },
+    {
+      "id": "levelling",
+      "system": "suspension"
+    },
+    {
+      "id": "damper",
+      "system": "suspension"
+    },
+    {
+      "id": "antiroll",
+      "system": "suspension"
+    },
+    {
+      "id": "starter",
+      "system": "electrical"
+    },
+    {
+      "id": "alternator",
+      "system": "electrical"
+    },
+    {
+      "id": "battery",
+      "system": "electrical"
+    },
+    {
+      "id": "lights",
+      "system": "electrical"
+    },
+    {
+      "id": "ac-compressor",
+      "system": "ac"
+    },
+    {
+      "id": "condenser",
+      "system": "ac"
+    },
+    {
+      "id": "expansion",
+      "system": "ac"
+    },
+    {
+      "id": "evaporator",
+      "system": "ac"
+    },
+    {
+      "id": "windscreen",
+      "system": "body"
+    },
+    {
+      "id": "side-glass",
+      "system": "body"
+    },
+    {
+      "id": "wiper",
+      "system": "body"
+    },
+    {
+      "id": "mirror",
+      "system": "body"
+    },
+    {
+      "id": "seat",
+      "system": "body"
+    },
+    {
+      "id": "door",
+      "system": "body"
+    }
+  ],
+  "systems": [
+    "engine",
+    "cooling",
+    "driveline",
+    "brakes",
+    "suspension",
+    "electrical",
+    "ac",
+    "body"
+  ]
+}

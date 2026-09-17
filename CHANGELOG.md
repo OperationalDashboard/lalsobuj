@@ -1,5 +1,56 @@
 # Changelog
 
+## 1.26.0 — 2026-09-18
+
+- Added shared Super Admin bus-model templates with rename-safe aliases, archive/restore, engine layout selection, and linked maintenance anatomy.
+- Added searchable bus selection in the Maintenance anatomy reference. Component edits are saved to the shared model for every linked bus; existing operational and repair history is preserved.
+- Added database-backed model settings with optimistic revision checks so concurrent edits cannot silently overwrite one another.
+
+## 1.25.0 — 2026-09-09
+
+- Admin and Super Admin can open Live Activity → Manage by date to search any journey date/range and bus, with 15 journeys per page, including completed and account-closed journeys.
+- Add, edit or remove historical checkpoints, including event type, passenger/fare and fuel values, place, note, and precise date/time. Editing preserves record IDs; switching event types clears unrelated quantities.
+- Added manual Left counter entries and arrival-time correction to administrator controls. Completed trips remain completed; already-posted Accounts transactions are not silently rewritten.
+- Server-side administrator checks protect historical management and checkpoint edits/removals. Other roles keep their normal role-specific entry creation.
+- No schema/data migration or animation changes. Unapproved maintenance illustration remains gated out of production builds.
+
+## 1.25.0-preview.3 — 2026-09-09 (local preview only; not deployed)
+
+- Added front glass, side glass, wipers, interior seats and side mirrors to the illustrated template, each with a dedicated close-up illustration.
+- Engine type is selected in Settings only: front, rear or double, with matching overview artwork. Maintenance uses the saved type. The double layout provides independent front/rear engine links and highlights.
+- Engine layout and layout-specific marker positions save with the local template. Earlier names, IDs, repair links and removed old markers are preserved during upgrade.
+- All added parts remain editable/removable. Dense maps show labels on selection/hover to keep the bus visible. No live data or deployment changes.
+
+## 1.25.0-preview.2 — 2026-09-09 (local preview only; not deployed)
+
+- Replaced the exterior 3D viewer with an illustrated coach cutaway and dedicated engine, brake and air-conditioning module illustrations.
+- Selecting a part zooms into its module, displays a pulsing problem highlight and retains the linked repair details. Back to bus restores the overview.
+- Settings preview supports choosing a component illustration, editing the maintenance-part link and placing bus/module highlights. Previous local marker IDs and names are preserved during migration.
+- Reduced-motion support and no WebGL render loop in the illustrated inspector. Live operations and production database remain untouched.
+
+## 1.25.0-preview.1 — 2026-09-09 (local preview only; not deployed)
+
+- Optional 3D maintenance inspector with a licensed bus model, clickable repair markers, camera controls, and repair details.
+- Settings preview for adding, renaming, removing and positioning part markers; saved only in this preview browser, preserving marker IDs.
+- Explicit preview-build flag, separate build directory, and in-memory sample records. No production database or live record changes.
+- Marker locations are illustrative; manufacturer-specific anatomy and production data integration require a later approved implementation.
+
+## 1.24.1 — 2026-09-09
+
+- Removed hidden database writes when opening Settings or reading the sidebar order, preventing these reads from waiting on a remote database write timeout.
+- Kept legacy staff-type IDs, editing/removal, saved sidebar order and explicit save actions unchanged. No operational records or database credentials changed.
+- Production hotfix is built separately from the unapproved maintenance preview.
+
+## 1.24.0 — 2026-09-08
+
+- Searchable Live Activity entry pickers, with corrected selection and View/Edit behavior.
+- Edit checkpoint passenger quantities, additional/exceptional fares, fuel liters and cost, location, notes and timestamps; edit normal seat fares separately.
+- Maintenance now has distinct Open, In Progress, Under Long Maintenance warning and Resolved Records sections, search, and in-place record editing. Fixed status-filter server errors.
+- PDF exports for company, bus/place accounts, journeys, maintenance/service history, attendance, payroll, removed rotations, and online daily/final reports; all matching rows are included.
+- Redesigned Previous/Next navigation with numbered pages and touch-friendly controls.
+- Added missing admin removal controls for attendance, salary plans and chat; exposed place account editing/removal and closed bus account corrections. Removing a salary plan keeps posted accounting history.
+- Added isolated regression tests; no business data or database connection settings changed.
+
 ## 1.22.1 — 2026-09-07
 
 - Fuel expenses now retain and display the recorded litre quantity for each leg and whole-rotation entry.
@@ -317,3 +368,18 @@ Every production update is recorded here. The version shown in the website also 
 ## 1.0.0 — Baseline
 
 - Initial tracked release of the Lal Sabuj Paribahan Operations Dashboard.
+# 1.23.0 — 2026-09-08
+
+- Added an **Additional passenger** live-activity entry. Passenger-checker users can enter a custom passenger count and seat price, with an optional description; entries remain editable for administrators and are included in trip passenger totals.
+
+# 1.23.1 — 2026-09-08
+
+- Accounts now automatically includes additional-passenger entries when a trip is selected, prefilling both the passenger total and the combined sale amount (normal passengers at the trip seat price plus additional passengers at their entered seat price).
+
+# 1.23.2 — 2026-09-08
+
+- Refined the Additional passenger entry UI with a premium grouped layout, clearer fields, responsive spacing, and a live total card.
+
+# 1.23.3 — 2026-09-08
+
+- Fixed Accounts rotation selection so route-specific passenger, seat-price, fuel, and amount values are replaced when switching rotations instead of carrying over the previous route's amount.

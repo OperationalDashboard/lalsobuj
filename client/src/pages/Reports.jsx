@@ -3,6 +3,9 @@ import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
 import { busLabel } from "../busLabel.js";
 import { isFullAccess } from "../roles.js";
+import Pagination from "../components/Pagination.jsx";
+import PdfExportButton from "../components/PdfExportButton.jsx";
+import { downloadReportPdf } from "../utils/reportPdf.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const ROTATIONS_PER_PAGE = 25;
@@ -189,6 +192,43 @@ export default function Reports() {
     setOpenExpenseGroupId(null);
   };
 
+  async function exportReport(busId = "") {
+    if (!fromDate || !toDate || fromDate > toDate) throw new Error("Choose a valid report date range.");
+    const query = `from=${fromDate}&to=${toDate}${busId ? `&bus_id=${busId}` : ""}`;
+    // Fetch at export time so a just-changed filter never prints older data.
+    const [groups, totals, transactions, exportBuses, exportStaff] = await Promise.all([
+      api.get(`/trips/rotations?${query}`), api.get(`/accounts/summary?${query}`), api.get(`/accounts?${query}`),
+      api.get("/buses"), api.get("/staff"),
+    ]);
+    const exportBusName = (id) => busLabel(exportBuses.find((b) => Number(b.id) === Number(id))) || `Bus ${id}`;
+    const exportStaffName = (id) => exportStaff.find((s) => Number(s.id) === Number(id))?.name || "—";
+    const exportWorkplace = (id) => {
+      const member = exportStaff.find((s) => Number(s.id) === Number(id));
+      if (!member) return "—";
+      if (member.staff_type_group !== "bus") return member.counter_name || "Counter not assigned";
+      const working = groups.filter((g) => g.legs.some((leg) => [leg.driver_id, leg.helper_id, leg.supervisor_id, leg.coach_id].some((staffId) => Number(staffId) === Number(id))));
+      return working.length ? [...new Set(working.map(busLabel))].join(", ") : member.assigned_bus_id ? exportBusName(member.assigned_bus_id) : "Bus not assigned";
+    };
+    const crew = (legs) => ROTATION_STAFF_FIELDS.map(([label, field]) => {
+      const names = [...new Set(legs.map((leg) => leg[field]).filter(Boolean))];
+      return names.length ? `${label}: ${names.join(", ")}` : "";
+    }).filter(Boolean).join("; ");
+    const sections = [
+      { title: "Rotations and assigned bus staff", columns: ["Date", "Bus", "Rotation", "Route", "Bus staff", "Departure", "Arrival", "Passengers"], rows: groups.flatMap((group) => group.legs.map((leg) => [leg.trip_date || group.trip_date, busLabel(group), group.rotation_no, leg.route, crew([leg]), leg.departure_time, leg.arrival_time, leg.passengers || 0])) },
+      { title: "Rotation totals", columns: ["Date", "Bus", "Rotation", "Passengers", "Income (BDT)", "Expense (BDT)", "Net (BDT)"], rows: groups.map((g) => [g.trip_date, busLabel(g), g.rotation_no, g.passengers || 0, g.income, g.expense, g.net]) },
+      { title: "Account transactions", columns: ["Date", "Bus / place", "Counter", "Type", "Category", "Amount (BDT)", "Fuel (L)", "Description"], rows: transactions.map((tx) => [tx.txn_date, tx.bus_id ? exportBusName(tx.bus_id) : tx.place_name, tx.counter_name, tx.type, tx.category, tx.amount, tx.fuel_liters, tx.description]) },
+    ];
+    if (!busId) {
+      const [records, issues, costs] = await Promise.all([api.get("/attendance"), api.get("/maintenance"), api.get("/maintenance/summary")]);
+      sections.push({ title: "Attendance and workplace", columns: ["Date", "Staff", "Workplace", "Covering for", "Status", "Check in", "Check out"], rows: records.filter((r) => r.work_date >= fromDate && r.work_date <= toDate).map((r) => [r.work_date, exportStaffName(r.staff_id), exportWorkplace(r.staff_id), r.representing_staff_id ? exportStaffName(r.representing_staff_id) : "", r.status, r.check_in, r.check_out]) });
+      for (const [status, label] of [["open", "Open"], ["in_progress", "In progress"], ["long_maintenance", "Warning: Under long maintenance"], ["resolved", "Resolved records"]]) {
+        sections.push({ title: `${label} — current maintenance snapshot`, note: "Maintenance status is current, independent of the financial date range.", columns: ["Bus", "Issue", "Repair location", "Reported", "Resolved", "Cost (BDT)", "Notes"], rows: issues.filter((m) => m.status === status).map((m) => [exportBusName(m.bus_id), m.issue, m.location, m.reported_date, m.resolved_date, m.total_cost, m.notes]) });
+      }
+      sections.push({ title: "Maintenance cost by bus — all records", columns: ["Bus", "Cost (BDT)"], rows: costs.perBus.map((b) => [busLabel(b), b.total_cost]) });
+    }
+    await downloadReportPdf({ filename: `report-${busId || "company"}-${fromDate}-${toDate}`, title: busId ? `Bus report — ${exportBusName(busId)}` : "Company operations report", subtitle: `${fromDate} to ${toDate} | Online Accounts are separate.`, summary: Object.entries(totals).filter(([key]) => ["income", "expense", "net"].includes(key)).map(([label, value]) => ({ label: `${label} (BDT)`, value })), sections });
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -200,6 +240,7 @@ export default function Reports() {
           <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setRotationPage(1); }} />
           <span style={{ color: "var(--muted)" }}>{t("to_date")}</span>
           <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setRotationPage(1); }} />
+          <PdfExportButton onExport={() => exportReport()} />
         </div>
       </div>
 
@@ -230,11 +271,7 @@ export default function Reports() {
               <h3>{t("buses_ran_rotation")} — {rangeLabel}</h3>
               <p>{totalRotations ? `Showing ${rotationStart + 1}–${Math.min(rotationStart + ROTATIONS_PER_PAGE, totalRotations)} of ${totalRotations} rotations` : "No rotations in this period"}</p>
             </div>
-            {totalRotationPages > 1 && <div className="rotation-report-pagination" aria-label="Rotation report pages">
-              <button type="button" disabled={rotationPage === 1} onClick={() => changeRotationPage(rotationPage - 1)}>Previous</button>
-              <span>Page {rotationPage} of {totalRotationPages}</span>
-              <button type="button" disabled={rotationPage === totalRotationPages} onClick={() => changeRotationPage(rotationPage + 1)}>Next</button>
-            </div>}
+            <Pagination page={rotationPage} pageCount={totalRotationPages} onPageChange={changeRotationPage} label="rotations" />
           </div>
           {reportError && <p className="error-text report-action-error">{reportError}</p>}
           <table>
@@ -410,6 +447,7 @@ export default function Reports() {
       <div className="card">
         <div className="page-header" style={{ marginBottom: 12 }}>
           <h3 style={{ margin: 0 }}>{t("bus_wise_solo_report")} — {rangeLabel}</h3>
+          {selectedBus && <PdfExportButton onExport={() => exportReport(selectedBus)} label="Bus report PDF" />}
           <select value={selectedBus} onChange={(e) => setSelectedBus(e.target.value)}>
             <option value="">{t("select_bus")}</option>
             {buses.map((b) => <option key={b.id} value={b.id}>{busLabel(b)}</option>)}

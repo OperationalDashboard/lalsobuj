@@ -85,8 +85,8 @@ export default function Routes() {
 
   async function handleDelete(id) {
     if (!confirm("Remove this route?")) return;
-    await api.del(`/routes/${id}`);
-    load();
+    try { await api.del(`/routes/${id}`); load(); setError(""); }
+    catch (err) { setError(err.message); }
   }
 
   const normalizedQuery = query.trim().toLowerCase();

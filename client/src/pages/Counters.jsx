@@ -37,8 +37,8 @@ export default function Counters() {
 
   async function handleDelete(id) {
     if (!confirm("Remove this counter? Staff assigned to it will become unassigned.")) return;
-    await api.del(`/counters/${id}`);
-    load();
+    try { await api.del(`/counters/${id}`); load(); setError(""); }
+    catch (err) { setError(err.message); }
   }
 
   function startEdit(counter) {

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { busLabel } from "../busLabel.js";
+import PdfExportButton from "../components/PdfExportButton.jsx";
+import { downloadReportPdf } from "../utils/reportPdf.js";
 
 export default function Trash() {
   const [items, setItems] = useState([]);
@@ -37,6 +39,14 @@ export default function Trash() {
     try { await api.del(`/trips/${item.group_id}/permanent`); load(); } catch (err) { setError(err.message); }
   }
 
+  async function exportRotation(item) {
+    const rows = (await Promise.all(item.legs.map((leg) => api.get(`/accounts?trip_id=${leg.id}`)))).flat();
+    await downloadReportPdf({ filename: `removed-rotation-${item.group_id}`, title: `Removed rotation — ${busLabel(item)}`, subtitle: `Rotation ${item.rotation_no} | ${item.trip_date} | Removed: ${item.deleted_at}`, sections: [
+      { title: "Journey legs", columns: ["Route", "Date", "Departure", "Arrival", "Status"], rows: item.legs.map((leg) => [leg.route, leg.trip_date, leg.departure_time, leg.arrival_time, leg.status]) },
+      { title: "Account history", columns: ["Date", "Type", "Category", "Amount (BDT)", "Fuel (L)", "Description"], rows: rows.map((tx) => [tx.txn_date, tx.type, tx.category, tx.amount, tx.fuel_liters, tx.description]) },
+    ] });
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -61,6 +71,7 @@ export default function Trash() {
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button className="primary" onClick={() => toggleOpen(item)}>{openId === item.group_id ? "Hide report" : "View report"}</button>
+                <PdfExportButton onExport={() => exportRotation(item)} />
                 <button className="link-danger" onClick={() => handleRestore(item.group_id)}>Restore</button>
                 <button className="link-danger" onClick={() => handlePermanentDelete(item)}>Permanently delete</button>
               </div>

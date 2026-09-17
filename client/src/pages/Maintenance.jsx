@@ -1,12 +1,28 @@
-import { useEffect, useState } from "react";
-import { api } from "../api.js";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
 import { busLabel } from "../busLabel.js";
+import { canUseFeature } from "../permissions.js";
+import SearchableSelect from "../components/SearchableSelect.jsx";
+import PdfExportButton from "../components/PdfExportButton.jsx";
+import { downloadReportPdf } from "../utils/reportPdf.js";
+
+// Explicit preview build only: never switches on from a production URL parameter.
+const Maintenance3DPreview = import.meta.env.VITE_MAINTENANCE_3D_PREVIEW === "1"
+  ? lazy(() => import("../components/maintenance3d/Maintenance3DPreview.jsx")) : null;
+const SharedBusAnatomy = lazy(() => import("../components/maintenance3d/SharedBusAnatomy.jsx"));
 
 const ticketEmpty = { bus_id: "", issue: "", location: "", reported_date: "", status: "open" };
 const partEmpty = { part_name: "", cost: "", changed_date: "" };
+const sections = [
+  { status: "open", title: "Open records", description: "New issues awaiting repair." },
+  { status: "in_progress", title: "In progress", description: "Buses currently being repaired." },
+  { status: "long_maintenance", title: "Under long maintenance", description: "Extended repairs — these buses remain unavailable for rotation." },
+  { status: "resolved", title: "Resolved records", description: "Completed repairs and their full cost history." },
+];
 
 export default function Maintenance() {
+  const canWrite = canUseFeature(getUser(), "maintenance", "write");
   const [tickets, setTickets] = useState([]);
   const [buses, setBuses] = useState([]);
   const [partsCatalog, setPartsCatalog] = useState([]);
@@ -22,6 +38,16 @@ export default function Maintenance() {
 
   const [reportBus, setReportBus] = useState("");
   const [partsReport, setPartsReport] = useState([]);
+  const [editingTicket, setEditingTicket] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [showAnatomy, setShowAnatomy] = useState(false);
+
+  async function change(action) {
+    if (busy) return;
+    setBusy(true); setError("");
+    try { await action(); load(); } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
 
   function load() {
     api.get("/maintenance").then(setTickets).catch(() => {});
@@ -55,8 +81,7 @@ export default function Maintenance() {
 
   async function handleUpdateStatus(ticket, status) {
     const resolved_date = status === "resolved" ? new Date().toISOString().slice(0, 10) : null;
-    await api.put(`/maintenance/${ticket.id}`, { status, resolved_date });
-    load();
+    await change(() => api.put(`/maintenance/${ticket.id}`, { status, resolved_date }));
   }
 
   async function handleDeleteTicket(id) {
@@ -93,21 +118,24 @@ export default function Maintenance() {
   }
 
   async function handleRemovePart(ticket, partId) {
-    await api.del(`/maintenance/${ticket.id}/parts/${partId}`);
-    load();
+    if (!confirm("Remove this repair/part and its cost from this ticket?")) return;
+    await change(() => api.del(`/maintenance/${ticket.id}/parts/${partId}`));
   }
   async function handleAddRepair(e, ticket) {
     e.preventDefault();
     if (!repairForm.part_name || !repairForm.cost || !repairForm.changed_date) { setError("Repair name, cost and date are required"); return; }
-    await api.post(`/maintenance/${ticket.id}/parts`, { ...repairForm, cost: Number(repairForm.cost) });
-    setRepairForm(partEmpty); load();
+    await change(async () => { await api.post(`/maintenance/${ticket.id}/parts`, { ...repairForm, cost: Number(repairForm.cost) }); setRepairForm(partEmpty); });
   }
   async function savePartEdit(ticket) {
-    await api.put(`/maintenance/${ticket.id}/parts/${editingPart.id}`, { part_name: editingPart.part_name, cost: Number(editingPart.cost), changed_date: editingPart.changed_date });
-    setEditingPart(null); load();
+    await change(async () => { await api.put(`/maintenance/${ticket.id}/parts/${editingPart.id}`, { part_name: editingPart.part_name, cost: Number(editingPart.cost), changed_date: editingPart.changed_date }); setEditingPart(null); });
   }
 
   const busName = (id) => busLabel(buses.find((b) => b.id === id));
+  const matchingTickets = tickets.filter((ticket) => `${busName(ticket.bus_id)} ${ticket.issue} ${ticket.location || ""}`.toLowerCase().includes(search.trim().toLowerCase()));
+  const exportTickets = (rows, title) => downloadReportPdf({ filename: `maintenance-${title}`, title, subtitle: search ? `Search: ${search}` : "All buses", sections: [
+    { title: "Maintenance records", columns: ["Bus", "Issue", "Repair location", "Reported", "Resolved", "Status", "Total cost (BDT)", "Notes"], rows: rows.map((ticket) => [busName(ticket.bus_id), ticket.issue, ticket.location, ticket.reported_date, ticket.resolved_date, sections.find((s) => s.status === ticket.status)?.title, ticket.total_cost, ticket.notes]) },
+    { title: "Repair details", columns: ["Bus", "Issue", "Part / repair", "Date", "Cost (BDT)"], rows: rows.flatMap((ticket) => ticket.parts.map((part) => [busName(ticket.bus_id), ticket.issue, part.part_name, part.changed_date, part.cost])) },
+  ] });
 
   return (
     <div>
@@ -116,7 +144,16 @@ export default function Maintenance() {
           <h1>{t("maintenance_title")}</h1>
           <p>{t("maintenance_subtitle")}</p>
         </div>
+        <PdfExportButton onExport={() => exportTickets(matchingTickets, "Maintenance report")} />
       </div>
+      {error && <p className="error-text" role="alert">{error}</p>}
+
+      {Maintenance3DPreview && <Suspense fallback={<div className="card">Loading maintenance preview…</div>}><Maintenance3DPreview tickets={tickets} buses={buses} canEdit={canWrite} /></Suspense>}
+
+      {!Maintenance3DPreview && <section className="card" style={{ marginBottom: 20 }} aria-label="Bus anatomy reference">
+        <div className="settings-card-heading"><div><span className="settings-eyebrow">INTERACTIVE REFERENCE</span><h3>Explore bus anatomy</h3><p>Open a bus model and inspect its systems and components in 3D. This reference does not change repair records or accounts.</p></div><button type="button" className="primary" aria-expanded={showAnatomy} aria-controls="shared-bus-anatomy" onClick={() => setShowAnatomy(value => !value)}>{showAnatomy ? "Close anatomy" : "Open bus anatomy"}</button></div>
+        {showAnatomy && <div id="shared-bus-anatomy"><Suspense fallback={<p role="status">Loading bus anatomy…</p>}><SharedBusAnatomy buses={buses} /></Suspense></div>}
+      </section>}
 
       <div className="grid grid-4" style={{ marginBottom: 20 }}>
         <div className="card stat-card"><div className="stat-label">{t("total_tickets")}</div><div className="stat-value">{summary.total}</div></div>
@@ -125,7 +162,7 @@ export default function Maintenance() {
         <div className="card stat-card long-maintenance-stat"><div className="stat-label">⚠ {t("under_long_maintenance")}</div><div className="stat-value">{summary.longMaintenance}</div></div>
       </div>
 
-      <div className="card" style={{ marginBottom: 20 }}>
+      {canWrite && <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ marginTop: 0 }}>{t("log_bus_maintenance")}</h3>
         <form className="form-row" onSubmit={handleCreateTicket}>
           <select value={ticketForm.bus_id} onChange={(e) => setTicketForm({ ...ticketForm, bus_id: e.target.value })}>
@@ -141,8 +178,8 @@ export default function Maintenance() {
           <input type="date" value={ticketForm.reported_date}
             onChange={(e) => setTicketForm({ ...ticketForm, reported_date: e.target.value })} />
           <select value={ticketForm.status} onChange={(e) => setTicketForm({ ...ticketForm, status: e.target.value })}>
-            <option value="open">{t("open")}</option>
-            <option value="in_progress">{t("in_progress")}</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In progress</option>
             <option value="long_maintenance">{t("under_long_maintenance")}</option>
           </select>
           <button className="primary" type="submit">{t("log_bus_maintenance")}</button>
@@ -150,13 +187,15 @@ export default function Maintenance() {
         {error && <p className="error-text">{error}</p>}
 
         <p style={{ color: "var(--muted)", fontSize: "0.8rem", marginBottom: 0 }}>Manage repair locations from Settings → Places where repair happens.</p>
-      </div>
+      </div>}
 
-      <div className="card" style={{ marginBottom: 20 }}>
-        <h3 style={{ marginTop: 0 }}>{t("bus_maintenance_records")}</h3>
-        {tickets.length === 0 && <p style={{ color: "var(--muted)" }}>{t("no_maintenance_tickets")}</p>}
-        {tickets.map((ticket) => (
-          <div key={ticket.id} className={ticket.status === "long_maintenance" ? "maintenance-ticket long-maintenance-warning" : "maintenance-ticket"}>
+      <label className="maintenance-search">Find a maintenance record<input type="search" placeholder="Search bus, issue or repair location" value={search} onChange={(e) => setSearch(e.target.value)} /></label>
+      <div className="maintenance-sections">
+      {sections.map((section) => <section key={section.status} className={`card maintenance-record-section status-${section.status}`}>
+        <div className="settings-card-heading"><div><span className="settings-eyebrow">{section.status === "resolved" ? "REPAIR HISTORY" : "MAINTENANCE"}</span><h3>{section.status === "long_maintenance" ? "⚠ " : ""}{section.title}</h3><p>{section.description}</p></div><span className="settings-count-pill">{matchingTickets.filter((ticket) => ticket.status === section.status).length}</span><PdfExportButton onExport={() => exportTickets(matchingTickets.filter((ticket) => ticket.status === section.status), section.title)} /></div>
+        {!matchingTickets.some((ticket) => ticket.status === section.status) && <p className="empty">No {section.title.toLowerCase()} {search ? "match your search" : "yet"}.</p>}
+        {matchingTickets.filter((ticket) => ticket.status === section.status).map((ticket) => (
+          <div key={ticket.id} id={`maintenance-record-${ticket.id}`} className={ticket.status === "long_maintenance" ? "maintenance-ticket long-maintenance-warning" : "maintenance-ticket"}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
               <div>
                 <strong>{busName(ticket.bus_id)}</strong> — {ticket.issue}
@@ -165,23 +204,32 @@ export default function Maintenance() {
                   {ticket.location || "No location set"} · {t("reported")} {ticket.reported_date}{ticket.resolved_date ? ` · Resolved ${ticket.resolved_date}` : ""} · {t("total_cost_so_far")}: ৳{ticket.total_cost.toLocaleString()}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <select value={ticket.status} onChange={(e) => handleUpdateStatus(ticket, e.target.value)}>
-                  <option value="open">{t("open")}</option>
-                  <option value="in_progress">{t("in_progress")}</option>
+              <div className="maintenance-ticket-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {canWrite && <select aria-label={`Status for ${busName(ticket.bus_id)}`} disabled={busy} value={ticket.status} onChange={(e) => handleUpdateStatus(ticket, e.target.value)}>
+                  <option value="open">Open</option>
+                  <option value="in_progress">In progress</option>
                   <option value="long_maintenance">{t("under_long_maintenance")}</option>
-                  <option value="resolved">{t("resolved")}</option>
-                </select>
+                  <option value="resolved">Resolved</option>
+                </select>}
+                {canWrite && <button className="settings-edit-button" disabled={busy} onClick={() => setEditingTicket({ ...ticket, location: ticket.location || "", notes: ticket.notes || "" })}>Edit record</button>}
                 <button className="primary" onClick={() => toggleTicket(ticket.id)}>
                   {openTicketId === ticket.id ? t("hide_parts") : `${t("parts")} (${ticket.parts.length})`}
                 </button>
-                <button className="link-danger" onClick={() => handleDeleteTicket(ticket.id)}>{t("delete")}</button>
+                {canWrite && <button className="link-danger" disabled={busy} onClick={() => handleDeleteTicket(ticket.id)}>{t("delete")}</button>}
               </div>
             </div>
+            {editingTicket?.id === ticket.id && <form className="maintenance-ticket-editor" onSubmit={(e) => { e.preventDefault(); change(async () => { await api.put(`/maintenance/${ticket.id}`, { issue: editingTicket.issue, location: editingTicket.location || null, reported_date: editingTicket.reported_date, resolved_date: ticket.status === "resolved" ? editingTicket.resolved_date || null : null, notes: editingTicket.notes }); setEditingTicket(null); }); }}>
+              <label className="live-field"><span>Issue / problem</span><input required value={editingTicket.issue} onChange={(e) => setEditingTicket({ ...editingTicket, issue: e.target.value })} /></label>
+              <label className="live-field"><span>Repair location</span><SearchableSelect id={`maintenance-location-${ticket.id}`} value={editingTicket.location} onChange={(location) => setEditingTicket({ ...editingTicket, location })} options={[...new Set([...locations.map((loc) => loc.name), ...(editingTicket.location ? [editingTicket.location] : [])])].map((name) => ({ value: name, label: name }))} /></label>
+              <label className="live-field"><span>Reported date</span><input required type="date" value={editingTicket.reported_date} onChange={(e) => setEditingTicket({ ...editingTicket, reported_date: e.target.value })} /></label>
+              {ticket.status === "resolved" && <label className="live-field"><span>Resolved date</span><input required type="date" value={editingTicket.resolved_date || ""} onChange={(e) => setEditingTicket({ ...editingTicket, resolved_date: e.target.value })} /></label>}
+              <label className="live-field"><span>Notes</span><input value={editingTicket.notes} onChange={(e) => setEditingTicket({ ...editingTicket, notes: e.target.value })} /></label>
+              <button type="submit" className="primary" disabled={busy} aria-busy={busy}>{busy ? "Saving…" : "Save changes"}</button><button type="button" className="secondary" disabled={busy} onClick={() => setEditingTicket(null)}>Cancel</button>
+            </form>}
 
             {openTicketId === ticket.id && (
               <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-                <form className="form-row" onSubmit={(e) => handleAddPart(e, ticket)}>
+                {canWrite && <><form className="form-row" onSubmit={(e) => handleAddPart(e, ticket)}>
                   <select value={partForm.part_name} onChange={(e) => setPartForm({ ...partForm, part_name: e.target.value })}>
                     <option value="">{t("select_part")}</option>
                     {partsCatalog.map((p) => <option key={p.id} value={p.part_name}>{p.part_name}</option>)}
@@ -199,10 +247,11 @@ export default function Maintenance() {
                   <button className="primary" type="submit">Add repair</button>
                 </form>
                 <p style={{ color: "var(--muted)", fontSize: "0.8rem" }}>{t("found_another_problem")}</p>
+                </>}
                 <table>
                   <thead><tr><th>{t("part")}</th><th>{t("cost")}</th><th>{t("changed_on")}</th><th></th></tr></thead>
                   <tbody>
-                    {ticket.parts.map((p) => editingPart?.id === p.id ? <tr key={p.id}><td><input value={editingPart.part_name} onChange={(e) => setEditingPart({ ...editingPart, part_name: e.target.value })} /></td><td><input type="number" value={editingPart.cost} onChange={(e) => setEditingPart({ ...editingPart, cost: e.target.value })} /></td><td><input type="date" value={editingPart.changed_date} onChange={(e) => setEditingPart({ ...editingPart, changed_date: e.target.value })} /></td><td><button className="primary" onClick={() => savePartEdit(ticket)}>Save</button> <button className="link-danger" onClick={() => setEditingPart(null)}>Cancel</button></td></tr> : <tr key={p.id}><td>{p.part_name}</td><td>৳{p.cost.toLocaleString()}</td><td>{p.changed_date}</td><td><button className="link-danger" onClick={() => setEditingPart(p)}>Edit</button> <button className="link-danger" onClick={() => handleRemovePart(ticket, p.id)}>{t("remove")}</button></td></tr>)}
+                    {ticket.parts.map((p) => editingPart?.id === p.id ? <tr key={p.id}><td><input value={editingPart.part_name} onChange={(e) => setEditingPart({ ...editingPart, part_name: e.target.value })} /></td><td><input type="number" value={editingPart.cost} onChange={(e) => setEditingPart({ ...editingPart, cost: e.target.value })} /></td><td><input type="date" value={editingPart.changed_date} onChange={(e) => setEditingPart({ ...editingPart, changed_date: e.target.value })} /></td><td><button className="primary" onClick={() => savePartEdit(ticket)}>Save</button> <button className="link-danger" onClick={() => setEditingPart(null)}>Cancel</button></td></tr> : <tr key={p.id}><td>{p.part_name}</td><td>৳{p.cost.toLocaleString()}</td><td>{p.changed_date}</td><td>{canWrite && <><button className="settings-edit-button" disabled={busy} onClick={() => setEditingPart(p)}>Edit</button> <button className="link-danger" disabled={busy} onClick={() => handleRemovePart(ticket, p.id)}>{t("remove")}</button></>}</td></tr>)}
                     {ticket.parts.length === 0 && <tr><td colSpan={4}>{t("no_parts_logged")}</td></tr>}
                   </tbody>
                 </table>
@@ -210,11 +259,13 @@ export default function Maintenance() {
             )}
           </div>
         ))}
+      </section>)}
       </div>
 
       <div className="card">
         <div className="page-header" style={{ marginBottom: 12 }}>
           <h3 style={{ margin: 0 }}>{t("parts_service_history")}</h3>
+          <PdfExportButton onExport={() => downloadReportPdf({ filename: "parts-service-history", title: "Parts service history", subtitle: reportBus ? busName(Number(reportBus)) : "All buses", sections: [{ title: "Service history", columns: ["Bus", "Part", "Last changed", "Total spent (BDT)"], rows: partsReport.map((r) => [busLabel(r), r.part_name, r.last_changed, r.total_spent]) }] })} />
           <select value={reportBus} onChange={(e) => setReportBus(e.target.value)}>
             <option value="">{t("all_buses")}</option>
             {buses.map((b) => <option key={b.id} value={b.id}>{busLabel(b)}</option>)}

@@ -1,9 +1,16 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireFeaturePermission, requireAnyFeaturePermission } = require("../middleware/auth");
+const { requireAuth, requireRole, requireFeaturePermission, requireAnyFeaturePermission } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireAuth);
+
+router.delete("/assignments/:staffId", requireRole("admin", "super_admin"), (req, res) => {
+  const info = db.prepare("DELETE FROM salary_assignments WHERE staff_id = ?").run(req.params.staffId);
+  if (!info.changes) return res.status(404).json({ error: "Salary plan not found" });
+  // Never silently delete already-posted accounting history.
+  res.json({ ok: true });
+});
 
 // GET /api/salary/assignments -> every staff member with their salary plan
 // (staff who don't have a row yet show as salary_type 'none' / unassigned —

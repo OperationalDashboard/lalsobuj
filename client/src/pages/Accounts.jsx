@@ -4,6 +4,9 @@ import { ROLES, isFullAccess } from "../roles.js";
 import { t } from "../i18n.js";
 import { canUseFeature } from "../permissions.js";
 import { busLabel } from "../busLabel.js";
+import Pagination from "../components/Pagination.jsx";
+import PdfExportButton from "../components/PdfExportButton.jsx";
+import { downloadReportPdf } from "../utils/reportPdf.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const readableDate = (value) => value
@@ -31,10 +34,40 @@ function displayBusNumber(bus) {
   return busLabel(bus);
 }
 
-function RotationDetails({ rows }) {
+function RotationDetails({ rows, onChanged }) {
+  const me = getUser();
+  const [draft, setDraft] = useState(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const editable = (tx) => canUseFeature(me, tx.bus_id ? "accounts_bus" : "accounts_place", "write");
+  async function change(tx, remove = false) {
+    if (busy) return;
+    if (remove && !confirm("Permanently remove this account transaction? Its amount will be removed from totals.")) return;
+    setBusy(true); setError("");
+    try {
+      if (remove) await api.del(`/accounts/${tx.id}`);
+      else await api.put(`/accounts/${tx.id}`, { amount: Number(draft.amount), description: draft.description, edit_note: draft.edit_note || undefined });
+      setDraft(null); onChanged?.();
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
   const income = rows.filter((tx) => tx.type === "income").reduce((sum, tx) => sum + tx.amount, 0);
   const expense = rows.filter((tx) => tx.type === "expense").reduce((sum, tx) => sum + tx.amount, 0);
-  return <div style={{ padding: 8 }}><strong>Transaction details</strong><table style={{ marginTop: 6 }}><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Place</th><th>Counter</th><th>Amount</th><th>Description</th></tr></thead><tbody>{rows.map((tx) => <tr key={tx.id}><td>{tx.txn_date}</td><td>{tx.type}</td><td>{tx.category}{tx.leg_scope === "both" && <small> · Whole rotation</small>}</td><td>{tx.place_name || "—"}</td><td>{tx.counter_name || "Whole place"}</td><td>৳{tx.amount.toLocaleString()}</td><td>{tx.description || "—"}</td></tr>)}{rows.length === 0 && <tr><td colSpan={7}>No transactions.</td></tr>}</tbody>{rows.length > 0 && <tfoot><tr style={{ fontWeight: 700 }}><td colSpan={5}>Total</td><td colSpan={2}>Income ৳{income.toLocaleString()} · Expense ৳{expense.toLocaleString()} · Net <span style={{ color: income - expense >= 0 ? "var(--green)" : "var(--red)" }}>৳{(income - expense).toLocaleString()}</span></td></tr></tfoot>}</table></div>;
+  return <div style={{ padding: 8 }}><strong>Transaction details</strong>
+    <PdfExportButton onExport={() => exportTransactions(rows, "Account transaction details")} />
+    {error && <p className="error-text" role="alert">{error}</p>}
+    <table style={{ marginTop: 6 }}><thead><tr><th>Date</th><th>Type / category</th><th>Place / counter</th><th>Amount</th><th>Description</th><th>Actions</th></tr></thead><tbody>
+      {rows.map((tx) => <tr key={tx.id}><td>{tx.txn_date}</td><td>{tx.type} · {tx.category}{tx.leg_scope === "both" && <small> · Whole rotation</small>}{tx.fuel_liters != null && <small> · {tx.fuel_liters} L</small>}</td><td>{tx.place_name || "—"} / {tx.counter_name || "Whole place"}</td>
+        <td>{draft?.id === tx.id ? <input aria-label="Transaction amount" type="number" min="0" step="0.01" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })} /> : `৳${tx.amount.toLocaleString()}`}</td>
+        <td>{draft?.id === tx.id ? <><input aria-label="Description" value={draft.description || ""} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /><input placeholder="Reason for change" value={draft.edit_note || ""} onChange={(e) => setDraft({ ...draft, edit_note: e.target.value })} /></> : tx.description || "—"}</td>
+        <td>{editable(tx) && (draft?.id === tx.id ? <div className="record-inline-editor"><button type="button" className="primary" disabled={busy || draft.amount === "" || Number(draft.amount) < 0} onClick={() => change(tx)}>{busy ? "Saving…" : "Save"}</button><button type="button" disabled={busy} onClick={() => setDraft(null)}>Cancel</button></div> : <div className="record-inline-editor"><button className="settings-edit-button" onClick={() => { setError(""); setDraft({ ...tx, edit_note: "" }); }}>Edit</button><button className="link-danger" disabled={busy} onClick={() => change(tx, true)}>Remove</button></div>)}</td></tr>)}
+      {rows.length === 0 && <tr><td colSpan={6}>No transactions.</td></tr>}</tbody>
+      <tfoot><tr><td colSpan={6}>Income ৳{income.toLocaleString()} · Expense ৳{expense.toLocaleString()} · Net ৳{(income - expense).toLocaleString()}</td></tr></tfoot></table></div>;
+}
+
+function exportTransactions(rows, title, subtitle = "Selected records | All amounts in BDT") {
+  const income = rows.filter((r) => r.type === "income").reduce((s, r) => s + r.amount, 0);
+  const expense = rows.filter((r) => r.type === "expense").reduce((s, r) => s + r.amount, 0);
+  return downloadReportPdf({ filename: title, title, subtitle, summary: [{ label: "Income (BDT)", value: income }, { label: "Expense (BDT)", value: expense }, { label: "Net (BDT)", value: income - expense }], sections: [{ title: "Transactions", columns: ["Date", "Type", "Category", "Place", "Counter", "Passengers", "Fuel (L)", "Amount (BDT)", "Description"], rows: rows.map((r) => [r.txn_date, r.type, r.category, r.place_name, r.counter_name, r.passengers_count, r.fuel_liters, r.amount, r.description]) }] });
 }
 
 export default function Accounts() {
@@ -45,7 +78,7 @@ export default function Accounts() {
   const canWriteBus = canUseFeature(me, "accounts_bus", "write");
   const canWritePlace = canUseFeature(me, "accounts_place", "write");
   const canFixPairing = canWriteBus;
-  const canRemoveRotations = canWriteBus;
+  const canRemoveRotations = isFullAccess(me?.role);
 
   const [busSummaries, setBusSummaries] = useState([]);
   const [buses, setBuses] = useState([]);
@@ -195,10 +228,15 @@ export default function Accounts() {
     setEntryForm((f) => ({
       ...f,
       trip_id: tripId, apply_to_both: false,
-      price_per_seat: trip?.price_per_seat || f.price_per_seat,
-      passengers_count: isTicketSales && trip?.logged_passengers ? String(trip.logged_passengers) : f.passengers_count,
-      amount: f.type === "expense" && f.category === "fuel" && trip?.logged_fuel_cost ? String(trip.logged_fuel_cost) : f.amount,
-      fuel_liters: f.type === "expense" && f.category === "fuel" && trip?.logged_fuel_liters ? String(trip.logged_fuel_liters) : f.fuel_liters,
+      // Always replace route-specific values. Keeping the previous form value
+      // here made the amount from the last rotation survive when another route
+      // was selected, especially when the new rotation had no checkpoint yet.
+      price_per_seat: isTicketSales ? (trip?.price_per_seat != null ? String(trip.price_per_seat) : "") : f.price_per_seat,
+      passengers_count: isTicketSales ? (trip?.logged_passengers != null ? String(trip.logged_passengers) : "") : f.passengers_count,
+      amount: isTicketSales
+        ? (trip?.logged_passenger_amount != null ? String(trip.logged_passenger_amount) : "")
+        : (f.type === "expense" && f.category === "fuel" ? (trip?.logged_fuel_cost != null ? String(trip.logged_fuel_cost) : "") : f.amount),
+      fuel_liters: f.type === "expense" && f.category === "fuel" ? (trip?.logged_fuel_liters != null ? String(trip.logged_fuel_liters) : "") : f.fuel_liters,
     }));
   }
   function handleBothPick(groupId) {
@@ -248,9 +286,9 @@ export default function Accounts() {
   }
 
   async function handleDelete(id) {
-    await api.del(`/accounts/${id}`);
-    loadBusDetail(selectedBus);
-    loadOverview();
+    if (!confirm("Permanently remove this account transaction and its amount from totals?")) return;
+    try { await api.del(`/accounts/${id}`); loadBusDetail(selectedBus); loadOverview(); }
+    catch (err) { setError(err.message); }
   }
 
   function startEdit(tx) {
@@ -428,11 +466,7 @@ export default function Accounts() {
           </div>
           <div className="accounts-bus-pagination">
             <span>Showing {firstVisibleBus}–{lastVisibleBus} of {searchableBusSummaries.length} buses</span>
-            <div>
-              <button type="button" className="secondary" disabled={currentBusPage === 1} onClick={() => setBusPage((page) => Math.max(1, page - 1))}>Previous</button>
-              <strong>Page {currentBusPage} of {busPageCount}</strong>
-              <button type="button" className="secondary" disabled={currentBusPage === busPageCount} onClick={() => setBusPage((page) => Math.min(busPageCount, page + 1))}>Next</button>
-            </div>
+            <Pagination page={currentBusPage} pageCount={busPageCount} onPageChange={setBusPage} label="bus accounts" />
           </div>
         </div>
       </div>}
@@ -473,15 +507,17 @@ export default function Accounts() {
             {canWritePlace && <form className="form-row" onSubmit={addExpenseType}><input placeholder="New expense type" value={newExpenseType} onChange={(e) => setNewExpenseType(e.target.value)} /><button className="link-danger" type="submit">Add expense type</button></form>}
           </div>
         <div className="place-results-heading"><div><strong>Place totals</strong><span>{placePeriodLabel}</span></div><small>{placeTransactionsLoading ? "Updating…" : `${placeTransactions.length} transaction${placeTransactions.length === 1 ? "" : "s"}`}</small></div>
+        <PdfExportButton disabled={placeTransactionsLoading || Boolean(placePeriodError)} onExport={() => exportTransactions(placeTransactions, "Place-wise accounts", placePeriodLabel)} />
         {placePeriodError && <p className="error-text">{placePeriodError}</p>}
         <table><thead><tr><th>Place</th><th>{t("income")}</th><th>{t("expense")}</th><th>{t("net")}</th><th></th></tr></thead><tbody>
-          {expensePlaces.map((place) => { const rows = placeTransactions.filter((tx) => tx.place_name === place.name); const income = rows.filter((tx) => tx.type === "income").reduce((sum, tx) => sum + tx.amount, 0); const expense = rows.filter((tx) => tx.type === "expense").reduce((sum, tx) => sum + tx.amount, 0); const counters = placeCounters.filter((counter) => counter.place_name === place.name); const detailRows = selectedCounterDetail ? rows.filter((row) => String(row.counter_id) === String(selectedCounterDetail)) : rows; return <Fragment key={place.id}><tr><td>{place.name}</td><td>৳{income.toLocaleString()}</td><td>৳{expense.toLocaleString()}</td><td style={{ color: income - expense >= 0 ? "var(--green)" : "var(--red)" }}>৳{(income - expense).toLocaleString()}</td><td><button className="link-danger" onClick={() => { setOpenPlace(openPlace === place.name ? "" : place.name); setSelectedCounterDetail(""); }}>Counter-wise details</button></td></tr>{openPlace === place.name && <tr><td colSpan={5}><div style={{ padding: 8 }}><label style={{ fontSize: "0.82rem", fontWeight: 700 }}>Counter details <select value={selectedCounterDetail} onChange={(e) => setSelectedCounterDetail(e.target.value)} style={{ marginLeft: 8 }}><option value="">All counters and whole-place entries</option>{counters.map((counter) => <option key={counter.id} value={counter.id}>{counter.name}</option>)}</select></label><RotationDetails rows={detailRows} /></div></td></tr>}</Fragment>; })}
+          {expensePlaces.map((place) => { const rows = placeTransactions.filter((tx) => tx.place_name === place.name); const income = rows.filter((tx) => tx.type === "income").reduce((sum, tx) => sum + tx.amount, 0); const expense = rows.filter((tx) => tx.type === "expense").reduce((sum, tx) => sum + tx.amount, 0); const counters = placeCounters.filter((counter) => counter.place_name === place.name); const detailRows = selectedCounterDetail ? rows.filter((row) => String(row.counter_id) === String(selectedCounterDetail)) : rows; return <Fragment key={place.id}><tr><td>{place.name}</td><td>৳{income.toLocaleString()}</td><td>৳{expense.toLocaleString()}</td><td style={{ color: income - expense >= 0 ? "var(--green)" : "var(--red)" }}>৳{(income - expense).toLocaleString()}</td><td><button className="link-danger" onClick={() => { setOpenPlace(openPlace === place.name ? "" : place.name); setSelectedCounterDetail(""); }}>Counter-wise details</button></td></tr>{openPlace === place.name && <tr><td colSpan={5}><div style={{ padding: 8 }}><label style={{ fontSize: "0.82rem", fontWeight: 700 }}>Counter details <select value={selectedCounterDetail} onChange={(e) => setSelectedCounterDetail(e.target.value)} style={{ marginLeft: 8 }}><option value="">All counters and whole-place entries</option>{counters.map((counter) => <option key={counter.id} value={counter.id}>{counter.name}</option>)}</select></label><RotationDetails rows={detailRows} onChanged={() => { loadBusDetail(selectedBus); loadOverview(); }} /></div></td></tr>}</Fragment>; })}
           {expensePlaces.length === 0 && <tr><td colSpan={5}>Add a place to begin recording separate place-wise expenses.</td></tr>}
         </tbody></table>
       </div>}
 
       {canViewBus && selectedBus && (
         <>
+          <PdfExportButton label="Bus accounts PDF" onExport={async () => exportTransactions(await api.get(`/accounts?bus_id=${selectedBus}`), `Bus accounts — ${busName(selectedBus)}`, "All account dates for this bus")} />
           <div className="grid grid-3" style={{ marginBottom: 20 }}>
             <div className="card stat-card income"><div className="stat-label">{busName(selectedBus)} — {t("income")}</div><div className="stat-value">৳{busSummary.income.toLocaleString()}</div></div>
             <div className="card stat-card expense"><div className="stat-label">{t("expense")}</div><div className="stat-value">৳{busSummary.expense.toLocaleString()}</div></div>
@@ -585,7 +621,7 @@ export default function Accounts() {
                     <td><span className="badge active">{t("open")}</span></td>
                     <td><button className="link-danger" onClick={() => setOpenGroupId(openGroupId === g.group_id ? null : g.group_id)}>Details</button>{canRemoveRotations && <> <button className="link-danger" onClick={() => handleRemoveRotation(g)}>Remove rotation</button></>}</td>
                   </tr>
-                  {openGroupId === g.group_id && <tr><td colSpan={6}><RotationDetails rows={busTransactions.filter((tx) => g.legs.some((leg) => String(leg.id) === String(tx.trip_id)))} /></td></tr>}
+                  {openGroupId === g.group_id && <tr><td colSpan={6}><RotationDetails rows={busTransactions.filter((tx) => g.legs.some((leg) => String(leg.id) === String(tx.trip_id)))} onChanged={() => { loadBusDetail(selectedBus); loadOverview(); }} /></td></tr>}
                   </>
                 ))}
                 {doneGroups.map((g) => (
@@ -598,7 +634,7 @@ export default function Accounts() {
                     <td><span className="badge maintenance">{t("done")}</span></td>
                     <td><button className="link-danger" onClick={() => setOpenGroupId(openGroupId === g.group_id ? null : g.group_id)}>Details</button>{canWriteBus && <> <button className="link-danger" onClick={() => handleReopen(g.group_id)}>{t("reopen_admin")}</button></>}{canRemoveRotations && <> <button className="link-danger" onClick={() => handleRemoveRotation(g)}>Remove rotation</button></>}</td>
                   </tr>
-                  {openGroupId === g.group_id && <tr><td colSpan={6}><RotationDetails rows={busTransactions.filter((tx) => g.legs.some((leg) => String(leg.id) === String(tx.trip_id)))} /></td></tr>}
+                  {openGroupId === g.group_id && <tr><td colSpan={6}><RotationDetails rows={busTransactions.filter((tx) => g.legs.some((leg) => String(leg.id) === String(tx.trip_id)))} onChanged={() => { loadBusDetail(selectedBus); loadOverview(); }} /></td></tr>}
                   </>
                 ))}
                 {rotationGroups.length === 0 && <tr><td colSpan={6}>{t("no_rotations_bus")}</td></tr>}
@@ -657,7 +693,7 @@ export default function Accounts() {
             <table>
               <thead><tr><th>{t("date")}</th><th>Type</th><th>{t("category")}</th><th>{t("amount")}</th><th>{t("description")}</th><th></th></tr></thead>
               <tbody>
-                {busTransactions.filter((tx) => !tx.trip_id || busTrips.find((trip) => String(trip.id) === String(tx.trip_id))?.accounts_status === "open").map((tx) => (
+                {busTransactions.filter((tx) => isFullAccess(me?.role) || !tx.trip_id || busTrips.find((trip) => String(trip.id) === String(tx.trip_id))?.accounts_status === "open").map((tx) => (
                   <tr key={tx.id}>
                     <td>{tx.txn_date}</td>
                     <td><span className={`badge ${tx.type === "income" ? "active" : "maintenance"}`}>{tx.type}</span></td>

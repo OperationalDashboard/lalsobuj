@@ -3,6 +3,7 @@ import { api } from "../api.js";
 import { t } from "../i18n.js";
 import { busLabel } from "../busLabel.js";
 import BusIcon from "../components/BusIcon.jsx";
+import Pagination from "../components/Pagination.jsx";
 
 export default function Dashboard() {
   const [buses, setBuses] = useState([]);
@@ -73,7 +74,7 @@ export default function Dashboard() {
             {buses.length === 0 && <tr><td colSpan={4}>{t("no_buses_add_one")}</td></tr>}
           </tbody>
         </table>
-        {buses.length > FLEET_PAGE_SIZE && <div className="bus-pagination"><span>Showing {(currentFleetPage - 1) * FLEET_PAGE_SIZE + 1}–{Math.min(currentFleetPage * FLEET_PAGE_SIZE, buses.length)} of {buses.length} buses</span><div><button className="secondary" type="button" disabled={currentFleetPage === 1} onClick={() => setFleetPage((page) => Math.max(1, page - 1))}>Previous</button><strong>Page {currentFleetPage} of {fleetPageCount}</strong><button className="secondary" type="button" disabled={currentFleetPage === fleetPageCount} onClick={() => setFleetPage((page) => Math.min(fleetPageCount, page + 1))}>Next</button></div></div>}
+        <Pagination page={currentFleetPage} pageCount={fleetPageCount} onPageChange={setFleetPage} label="buses" />
       </div>
     </div>
   );

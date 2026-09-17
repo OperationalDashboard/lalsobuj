@@ -94,6 +94,7 @@ router.get("/public", (req, res) => {
 });
 
 router.use(requireAuth);
+router.use('/bus-models', require('./busModels'));
 
 // Anyone logged in can read settings (colors need to render for every role,
 // the call contact needs to show in everyone's chat box).
@@ -103,9 +104,9 @@ router.get("/", (req, res) => {
   const settings = { ...DEFAULTS };
   rows.forEach((r) => { settings[r.key] = r.value; });
   const normalizedStaffTypes = JSON.stringify(getStaffTypes());
-  // Persist the compatible shape on the first settings read, so an existing
-  // installation's old staff type list gains IDs needed by Edit and Remove.
-  if (settings.staff_types !== normalizedStaffTypes) saveSetting("staff_types", normalizedStaffTypes);
+  // Normalize the response without writing to the remote primary. A settings
+  // read must stay local even when Turso is unreachable. Explicit edits below
+  // persist the same stable keys, so legacy types still support Edit/Remove.
   settings.staff_types = normalizedStaffTypes;
   res.json(settings);
 });
@@ -122,7 +123,7 @@ router.get("/sidebar-order", requireRole(ROLES.SUPER_ADMIN), (req, res) => {
   } catch {
     order = NAV_ROUTES;
   }
-  if (row && row.value !== JSON.stringify(order)) saveSetting("sidebar_nav_order", JSON.stringify(order));
+  // Missing/new routes are normalized for display only; PUT owns persistence.
   res.json({ order, updated_at: row?.updated_at || null });
 });
 

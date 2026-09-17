@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "provider": "built-in image_gen.imagegen",
+  "request_policy": "Exactly one generation request per distinct asset; all seven succeeded; no retries or variants.",
+  "requested_dimensions": [
+    1536,
+    1024
+  ],
+  "coordinates": "Estimated normalized [x,y] hotspot centers; bounds are [left,top,right,bottom].",
+  "style_inspection_references": [
+    "C:/Users/Afik/Documents/ChatGPT/Data/mobile-responsive-deploy/client/src/assets/maintenance-preview/bus-overview.png",
+    "C:/Users/Afik/Documents/ChatGPT/Data/mobile-responsive-deploy/client/src/assets/maintenance-preview/engine-module.png"
+  ],
+  "assets": [
+    {
+      "id": "front-windshield-module",
+      "saved_project_path": "C:/Users/Afik/Documents/ChatGPT/Data/mobile-responsive-deploy/client/src/assets/maintenance-preview/front-glass-module.png",
+      "mode": "generate",
+      "input_references": [],
+      "exact_prompt": "Use case: stylized-concept.\nAsset type: interactive bus-maintenance module illustration.\nStyle: premium crisp technical illustration, dark precise outlines, detailed cel shading, off-white painted metal, deep green accents, charcoal hardware and muted blue-gray glass; no photorealistic background.\nBackdrop: flat #eaf0f4.\nComposition: 1536x1024 landscape 3:2, centered isolated assembly, complete silhouette with at least 10% padding, clear three-quarter perspective, small soft contact shadow.\nConstraints: no bus body, no whole vehicle, no text, labels, UI, arrows, warnings, logos, watermark, or extra objects.\nPrimary request: one standalone upright coach front windshield glass assembly with its curved dark perimeter frame and visible rubber seal. Tall broad gently convex glass, top at top, lower edge at bottom, muted blue-gray transparent glazing with restrained pale reflections; frame connection details visible. Do not include wipers or bus cab.",
+      "output_path": "C:/Users/Afik/.codex/generated_images/01a085ae-971c-7ef2-b5e0-0c6a66a4f37f/exec-fc5b028f-8551-4c22-9f38-e65791fe7898.png",
+      "hotspots": {
+        "glass": [
+          0.52,
+          0.49
+        ],
+        "seal": [
+          0.51,
+          0.85
+        ],
+        "frame": [
+          0.51,
+          0.9
+        ]
+      },
+      "bounds": [
+        0.138,
+        0.02,
+        0.891,
+        0.93
+      ],
+      "inspection": "Upright standalone windshield assembly; no bus contamination or text. Padding is tighter than requested; render with object-fit contain."
+    },
+    {
+      "id": "side-window-module",
+      "saved_project_path": "C:/Users/Afik/Documents/ChatGPT/Data/mobile-responsive-deploy/client/src/assets/maintenance-preview/side-glass-module.png",
+      "mode": "generate",
+      "input_references": [],
+      "exact_prompt": "Use case: stylized-concept.\nAsset type: interactive bus-maintenance module illustration.\nStyle: premium crisp technical illustration, dark precise outlines, detailed cel shading, off-white painted metal, deep green accents, charcoal hardware and muted blue-gray glass; no photorealistic background.\nBackdrop: flat #eaf0f4.\nComposition: 1536x1024 landscape 3:2, centered isolated assembly, complete silhouette with at least 10% padding, clear three-quarter perspective, small soft contact shadow.\nConstraints: no bus body, no whole vehicle, no text, labels, UI, arrows, warnings, logos, watermark, or extra objects.\nPrimary request: one standalone coach side passenger window assembly, wide horizontal blue-gray tinted glass held in a dark rectangular frame with rounded corners, visible rubber sealing gasket and simple mounting hardware. Upright installed orientation with long edge horizontal, subtle glass reflections. No interior scenery.",
+      "output_path": "C:/Users/Afik/.codex/generated_images/01a085ae-971c-7ef2-b5e0-0c6a66a4f37f/exec-7315a243-758b-4aee-b826-ae0bec278d75.png",
+      "hotspots": {
+        "glass": [
+          0.52,
+          0.46
+        ],
+        "seal": [
+          0.51,
+          0.73
+        ],
+        "frame": [
+          0.49,
+          0.8
+        ]
+      },
+      "bounds": [
+        0.047,
+        0.088,
+        0.959,
+        0.855
+      ],
+      "inspection": "Upright horizontal standalone side glass assembly; no bus contamination or text. Render with object-fit contain."
+    },
+    {
+      "id": "wiper-module",
+      "saved_project_path": "C:/Users/Afik/Documents/ChatGPT/Data/mobile-responsive-deploy/client/src/assets/maintenance-preview/wiper-module.png",
+      "mode": "generate",
+      "input_references": [],
+      "exact_prompt": "Use case: stylized-concept.\nAsset type: interactive bus-maintenance module illustration.\nStyle: premium crisp technical illustration, dark precise outlines, detailed cel shading, off-white painted metal, deep green accents, charcoal hardware and muted blue-gray glass; no photorealistic background.\nBackdrop: flat #eaf0f4.\nComposition: 1536x1024 landscape 3:2, centered isolated assembly, complete silhouette with at least 10% padding, clear three-quarter perspective, small soft contact shadow.\nConstraints: no bus body, no whole vehicle, no text, labels, UI, arrows, warnings, logos, watermark, or extra objects.\nPrimary request: one standalone coach windshield wiper mechanism: long charcoal blade on articulated metal arm, pivot housing, electric wiper motor and silver motor-linkage rods connected at base. Show recognizable blade, arm, motor, linkage and mounting bracket clearly in a coherent assembled perspective. No windshield or other vehicle body.",
+      "output_path": "C:/Users/Afik/.codex/generated_images/01a085ae-971c-7ef2-b5e0-0c6a66a4f37f/exec-1f40c556-7a33-4e22-b354-15624069ff37.png",
+      "hotspots": {
+        "blade": [
+          0.32,
+          0.2
+        ],
+        "arm": [
+          0.69,
+          0.39
+        ],
+        "motor": [
+          0.59,
+          0.72
+        ],
+        "linkage": [
+          0.56,
+          0.58
+        ],
+        "mount": [
+          0.86,
+          0.76
+        ]
+      },
+      "bounds": [
+        0.015,
+        0.052,
+        0.978,
+        0.887
+      ],
+      "inspection": "Complete blade, arm, motor-linkage, and mounting bracket. Tighter margins than requested; render with object-fit contain."
+    },
+    {
+      "id": "seat-module",
+      "saved_project_path": "C:/Users/Afik/Documents/ChatGPT/Data/mobile-responsive-deploy/client/src/assets/maintenance-preview/seat-module.png",
+      "mode": "generate",
+      "input_references": [],
+      "exact_prompt": "Use case: stylized-concept.\nAsset type: interactive bus-maintenance module illustration.\nStyle: premium crisp technical illustration, dark precise outlines, detailed cel shading, off-white painted metal, deep green accents, charcoal hardware and muted blue-gray glass; no photorealistic background.\nBackdrop: flat #eaf0f4.\nComposition: 1536x1024 landscape 3:2, centered isolated assembly, complete silhouette with at least 10% padding, clear three-quarter perspective, small soft contact shadow.\nConstraints: no bus body, no whole vehicle, no text, labels, UI, arrows, warnings, logos, watermark, or extra objects.\nPrimary request: one pair of upright adjacent high-back coach passenger seats on a shared metal base, deep green upholstered cushions with charcoal bolsters, headrests, armrests and visible under-seat mounting rails/base hardware. Three-quarter front view showing both seat cushions and backrests clearly. Empty seats, no people.",
+      "output_path": "C:/Users/Afik/.codex/generated_images/01a085ae-971c-7ef2-b5e0-0c6a66a4f37f/exec-64381da2-786b-4dde-8260-d576e76d77a6.png",
+      "hotspots": {
+        "upholstery": [
+          0.57,
+          0.38
+        ],
+        "cushions": [
+          0.49,
+          0.61
+        ],
+        "armrest": [
+          0.7,
+          0.47
+        ],
+        "base": [
+          0.49,
+          0.78
+        ]
+      },
+      "bounds": [
+        0.17,
+        0.019,
+        0.771,
+        0.934
+      ],
+      "inspection": "Upright adjacent green coach seat pair with visible base hardware. Upholstery texture is somewhat more realistic than other technical modules."
+    },
+    {
+      "id": "mirror-module",
+      "saved_project_path": "C:/Users/Afik/Documents/ChatGPT/Data/mobile-responsive-deploy/client/src/assets/maintenance-preview/side-mirror-module.png",
+      "mode": "generate",
+      "input_references": [],
+      "exact_prompt": "Use case: stylized-concept.\nAsset type: interactive bus-maintenance module illustration.\nStyle: premium crisp technical illustration, dark precise outlines, detailed cel shading, off-white painted metal, deep green accents, charcoal hardware and muted blue-gray glass; no photorealistic background.\nBackdrop: flat #eaf0f4.\nComposition: 1536x1024 landscape 3:2, centered isolated assembly, complete silhouette with at least 10% padding, clear three-quarter perspective, small soft contact shadow.\nConstraints: no bus body, no whole vehicle, no text, labels, UI, arrows, warnings, logos, watermark, or extra objects.\nPrimary request: one standalone coach exterior side-mirror assembly: tall rounded rectangular mirror face in charcoal housing, gently curved support arm leading to a clearly visible metal mounting bracket and bolts. Muted blue-gray reflective glass, dark arm and silver mounting details, entire assembly visible.",
+      "output_path": "C:/Users/Afik/.codex/generated_images/01a085ae-971c-7ef2-b5e0-0c6a66a4f37f/exec-97b671e7-c813-4f96-b4b3-88ed47772385.png",
+      "hotspots": {
+        "glass": [
+          0.33,
+          0.35
+        ],
+        "arm": [
+          0.52,
+          0.73
+        ],
+        "mount": [
+          0.72,
+          0.75
+        ]
+      },
+      "bounds": [
+        0.25,
+        0.024,
+        0.758,
+        0.935
+      ],
+      "inspection": "Upright side mirror, full support arm, mounting bracket and bolts. No bus contamination or text; render with object-fit contain."
+    },
+    {
+      "id": "bus-overview-front-engine",
+      "saved_project_path": "C:/Users/Afik/Documents/ChatGPT/Data/mobile-responsive-deploy/client/src/assets/maintenance-preview/bus-front-engine.png",
+      "mode": "edit",
+      "input_references": [
+        "C:/Users/Afik/Documents/ChatGPT/Data/mobile-responsive-deploy/client/src/assets/maintenance-preview/bus-overview.png"
+      ],
+      "exact_prompt": "Use case: precise-object-edit.\nInput image 1 is the edit target: existing technical coach illustration. Keep the original bus facing RIGHT exactly: rear at LEFT and windshield/nose at RIGHT. Preserve bus pose, perspective, proportions, framing, off-white and deep-green livery, all windows, roof AC, wheels and front brake cutaway, mirrors, and flat #eaf0f4 backdrop. Preserve the crisp dark-outline detailed cel-shaded technical illustration style. 1536x1024 landscape 3:2. No mirroring, reversal, text, UI, arrows, warnings, labels, logos, or watermark. Conceptual maintenance template, no manufacturer-specific claim.\nChange only the engine-bay arrangement: fully close/remove the exposed engine and raised hatch at the LEFT rear using matching flush body/livery panels. Create one exposed conceptual engine module within a cutaway opening at the RIGHT front lower nose/cabin, just below the windshield and forward of the front wheel. The sole visible engine must sit inside that RIGHT-front cutaway, integrated into the bus volume; preserve the rest.",
+      "output_path": "C:/Users/Afik/.codex/generated_images/01a085ae-971c-7ef2-b5e0-0c6a66a4f37f/exec-414260a8-bca6-4ed4-a606-e240dbb21d1c.png",
+      "hotspots": {
+        "front-engine": [
+          0.89,
+          0.62
+        ]
+      },
+      "part_bounds": {
+        "front-engine": [
+          0.808,
+          0.5,
+          0.967,
+          0.71
+        ]
+      },
+      "inspection": "Bus faces RIGHT; rear engine bay closed with matching livery. Sole exposed conceptual engine is below windshield at RIGHT front. Pose, windows, roof AC, wheels and front brake cutaway retained. Front cutaway extends slightly into lower door area."
+    },
+    {
+      "id": "bus-overview-double-engine",
+      "saved_project_path": "C:/Users/Afik/Documents/ChatGPT/Data/mobile-responsive-deploy/client/src/assets/maintenance-preview/bus-double-engine.png",
+      "mode": "edit",
+      "input_references": [
+        "C:/Users/Afik/Documents/ChatGPT/Data/mobile-responsive-deploy/client/src/assets/maintenance-preview/bus-overview.png"
+      ],
+      "exact_prompt": "Use case: precise-object-edit.\nInput image 1 is the edit target: existing technical coach illustration. Keep the original bus facing RIGHT exactly: rear at LEFT and windshield/nose at RIGHT. Preserve bus pose, perspective, proportions, framing, off-white and deep-green livery, all windows, roof AC, wheels and front brake cutaway, mirrors, and flat #eaf0f4 backdrop. Preserve the crisp dark-outline detailed cel-shaded technical illustration style. 1536x1024 landscape 3:2. No mirroring, reversal, text, UI, arrows, warnings, labels, logos, or watermark. Conceptual maintenance template, no manufacturer-specific claim.\nChange only this: KEEP the existing exposed LEFT-rear engine, its location and raised hatch unchanged. ADD a second clearly visible conceptual engine module inside a cutaway opening at the RIGHT front lower nose/cabin, below the windshield and forward of the front wheel. Exactly two visible engines: the unchanged original LEFT-rear engine plus the new RIGHT-front engine. Integrate the added engine into bus volume; preserve everything else.",
+      "output_path": "C:/Users/Afik/.codex/generated_images/01a085ae-971c-7ef2-b5e0-0c6a66a4f37f/exec-c0c82e0b-13aa-44a5-9127-b48c6f84063e.png",
+      "hotspots": {
+        "rear-engine": [
+          0.139,
+          0.523
+        ],
+        "front-engine": [
+          0.89,
+          0.64
+        ]
+      },
+      "part_bounds": {
+        "rear-engine": [
+          0.045,
+          0.423,
+          0.228,
+          0.627
+        ],
+        "front-engine": [
+          0.815,
+          0.562,
+          0.969,
+          0.713
+        ]
+      },
+      "inspection": "Bus faces RIGHT. Original exposed LEFT rear engine retained; second exposed conceptual engine added below windshield at RIGHT front. Pose, livery, windows, roof AC and wheels retained."
+    }
+  ]
+}

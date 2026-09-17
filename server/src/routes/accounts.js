@@ -108,7 +108,7 @@ router.get("/", guardBusRead, (req, res) => {
   if (from) { clauses.push("txn_date >= ?"); params.push(from); }
   if (to) { clauses.push("txn_date <= ?"); params.push(to); }
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
-  const rows = db.prepare(`SELECT * FROM transactions ${where} ORDER BY txn_date DESC, id DESC`).all(...params);
+  const rows = db.prepare(`SELECT transactions.*, c.name AS counter_name FROM transactions LEFT JOIN counters c ON c.id = transactions.counter_id ${where} ORDER BY transactions.txn_date DESC, transactions.id DESC`).all(...params);
   res.json(rows);
 });
 

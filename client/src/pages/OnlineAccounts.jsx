@@ -4,6 +4,8 @@ import OnlineAccountsImporter from "../components/OnlineAccountsImporter.jsx";
 import OnlineAccountsImportHistory from "../components/OnlineAccountsImportHistory.jsx";
 import { ROLES, isFullAccess } from "../roles.js";
 import { canUseFeature } from "../permissions.js";
+import PdfExportButton from "../components/PdfExportButton.jsx";
+import { downloadReportPdf } from "../utils/reportPdf.js";
 
 const today = () => {
   const now = new Date();
@@ -573,28 +575,23 @@ export default function OnlineAccounts() {
 
   async function makePdf() {
     if (!report) return;
-    const [{ jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
-    const doc = new jsPDF({ orientation: "landscape" });
-    doc.setFontSize(17);
-    doc.text("Lal Sabuj Paribahan - Online Accounts", 14, 16);
-    doc.setFontSize(10);
-    doc.text(`Final report: ${report.from} to ${report.to}`, 14, 23);
-    doc.text(`Online sale: ${money(report.totals.online_sale)}   Cash sale: ${money(report.totals.cash_sale)}   Expenses: ${money(report.totals.total_expense)}   Final cash: ${money(report.totals.final_cash)}`, 14, 30);
-    autoTable(doc, {
-      startY: 37,
-      head: [["Platform", "Normal", "Long", "Total passengers", "Sales (BDT)"]],
-      body: report.platforms.map((item) => [channelLabels[item.channel], item.channel === "cash" ? "-" : item.normal_passengers, item.channel === "cash" ? "-" : item.long_passengers, item.passenger_count, plainNumber(item.sales)]),
-      theme: "grid",
-      headStyles: { fillColor: [4, 106, 56] },
-    });
-    autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 8,
-      head: [["Expense category", "Entries", "Days used", "Total (BDT)"]],
-      body: report.expense_categories.length ? report.expense_categories.map((item) => [item.category_name, item.entry_count, item.days_used, plainNumber(item.total)]) : [["No expenses", "-", "-", "0"]],
-      theme: "grid",
-      headStyles: { fillColor: [169, 93, 115] },
-    });
-    doc.save(`online-accounts-${report.from}-to-${report.to}.pdf`);
+    await downloadReportPdf({ filename: `online-accounts-${report.from}-to-${report.to}`, title: "Online Accounts — Final report", subtitle: `${report.from} to ${report.to} | Separate from company Accounts. All amounts in BDT.`, summary: [
+      { label: "Digital sale", value: report.totals.online_sale }, { label: "Cash sale", value: report.totals.cash_sale }, { label: "Total sale", value: report.totals.combined_sale }, { label: "Expenses", value: report.totals.total_expense }, { label: "Final cash", value: report.totals.final_cash },
+    ], sections: [
+      { title: "Sales and passengers", columns: ["Platform", "Normal", "Long", "Passengers", "Sales (BDT)"], rows: report.platforms.map((r) => [channelLabels[r.channel], r.channel === "cash" ? "-" : r.normal_passengers, r.channel === "cash" ? "-" : r.long_passengers, r.passenger_count, r.sales]) },
+      { title: "Clustered expenses", columns: ["Category", "Entries", "Days used", "Total (BDT)"], rows: report.expense_categories.map((r) => [r.category_name, r.entry_count, r.days_used, r.total]) },
+      { title: "Day-by-day sales and cash", columns: ["Date", "Website", "Android", "iOS", "Legacy Web/Android", "Cash", "Digital passengers", "Cash passengers", "Expenses", "Final cash"], rows: report.daily.map((r) => [r.date, r.website_sales, r.android_sales, r.ios_sales, r.website_android_sales || 0, r.cash_sales, r.online_passengers, r.cash_passengers, r.expenses, r.final_cash]) },
+    ] });
+  }
+
+  async function makeDailyPdf() {
+    const query = `from=${encodeURIComponent(selectedDate)}&to=${encodeURIComponent(selectedDate)}`;
+    const [saleRows, costRows] = await Promise.all([api.get(`/online-accounts/entries?${query}`), api.get(`/online-accounts/expenses?${query}`)]);
+    await downloadReportPdf({ filename: `online-daily-${selectedDate}`, title: "Online Accounts — Daily collection", subtitle: `${selectedDate} | All amounts in BDT`, sections: [
+      { title: "Digital sales", columns: ["Platform", "Coach", "Bus", "Normal", "Long", "Passengers", "Sale"], rows: saleRows.filter((r) => r.channel !== "cash").map((r) => [channelLabels[r.channel], r.coach_number, r.bus_number, r.normal_passengers, r.long_passengers, r.passenger_count, r.amount]) },
+      { title: "Cash sales", columns: ["Coach", "Bus", "Passengers", "Sale"], rows: saleRows.filter((r) => r.channel === "cash").map((r) => [r.coach_number, r.bus_number, r.passenger_count, r.amount]) },
+      { title: "Daily cash costs", columns: ["Category", "Note", "Amount"], rows: costRows.map((r) => [r.category_name, r.description, r.amount]) },
+    ] });
   }
 
   async function shareReport() {
@@ -662,6 +659,7 @@ export default function OnlineAccounts() {
     {view === "daily" && <>
       <div className="online-day-toolbar card">
         <div><span className="settings-eyebrow">WORKING DAY</span><h3>Daily collection sheet</h3><p>Choose a date to enter or revise that day’s sales and expenses.</p></div>
+        <PdfExportButton onExport={makeDailyPdf} disabled={loading} label="Daily sheet PDF" />
         <Field label="Entry date"><input type="date" value={selectedDate} onChange={(event) => event.target.value && setSelectedDate(event.target.value)} required /></Field>
       </div>
 
@@ -752,7 +750,7 @@ export default function OnlineAccounts() {
       </div>
 
       {report && <div className="online-final-report">
-        <div className="online-report-heading"><div><span className="settings-eyebrow">FINAL REPORT</span><h2>Online Accounts</h2><p>{report.from} to {report.to}</p></div><div className="online-report-actions"><button type="button" className="settings-edit-button" onClick={() => window.print()}>Print</button><button type="button" className="settings-edit-button" onClick={makePdf}>Make PDF</button><button type="button" className="settings-edit-button" onClick={shareReport}>Share</button><button type="button" className="primary" onClick={exportExcel}>Move to Excel</button></div></div>
+        <div className="online-report-heading"><div><span className="settings-eyebrow">FINAL REPORT</span><h2>Online Accounts</h2><p>{report.from} to {report.to}</p></div><div className="online-report-actions"><button type="button" className="settings-edit-button" onClick={() => window.print()}>Print</button><PdfExportButton onExport={makePdf} disabled={reportLoading} label="Make PDF" /><button type="button" className="settings-edit-button" onClick={shareReport}>Share</button><button type="button" className="primary" onClick={exportExcel}>Move to Excel</button></div></div>
 
         <div className="online-report-summary">
           <div><span>Online sale</span><strong>{money(report.totals.online_sale)}</strong><small>Website + Android App + iOS App</small></div>

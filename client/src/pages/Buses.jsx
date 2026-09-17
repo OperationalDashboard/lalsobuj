@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { api, getUser } from "../api.js";
 import { t } from "../i18n.js";
 import BusIcon from "../components/BusIcon.jsx";
+import Pagination from "../components/Pagination.jsx";
 import { canUseFeature } from "../permissions.js";
 import { busLabel } from "../busLabel.js";
+import BusModelManager from "../components/BusModelManager.jsx";
 
 const DEFAULT_BUS_CLASSES = ["AC", "Non AC", "Sleeper"];
 const DEFAULT_BUS_CATEGORIES = ["Economy (AC)", "Economy (NON AC)", "Suite-Class AC (AC)", "Sleeper (AC)"];
@@ -23,6 +25,7 @@ export default function Buses() {
   const [form, setForm] = useState(empty);
   const [busClasses, setBusClasses] = useState(DEFAULT_BUS_CLASSES);
   const [busCategories, setBusCategories] = useState(DEFAULT_BUS_CATEGORIES);
+  const [modelCatalog, setModelCatalog] = useState(null);
   const [error, setError] = useState("");
   const [statusEditId, setStatusEditId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -32,6 +35,7 @@ export default function Buses() {
 
   function load() {
     api.get("/buses").then(setBuses).catch(() => {});
+    api.get("/settings/bus-models").then(setModelCatalog).catch(() => setModelCatalog({ revision: 0, models: [] }));
     api.get("/settings").then((settings) => {
       try {
         const parsed = JSON.parse(settings.bus_class_types || "null");
@@ -48,6 +52,8 @@ export default function Buses() {
     }).catch(() => {});
   }
   useEffect(load, []);
+
+  const activeModels = (modelCatalog?.models || []).filter((model) => !model.archived);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -86,8 +92,8 @@ export default function Buses() {
 
   async function handleDelete(id) {
     if (!confirm("Remove this bus?")) return;
-    await api.del(`/buses/${id}`);
-    load();
+    try { await api.del(`/buses/${id}`); load(); setError(""); }
+    catch (err) { setError(err.message); }
   }
 
   async function handleStatusChange(id, status) {
@@ -135,7 +141,8 @@ export default function Buses() {
         </div>
       </div>
 
-      {canEditFull && !showForm && <div className="bus-add-launch"><button type="button" className="primary" onClick={() => { setEditingId(null); setForm(empty); setShowForm(true); }}>+ Add bus</button></div>}
+      {canEditFull && <div className="bus-add-launch"><button type="button" className="primary" onClick={() => { setEditingId(null); setForm(empty); setShowForm(true); }}>+ Add bus</button>{me?.role === "super_admin" && modelCatalog && <a className="secondary" href="#shared-model-manager">Manage shared models</a>}</div>}
+      {me?.role === "super_admin" && modelCatalog && <div id="shared-model-manager"><BusModelManager catalog={modelCatalog} buses={buses} onCatalogChange={setModelCatalog} /></div>}
       {canEditFull && showForm && (
         <div className="card" style={{ marginBottom: 20 }}>
           <div className="bus-form-heading"><div><strong>{editingId ? "Edit bus details" : "Add a bus"}</strong><span>All detailed fields are optional except the unique registration key.</span></div>{editingId && <button type="button" className="secondary" onClick={cancelEdit}>Cancel editing</button>}</div>
@@ -143,6 +150,7 @@ export default function Buses() {
             <label>Internal unique key<input placeholder="Internal unique key" value={form.reg_number} required onChange={(e) => setForm({ ...form, reg_number: e.target.value })} /></label>
             <label>Fleet serial<input type="number" placeholder="e.g. 25" value={form.fleet_serial} onChange={(e) => setForm({ ...form, fleet_serial: e.target.value })} /></label>
             <label>Bus number<input placeholder="Bus number" value={form.source_bus_number} onChange={(e) => setForm({ ...form, source_bus_number: e.target.value })} /></label>
+            <label>Model number / anatomy template<select required={!editingId} value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })}><option value="">{editingId ? "Keep existing / no shared model" : "Select model"}</option>{form.model && !activeModels.some((model) => model.name === form.model) && <option value={form.model}>{form.model} (existing)</option>}{activeModels.map(model => <option key={model.id} value={model.name}>{model.name}</option>)}</select><small>Same model uses one shared maintenance anatomy.</small></label>
             <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
               <option value="">Select category</option>
               {form.category && !busCategories.includes(form.category) && <option value={form.category}>{form.category} (legacy)</option>}
@@ -211,7 +219,7 @@ export default function Buses() {
           </tbody>
         </table></div>
         {!visibleBuses.length && <p className="empty">No buses match this search.</p>}
-        {pageCount > 1 && <div className="bus-pagination"><span>Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredBuses.length)} of {filteredBuses.length}</span><div><button className="secondary" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button><strong>Page {currentPage} of {pageCount}</strong><button className="secondary" disabled={currentPage === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</button></div></div>}
+        <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} label="buses" />
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth, requireFeaturePermission } = require("../middleware/auth");
+const { requireAuth, requireRole, requireFeaturePermission } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -32,6 +32,12 @@ router.post("/", requireFeaturePermission("chat", "write"), (req, res) => {
     )
     .get(info.lastInsertRowid);
   res.status(201).json(row);
+});
+
+router.delete("/:id", requireRole("admin", "super_admin"), (req, res) => {
+  const info = db.prepare("DELETE FROM chat_messages WHERE id = ?").run(req.params.id);
+  if (!info.changes) return res.status(404).json({ error: "Message not found" });
+  res.json({ ok: true });
 });
 
 module.exports = router;

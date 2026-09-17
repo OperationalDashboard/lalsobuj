@@ -58,8 +58,8 @@ export default function Staff() {
 
   async function handleDelete(id) {
     if (!confirm("Remove this staff member?")) return;
-    await api.del(`/staff/${id}`);
-    load();
+    try { await api.del(`/staff/${id}`); load(); setError(""); }
+    catch (err) { setError(err.message); }
   }
   function startEdit(member) {
     setEditingId(member.id);

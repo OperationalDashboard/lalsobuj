@@ -1,12 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, getUser } from "../api.js";
 import { ROLES, isFullAccess } from "../roles.js";
 import { busLabel } from "../busLabel.js";
 import { t } from "../i18n.js";
-import { activityClock, activityDay, activityInput, chronologicalLogs } from "../activityTime.js";
+import { activityClock, activityDay, activityInput, activityTimestamp, chronologicalLogs } from "../activityTime.js";
 import SearchableSelect from "../components/SearchableSelect.jsx";
+import Pagination from "../components/Pagination.jsx";
+import PdfExportButton from "../components/PdfExportButton.jsx";
+import { downloadReportPdf } from "../utils/reportPdf.js";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dhaka", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
 const startEmpty = { rotation_id: "", departure_time: "", price_per_seat: "" };
 const ROTATION_PAGE_SIZE = 15;
@@ -38,8 +41,10 @@ const EVENT_OPTIONS_BY_ROLE = {
   [ROLES.PASSENGER_CHECKER]: [
     { value: "passenger_count", label: "Passenger count" },
     { value: "exceptional_passenger_count", label: "Exceptional passenger count" },
+    { value: "additional_passenger_count", label: "Additional passenger" },
   ],
   [ROLES.ADMIN]: [
+    { value: "left_counter", label: "Left counter" },
     { value: "stop_arrival", label: "Arrived at stop" },
     { value: "stop_departure", label: "Left stop" },
     { value: "hotel_break", label: "Hotel break" },
@@ -47,6 +52,7 @@ const EVENT_OPTIONS_BY_ROLE = {
     { value: "passenger_count", label: "Passenger count" },
     { value: "note", label: "Note" },
     { value: "exceptional_passenger_count", label: "Exceptional passenger count" },
+    { value: "additional_passenger_count", label: "Additional passenger" },
   ],
 };
 EVENT_OPTIONS_BY_ROLE[ROLES.SUPER_ADMIN] = EVENT_OPTIONS_BY_ROLE[ROLES.ADMIN];
@@ -59,6 +65,7 @@ const eventLabel = {
   fuel: "Fuel taken",
   passenger_count: "Passenger count",
   exceptional_passenger_count: "Exceptional passenger count",
+  additional_passenger_count: "Additional passenger",
   note: "Note",
 };
 
@@ -84,6 +91,16 @@ export default function LiveActivity() {
   const [myCounterName, setMyCounterName] = useState("");
   const [myAssignedBus, setMyAssignedBus] = useState(null);
   const [liveTrips, setLiveTrips] = useState([]);
+  const [activityView, setActivityView] = useState("live");
+  const historyMode = isAdmin && activityView === "history";
+  const [historyFilters, setHistoryFilters] = useState(() => ({ from: today(), to: today(), bus_id: "" }));
+  const [historyQuery, setHistoryQuery] = useState(historyFilters);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [history, setHistory] = useState({ rows: [], total: 0, page: 1, page_count: 1 });
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [historyRevision, setHistoryRevision] = useState(0);
+  const logRequest = useRef(0);
   const [rotationCounts, setRotationCounts] = useState([]);
   const [rotationPage, setRotationPage] = useState(1);
   const [startForm, setStartForm] = useState(startEmpty);
@@ -106,6 +123,10 @@ export default function LiveActivity() {
   const [completeTime, setCompleteTime] = useState("");
   const [editingTripTimeId, setEditingTripTimeId] = useState(null);
   const [editTripDeparture, setEditTripDeparture] = useState("");
+  const [editTripArrival, setEditTripArrival] = useState("");
+  const [editTripPrice, setEditTripPrice] = useState("");
+  const [busy, setBusy] = useState("");
+  const [logsLoading, setLogsLoading] = useState(false);
 
   function loadReferenceData() {
     api.get("/buses").then(setBuses).catch(() => {});
@@ -141,6 +162,41 @@ export default function LiveActivity() {
     const interval = setInterval(loadActivityData, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!historyMode) { setHistoryLoading(false); return; }
+    let cancelled = false;
+    setHistoryLoading(true); setHistoryError("");
+    const query = new URLSearchParams({ ...historyQuery, page: String(historyPage) });
+    api.get(`/activity-logs/journeys?${query}`).then((result) => {
+      if (!cancelled) setHistory(result);
+    }).catch((err) => {
+      if (!cancelled) { setHistoryError(err.message); setHistory({ rows: [], total: 0, page: 1, page_count: 1 }); }
+    }).finally(() => { if (!cancelled) setHistoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [historyMode, historyQuery, historyPage, historyRevision]);
+
+  function closeEditors() {
+    logRequest.current++;
+    setOpenTripId(null); setEditingLogId(null); setEditingTripTimeId(null); setCompletingId(null);
+    setError(""); setLogsLoading(false);
+  }
+
+  function refreshJourneys() {
+    loadActivityData();
+    if (historyMode) setHistoryRevision((value) => value + 1);
+  }
+
+  function findHistory(e) {
+    e.preventDefault();
+    if (busy) return;
+    if (!historyFilters.from || !historyFilters.to || historyFilters.from > historyFilters.to) {
+      setHistoryError("Choose a valid journey date range."); return;
+    }
+    closeEditors(); setHistoryPage(1); setHistoryQuery({ ...historyFilters });
+  }
+
+  const visibleTrips = historyMode ? (historyLoading ? [] : history.rows) : liveTrips;
 
   const rotationPageCount = Math.max(1, Math.ceil(rotationCounts.length / ROTATION_PAGE_SIZE));
   const currentRotationPage = Math.min(rotationPage, rotationPageCount);
@@ -188,15 +244,16 @@ export default function LiveActivity() {
     try {
       await api.put(`/trips/${trip.id}/complete`, { arrival_time: completeTime || null });
       setCompletingId(null);
-      load();
+      refreshJourneys();
     } catch (err) {
       setError(err.message);
     }
   }
 
   async function removeLiveTrip(trip) {
-    if (!confirm(`Remove ${busLabel(trip)}'s running trip?`)) return;
-    try { await api.del(`/trips/${trip.id}`); load(); } catch (err) { setError(err.message); }
+    if (busy || !confirm(`Move ${busLabel(trip)} — Rotation ${trip.rotation_no} to Trash, including its linked journeys and accounts? You can restore it from Trash.`)) return;
+    setBusy(`remove-trip:${trip.id}`);
+    try { await api.del(`/trips/${trip.id}/trash`); closeEditors(); refreshJourneys(); } catch (err) { setError(err.message); } finally { setBusy(""); }
   }
 
   // Admin/Super Admin only: give or edit a trip's departure time directly,
@@ -204,28 +261,41 @@ export default function LiveActivity() {
   function openTripTimeEdit(trip) {
     setEditingTripTimeId(trip.id);
     setEditTripDeparture(trip.departure_time || "");
+    setEditTripArrival(trip.arrival_time || "");
+    setEditTripPrice(trip.price_per_seat ?? "");
   }
   async function saveTripTime(trip) {
+    if (busy) return;
+    setBusy(`trip:${trip.id}`); setError("");
     try {
-      await api.put(`/trips/${trip.id}/time`, { departure_time: editTripDeparture || null });
+      await api.put(`/trips/${trip.id}/time`, { departure_time: editTripDeparture || null, arrival_time: editTripArrival || null, price_per_seat: editTripPrice === "" ? null : Number(editTripPrice) });
       setEditingTripTimeId(null);
-      load();
+      refreshJourneys();
     } catch (err) {
       setError(err.message);
-    }
+    } finally { setBusy(""); }
   }
 
-  function toggleTrip(tripId) {
-    if (openTripId === tripId) { setOpenTripId(null); return; }
+  function toggleTrip(trip) {
+    if (busy) return;
+    const tripId = trip.id;
+    const requestId = ++logRequest.current;
+    if (openTripId === tripId) { setOpenTripId(null); setLogsLoading(false); return; }
     setOpenTripId(tripId);
-    setLogForm({ event_type: eventOptions[0]?.value || "note", location_name: "", other_place: "", passengers_count: "", fuel_liters: "", fuel_cost: "", note: "", recorded_at: "" });
-    api.get(`/activity-logs?trip_id=${tripId}`).then((rows) =>
-      setLogsByTrip((prev) => ({ ...prev, [tripId]: rows }))
-    ).catch((err) => setError(err.message));
+    setEditingLogId(null); setError(""); setLogsLoading(true);
+    setLogForm({ event_type: eventOptions[0]?.value || "note", location_name: "", other_place: "", passengers_count: "", fuel_liters: "", fuel_cost: "", note: "", recorded_at: historyMode ? `${trip.trip_date}T${(trip.departure_time || "00:00").slice(0, 5)}` : "" });
+    api.get(`/activity-logs?trip_id=${tripId}`).then((rows) => {
+      if (requestId === logRequest.current) setLogsByTrip((prev) => ({ ...prev, [tripId]: rows }));
+    }).catch((err) => { if (requestId === logRequest.current) setError(err.message); })
+      .finally(() => { if (requestId === logRequest.current) setLogsLoading(false); });
   }
 
   async function handleAddLog(e, trip) {
     e.preventDefault();
+    if (busy) return;
+    if (historyMode && !logForm.recorded_at) { setError("Choose the checkpoint date and time for this historical journey."); return; }
+    if (!eventOptions.some((option) => option.value === logForm.event_type)) { setError("Select the entry type first."); return; }
+    setBusy(`add:${trip.id}`);
     setError("");
     const location_name = logForm.location_name === OTHER_PLACE ? logForm.other_place : logForm.location_name;
     try {
@@ -235,41 +305,64 @@ export default function LiveActivity() {
         event_type: logForm.event_type,
         location_name: location_name || null,
         passengers_count: logForm.passengers_count ? Number(logForm.passengers_count) : null,
-        price_per_seat: logForm.event_type === "exceptional_passenger_count" ? Number(logForm.price_per_seat) : undefined,
+        price_per_seat: ["exceptional_passenger_count", "additional_passenger_count"].includes(logForm.event_type) ? Number(logForm.price_per_seat) : undefined,
         fuel_liters: logForm.fuel_liters ? Number(logForm.fuel_liters) : null,
         fuel_cost: logForm.fuel_cost ? Number(logForm.fuel_cost) : null,
         note: logForm.note || null,
-        recorded_at: isAdmin && logForm.recorded_at ? logForm.recorded_at.replace("T", " ") + ":00" : undefined,
+        recorded_at: isAdmin && logForm.recorded_at ? activityTimestamp(logForm.recorded_at) : undefined,
       });
-      setLogForm({ ...logForm, location_name: "", other_place: "", passengers_count: "", fuel_liters: "", fuel_cost: "", note: "", recorded_at: "" });
+      setLogForm({ ...logForm, location_name: "", other_place: "", passengers_count: "", fuel_liters: "", fuel_cost: "", note: "", recorded_at: historyMode ? logForm.recorded_at : "" });
       const rows = await api.get(`/activity-logs?trip_id=${trip.id}`);
       setLogsByTrip((prev) => ({ ...prev, [trip.id]: rows }));
-      load();
+      refreshJourneys();
     } catch (err) {
       setError(err.message);
-    }
+    } finally { setBusy(""); }
   }
 
   // Admin/Super Admin only: edit the recorded time of any past checkpoint entry.
   function startEditLogTime(log, trip) {
-    setEditExceptional({ passengers_count: log.passengers_count ?? "", price_per_seat: log.price_per_seat ?? "", note: log.note || "" });
+    setError("");
+    setEditExceptional({ event_type: log.event_type, passengers_count: log.passengers_count ?? "", price_per_seat: log.price_per_seat ?? "", fuel_liters: log.fuel_liters ?? "", fuel_cost: log.fuel_cost ?? "", location_name: log.location_name || "", note: log.note || "" });
     setEditingLogId(log.id);
-    setEditLogTime(activityInput(log.recorded_at, trip.trip_date));
+    setEditLogTime(activityInput(log.recorded_at, trip.trip_date, true));
   }
   async function saveLogTime(trip, log) {
     if (!editLogTime) { setError("Choose the checkpoint date and time"); return; }
+    if (busy) return;
+    setBusy(`edit:${log.id}`); setError("");
     try {
-      await api.put(`/activity-logs/${log.id}`, { recorded_at: editLogTime.replace("T", " ") + ":00", ...(log.event_type === "exceptional_passenger_count" ? editExceptional : {}) });
+      const eventType = editExceptional.event_type;
+      const changes = { event_type: eventType, recorded_at: activityTimestamp(editLogTime), note: editExceptional.note, location_name: editExceptional.location_name || null };
+      if (["passenger_count", "exceptional_passenger_count", "additional_passenger_count"].includes(eventType)) changes.passengers_count = Number(editExceptional.passengers_count);
+      if (["exceptional_passenger_count", "additional_passenger_count"].includes(eventType)) changes.price_per_seat = Number(editExceptional.price_per_seat);
+      if (eventType === "fuel") { changes.fuel_liters = Number(editExceptional.fuel_liters); changes.fuel_cost = Number(editExceptional.fuel_cost); }
+      await api.put(`/activity-logs/${log.id}`, changes);
       setEditingLogId(null);
       const rows = await api.get(`/activity-logs?trip_id=${trip.id}`);
       setLogsByTrip((prev) => ({ ...prev, [trip.id]: rows }));
-      loadActivityData();
+      refreshJourneys();
     } catch (err) {
       setError(err.message);
-    }
+    } finally { setBusy(""); }
   }
 
-  const isOwnPlaceEvent = logForm.event_type === "stop_arrival" || logForm.event_type === "stop_departure";
+  async function removeLog(trip, log) {
+    if (busy || !confirm(`Remove this ${eventLabel[log.event_type] || "checkpoint"} entry? Its passenger/fuel values will be removed from the journey totals.`)) return;
+    setBusy(`delete:${log.id}`); setError("");
+    try {
+      await api.del(`/activity-logs/${log.id}`);
+      setLogsByTrip((prev) => ({ ...prev, [trip.id]: (prev[trip.id] || []).filter((row) => row.id !== log.id) }));
+      setEditingLogId(null); refreshJourneys();
+    } catch (err) { setError(err.message); } finally { setBusy(""); }
+  }
+
+  async function exportJourney(trip) {
+    const rows = await api.get(`/activity-logs?trip_id=${trip.id}`);
+    return downloadReportPdf({ filename: `journey-${trip.id}`, title: `${busLabel(trip)} — Journey report`, subtitle: `${trip.route || "No route"} | ${trip.trip_date} | Rotation ${trip.rotation_no}`, sections: [{ title: "Journey checkpoints", columns: ["Date & time", "Event", "Place", "Passengers", "Seat price (BDT)", "Fuel (L)", "Fuel cost (BDT)", "Note"], rows: chronologicalLogs(rows, trip.trip_date).map((row) => [row.recorded_at, eventLabel[row.event_type], row.location_name, row.passengers_count, row.price_per_seat ?? (row.event_type === "passenger_count" ? trip.price_per_seat : null), row.fuel_liters, row.fuel_cost, row.note]) }] });
+  }
+
+  const isOwnPlaceEvent = ["stop_arrival", "stop_departure", "left_counter"].includes(logForm.event_type);
   const needsHotelDropdown = logForm.event_type === "hotel_break";
   const needsAdminPlacePicker = isAdmin && isOwnPlaceEvent;
   const needsPlainLocationText = !placeIsAutoFilled && !isAdmin && isOwnPlaceEvent;
@@ -282,6 +375,26 @@ export default function LiveActivity() {
           <p>{t("live_activity_subtitle")}</p>
         </div>
       </div>
+
+      {isAdmin && <section className="card live-history-controls" aria-label="Manage activity by date">
+        <div className="live-history-heading"><div><h3>Activity workspace</h3><p>Manage checkpoints for any journey date, including completed trips.</p></div>
+          <div className="live-history-switch" role="group" aria-label="Activity view">
+            <button type="button" className={historyMode ? "secondary" : "primary"} aria-pressed={!historyMode} disabled={Boolean(busy)} onClick={() => { closeEditors(); setActivityView("live"); }}>On the road</button>
+            <button type="button" className={historyMode ? "primary" : "secondary"} aria-pressed={historyMode} disabled={Boolean(busy)} onClick={() => { closeEditors(); setActivityView("history"); }}>Manage by date</button>
+          </div>
+        </div>
+        {historyMode && <>
+          <form className="live-history-filters" onSubmit={findHistory}>
+            <label className="live-field"><span>Journey date from</span><input type="date" required value={historyFilters.from} onChange={(e) => setHistoryFilters({ ...historyFilters, from: e.target.value })} /></label>
+            <label className="live-field"><span>Journey date to</span><input type="date" required value={historyFilters.to} onChange={(e) => setHistoryFilters({ ...historyFilters, to: e.target.value })} /></label>
+            <label className="live-field"><span>Bus number</span><SearchableSelect id="activity-history-bus" value={historyFilters.bus_id} onChange={(bus_id) => setHistoryFilters({ ...historyFilters, bus_id })} options={[{ value: "", label: "All buses" }, ...buses.map((bus) => ({ value: bus.id, label: busLabel(bus) }))]} placeholder="Search bus number" /></label>
+            <button className="primary" type="submit" disabled={Boolean(busy) || historyLoading} aria-busy={historyLoading}>{historyLoading ? "Finding journeys…" : "Find journeys"}</button>
+          </form>
+          <p className="live-history-note">Choose the same date in both fields for one day. Open a journey below to add, edit or remove entries at any date and time. This does not reopen completed trips or change already-posted Accounts entries. Removed journeys must first be restored from Trash.</p>
+          {historyError && <p className="error-text" role="alert">{historyError}</p>}
+        </>}
+      </section>}
+      {error && !openTripId && !editingTripTimeId && <p className="error-text" role="alert">{error}</p>}
 
       {placeIsAutoFilled && (
         <div className="card" style={{ marginBottom: 20, background: "var(--surface-soft)" }}>
@@ -298,7 +411,7 @@ export default function LiveActivity() {
         </div>
       )}
 
-      {canStartTrip && (
+      {!historyMode && canStartTrip && (
         <div className="card" style={{ marginBottom: 20 }}>
           <h3 style={{ marginTop: 0 }}>{t("start_a_trip")}</h3>
           <form className="live-start-form" onSubmit={handleStartTrip}>
@@ -325,7 +438,7 @@ export default function LiveActivity() {
         </div>
       )}
 
-      <div className="card" style={{ marginBottom: 20 }}>
+      {!historyMode && <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ marginTop: 0 }}>{t("todays_rotations")}</h3>
         <table>
           <thead><tr><th>{t("bus")}</th><th>{t("rotations_today")}</th><th>{t("running_now")}</th></tr></thead>
@@ -341,33 +454,32 @@ export default function LiveActivity() {
         </table>
         {rotationCounts.length > ROTATION_PAGE_SIZE && <div className="bus-pagination">
           <span>Showing {(currentRotationPage - 1) * ROTATION_PAGE_SIZE + 1}–{Math.min(currentRotationPage * ROTATION_PAGE_SIZE, rotationCounts.length)} of {rotationCounts.length} buses</span>
-          <div>
-            <button className="secondary" type="button" disabled={currentRotationPage === 1} onClick={() => setRotationPage((page) => Math.max(1, page - 1))}>Previous</button>
-            <strong>Page {currentRotationPage} of {rotationPageCount}</strong>
-            <button className="secondary" type="button" disabled={currentRotationPage === rotationPageCount} onClick={() => setRotationPage((page) => Math.min(rotationPageCount, page + 1))}>Next</button>
-          </div>
+          <Pagination page={currentRotationPage} pageCount={rotationPageCount} onPageChange={setRotationPage} label="today's buses" />
         </div>}
-      </div>
+      </div>}
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>{t("trips_on_the_road")}</h3>
-        {liveTrips.length === 0 && <p style={{ color: "var(--muted)" }}>{t("no_trips_running")}</p>}
-        {liveTrips.map((trip) => (
+        <h3 style={{ marginTop: 0 }}>{historyMode ? "Journey activity records" : t("trips_on_the_road")}</h3>
+        {historyMode && <p className="live-history-note">Journey dates {historyQuery.from} to {historyQuery.to} · {history.total} journeys · 15 per page</p>}
+        {historyMode && historyLoading && <p role="status">Loading journey records…</p>}
+        {visibleTrips.length === 0 && !historyLoading && <p style={{ color: "var(--muted)" }}>{historyMode ? "No journeys found for this date range and bus. Try a different journey date." : t("no_trips_running")}</p>}
+        {visibleTrips.map((trip) => (
           <article key={trip.id} className="live-trip-card">
             <div className="live-trip-heading">
               <div className="live-trip-identity">
-                <div className="live-trip-title"><strong>{busLabel(trip)}</strong><span className="badge running">On the road</span></div>
+                <div className="live-trip-title"><strong>{busLabel(trip)}</strong><span className={`badge ${trip.status === "running" ? "running" : "active"}`}>{trip.status === "running" ? "On the road" : "Completed"}</span>{historyMode && trip.accounts_status === "done" && <span className="badge">Accounts posted</span>}</div>
                 <p>{trip.route || "No route set"}</p>
                 <div className="live-trip-meta"><span>Rotation {trip.rotation_no} · {trip.trip_date}</span><span>{trip.route || (trip.leg_no === 2 ? t("leg2") : t("leg1"))}</span>{trip.price_per_seat ? <span>৳{trip.price_per_seat}/seat</span> : null}</div>
               </div>
               <div className="live-trip-actions">
-                {isAdmin && <button className="link-danger" onClick={() => removeLiveTrip(trip)}>Remove trip</button>}
-                {canLogAnything && (
-                  <button className="primary" onClick={() => toggleTrip(trip.id)}>
-                    {openTripId === trip.id ? t("hide_log") : t("log_checkpoint")}
+                <PdfExportButton onExport={() => exportJourney(trip)} />
+                {isAdmin && <button className="link-danger" disabled={Boolean(busy)} onClick={() => removeLiveTrip(trip)}>{busy === `remove-trip:${trip.id}` ? "Removing…" : "Remove trip"}</button>}
+                {(
+                  <button className="primary" disabled={Boolean(busy)} onClick={() => toggleTrip(trip)}>
+                    {openTripId === trip.id ? "Hide entries" : isAdmin ? "Add / edit / remove entries" : canLogAnything ? t("log_checkpoint") : "View entries"}
                   </button>
                 )}
-                {canCompleteTrip && (
+                {canCompleteTrip && trip.status === "running" && (
                   <button className="link-danger" onClick={() => openCompleteFor(trip)}>{t("mark_completed")}</button>
                 )}
               </div>
@@ -375,14 +487,17 @@ export default function LiveActivity() {
 
             <div className="live-timing-grid" aria-label="Trip timing">
               <div className="live-timing-item"><span className="live-timing-label">Trip date</span><strong>{activityDay(`${trip.trip_date}T12:00:00`)}</strong><small>{trip.leg_no === 2 ? "Return journey" : "Outbound journey"}</small></div>
-              <div className="live-timing-item"><span className="live-timing-label">Departure</span><strong>{activityClock(trip.departure_time, trip.trip_date)}</strong>{isAdmin && <button className="live-time-edit" onClick={() => openTripTimeEdit(trip)}>Edit departure</button>}</div>
+              <div className="live-timing-item"><span className="live-timing-label">Departure</span><strong>{activityClock(trip.departure_time, trip.trip_date)}</strong>{isAdmin && <button className="live-time-edit" disabled={Boolean(busy)} onClick={() => openTripTimeEdit(trip)}>Edit times &amp; fare</button>}</div>
               <div className="live-timing-item"><span className="live-timing-label">Latest checkpoint</span><strong>{activityClock(trip.last_update, trip.trip_date)}</strong><small>{trip.last_event ? `${eventLabel[trip.last_event] || trip.last_event}${trip.last_location ? ` · ${trip.last_location}` : ""}` : "No checkpoint yet"}</small>{trip.last_update && <small>{activityDay(trip.last_update, trip.trip_date)}</small>}</div>
               <div className="live-timing-item"><span className="live-timing-label">Arrival</span><strong>{trip.arrival_time ? activityClock(trip.arrival_time, trip.trip_date) : "Pending"}</strong><small>{trip.arrival_time ? "Recorded arrival" : "Awaiting completion"}</small></div>
             </div>
 
             {editingTripTimeId === trip.id && <form className="live-time-editor" onSubmit={(e) => { e.preventDefault(); saveTripTime(trip); }}>
               <label className="live-field"><span>Departure time</span><input type="time" value={editTripDeparture} onChange={(e) => setEditTripDeparture(e.target.value)} /></label>
-              <button className="primary" type="submit">{t("save")}</button><button className="secondary" type="button" onClick={() => setEditingTripTimeId(null)}>{t("cancel")}</button>
+              <label className="live-field"><span>Arrival time</span><input type="time" value={editTripArrival} onChange={(e) => setEditTripArrival(e.target.value)} /></label>
+              <label className="live-field"><span>Normal seat price (BDT)</span><input type="number" min="0" step="0.01" value={editTripPrice} onChange={(e) => setEditTripPrice(e.target.value)} /></label>
+              <button className="primary" type="submit" disabled={Boolean(busy)} aria-busy={busy === `trip:${trip.id}`}>{busy === `trip:${trip.id}` ? "Saving…" : t("save")}</button><button className="secondary" type="button" disabled={Boolean(busy)} onClick={() => setEditingTripTimeId(null)}>{t("cancel")}</button>
+              {error && <p className="error-text" role="alert">{error}</p>}
             </form>}
 
             {completingId === trip.id && (
@@ -393,12 +508,10 @@ export default function LiveActivity() {
               </form>
             )}
 
-            {openTripId === trip.id && canLogAnything && (
+            {openTripId === trip.id && (
               <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-                <form className="form-row" onSubmit={(e) => handleAddLog(e, trip)}>
-                  <select value={logForm.event_type} onChange={(e) => setLogForm({ ...logForm, event_type: e.target.value })}>
-                    {eventOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                  </select>
+                {canLogAnything && <form className={`form-row ${["exceptional_passenger_count", "additional_passenger_count"].includes(logForm.event_type) ? "paid-passenger-entry" : ""}`} onSubmit={(e) => handleAddLog(e, trip)}>
+                  <label className="live-field"><span>Entry type</span><SearchableSelect id={`live-event-${trip.id}`} value={logForm.event_type} onChange={(event_type) => setLogForm({ event_type, location_name: "", other_place: "", passengers_count: "", price_per_seat: "", fuel_liters: "", fuel_cost: "", note: "", recorded_at: logForm.recorded_at })} options={eventOptions} required placeholder="Search entry type" /></label>
                   {isOwnPlaceEvent && placeIsAutoFilled && (
                     <span style={{ alignSelf: "center", fontSize: "0.85rem", color: "var(--muted)" }}>
                       Place: <strong>{myCounterName || "no counter assigned"}</strong>
@@ -406,11 +519,7 @@ export default function LiveActivity() {
                   )}
                   {needsAdminPlacePicker && (
                     <>
-                      <select value={logForm.location_name} onChange={(e) => setLogForm({ ...logForm, location_name: e.target.value })}>
-                        <option value="">Select place</option>
-                        {places.map((p) => <option key={p} value={p}>{p}</option>)}
-                        <option value={OTHER_PLACE}>Other (exception)…</option>
-                      </select>
+                      <SearchableSelect id={`live-place-${trip.id}`} value={logForm.location_name} onChange={(location_name) => setLogForm({ ...logForm, location_name })} placeholder="Search place" options={[...places.map((p) => ({ value: p, label: p })), { value: OTHER_PLACE, label: "Other (exception)…" }]} />
                       {logForm.location_name === OTHER_PLACE && (
                         <input placeholder="Type the place" value={logForm.other_place}
                           onChange={(e) => setLogForm({ ...logForm, other_place: e.target.value })} />
@@ -422,10 +531,7 @@ export default function LiveActivity() {
                       onChange={(e) => setLogForm({ ...logForm, location_name: e.target.value })} />
                   )}
                   {needsHotelDropdown && (
-                    <select value={logForm.location_name} onChange={(e) => setLogForm({ ...logForm, location_name: e.target.value })}>
-                      <option value="">Select hotel</option>
-                      {hotels.map((h) => <option key={h.id} value={h.name}>{h.name}</option>)}
-                    </select>
+                    <SearchableSelect id={`live-hotel-${trip.id}`} value={logForm.location_name} onChange={(location_name) => setLogForm({ ...logForm, location_name })} placeholder="Search hotel" options={hotels.map((h) => ({ value: h.name, label: h.name }))} />
                   )}
                   {logForm.event_type === "fuel" && (
                     <>
@@ -443,39 +549,47 @@ export default function LiveActivity() {
                     <input placeholder="Note" value={logForm.note}
                       onChange={(e) => setLogForm({ ...logForm, note: e.target.value })} />
                   )}
-                  {logForm.event_type === "exceptional_passenger_count" && <>
-                    <label className="live-field"><span>Exceptional passengers</span><input required min="1" step="1" type="number" value={logForm.passengers_count} onChange={(e) => setLogForm({ ...logForm, passengers_count: e.target.value })} /></label>
-                    <label className="live-field"><span>Price per passenger (৳)</span><input required min="0" step="0.01" type="number" value={logForm.price_per_seat ?? ""} onChange={(e) => setLogForm({ ...logForm, price_per_seat: e.target.value })} /></label>
-                    <label className="live-field"><span>Description / passenger type</span><input required value={logForm.note} onChange={(e) => setLogForm({ ...logForm, note: e.target.value })} /></label>
-                    <span>Total: ৳{(Number(logForm.passengers_count || 0) * Number(logForm.price_per_seat || 0)).toLocaleString()}</span>
-                  </>}
+                  {["exceptional_passenger_count", "additional_passenger_count"].includes(logForm.event_type) && <div className="paid-passenger-fields">
+                    <div className="paid-passenger-heading"><div><span className="paid-passenger-kicker">CUSTOM FARE ENTRY</span><strong>{logForm.event_type === "additional_passenger_count" ? "Additional passenger" : "Exceptional passenger"}</strong><small>Set the passenger quantity and seat price for this entry.</small></div><span className="paid-passenger-total">৳{(Number(logForm.passengers_count || 0) * Number(logForm.price_per_seat || 0)).toLocaleString()}<small>Total</small></span></div>
+                    <div className="paid-passenger-grid">
+                      <label className="live-field"><span>Passengers</span><input required min="1" step="1" type="number" value={logForm.passengers_count} onChange={(e) => setLogForm({ ...logForm, passengers_count: e.target.value })} /></label>
+                      <label className="live-field"><span>Seat price (৳)</span><input required min="0" step="0.01" type="number" value={logForm.price_per_seat ?? ""} onChange={(e) => setLogForm({ ...logForm, price_per_seat: e.target.value })} /></label>
+                      <label className="live-field paid-passenger-description"><span>Description / passenger type{logForm.event_type === "exceptional_passenger_count" ? "" : " (optional)"}</span><input required={logForm.event_type === "exceptional_passenger_count"} value={logForm.note} onChange={(e) => setLogForm({ ...logForm, note: e.target.value })} /></label>
+                    </div>
+                  </div>}
                   {isAdmin && (
-                    <label className="live-field"><span>Checkpoint date &amp; time</span><input type="datetime-local" value={logForm.recorded_at} onChange={(e) => setLogForm({ ...logForm, recorded_at: e.target.value })} /><small>Optional · leave blank to record now</small></label>
+                    <label className="live-field"><span>Checkpoint date &amp; time</span><input type="datetime-local" step="1" required={historyMode} value={logForm.recorded_at} onChange={(e) => setLogForm({ ...logForm, recorded_at: e.target.value })} /><small>{historyMode ? "Required · choose the actual event date and time" : "Optional · leave blank to record now"}</small></label>
                   )}
-                  <button className="primary" type="submit">Add entry</button>
-                </form>
+                  <button className="primary" type="submit" disabled={Boolean(busy)} aria-busy={busy === `add:${trip.id}`}>{busy === `add:${trip.id}` ? "Adding entry…" : "Add entry"}</button>
+                </form>}
                 {error && <p className="error-text">{error}</p>}
 
                 <div className="live-timeline-heading"><h4>Journey timeline</h4><span>Earliest to latest · {(logsByTrip[trip.id] || []).length} checkpoints</span></div>
+                {logsLoading && <p role="status">Loading entries…</p>}
                 <ol className="live-timeline" aria-label="Journey checkpoints in time order">
                     {chronologicalLogs(logsByTrip[trip.id] || [], trip.trip_date).map((l) => (
                       <li key={l.id} className="live-timeline-entry">
                         <div className="live-timeline-clock"><strong>{activityClock(l.recorded_at, trip.trip_date)}</strong><small>{activityDay(l.recorded_at, trip.trip_date)}</small></div>
                         <div className="live-timeline-detail">
-                          <div className="live-timeline-event"><strong>{eventLabel[l.event_type] || l.event_type}</strong>{isAdmin && editingLogId !== l.id && <button className="live-time-edit" onClick={() => startEditLogTime(l, trip)}>{l.event_type === "exceptional_passenger_count" ? "Edit entry" : "Edit time"}</button>}</div>
+                          <div className="live-timeline-event"><strong>{eventLabel[l.event_type] || l.event_type}</strong>{isAdmin && editingLogId !== l.id && <><button className="settings-edit-button" disabled={Boolean(busy)} onClick={() => startEditLogTime(l, trip)}>Edit entry</button><button className="link-danger" disabled={Boolean(busy)} onClick={() => removeLog(trip, l)}>Remove</button></>}</div>
                           {l.location_name && <p>{l.location_name}</p>}
-                          {l.event_type === "exceptional_passenger_count" && <p>৳{Number(l.price_per_seat).toLocaleString()} per passenger · Total ৳{(Number(l.passengers_count) * Number(l.price_per_seat)).toLocaleString()}</p>}
+                          {["exceptional_passenger_count", "additional_passenger_count"].includes(l.event_type) && <p>৳{Number(l.price_per_seat).toLocaleString()} per passenger · Total ৳{(Number(l.passengers_count) * Number(l.price_per_seat)).toLocaleString()}</p>}
                           <div className="live-checkpoint-facts">{l.fuel_liters != null && <span>{l.fuel_liters} L · ৳{l.fuel_cost || 0}</span>}{l.passengers_count != null && <span>{l.passengers_count} passengers</span>}{l.note && <span>{l.note}</span>}</div>
                           {editingLogId === l.id ? (
                             <form className="live-time-editor" onSubmit={(e) => { e.preventDefault(); saveLogTime(trip, l); }}>
-                              <label className="live-field"><span>Checkpoint date &amp; time</span><input type="datetime-local" required value={editLogTime} onChange={(e) => setEditLogTime(e.target.value)} /></label>
-                              {l.event_type === "exceptional_passenger_count" && <>
+                              <label className="live-field"><span>Entry type</span><SearchableSelect id={`edit-event-${l.id}`} required value={editExceptional.event_type} options={eventOptions} onChange={(event_type) => setEditExceptional({ ...editExceptional, event_type })} /></label>
+                              <label className="live-field"><span>Checkpoint date &amp; time</span><input type="datetime-local" step="1" required value={editLogTime} onChange={(e) => setEditLogTime(e.target.value)} /></label>
+                              <label className="live-field"><span>Location</span><input value={editExceptional.location_name} onChange={(e) => setEditExceptional({ ...editExceptional, location_name: e.target.value })} /></label>
+                              {editExceptional.event_type === "passenger_count" && <label className="live-field"><span>Normal passengers</span><input required type="number" min="0" step="1" value={editExceptional.passengers_count} onChange={(e) => setEditExceptional({ ...editExceptional, passengers_count: e.target.value })} /></label>}
+                              {editExceptional.event_type === "fuel" && <><label className="live-field"><span>Fuel (liters)</span><input required type="number" min="0" step="0.01" value={editExceptional.fuel_liters} onChange={(e) => setEditExceptional({ ...editExceptional, fuel_liters: e.target.value })} /></label><label className="live-field"><span>Fuel amount (BDT)</span><input required type="number" min="0" step="0.01" value={editExceptional.fuel_cost} onChange={(e) => setEditExceptional({ ...editExceptional, fuel_cost: e.target.value })} /></label></>}
+                              {!["exceptional_passenger_count", "additional_passenger_count"].includes(editExceptional.event_type) && <label className="live-field"><span>Note</span><input value={editExceptional.note} onChange={(e) => setEditExceptional({ ...editExceptional, note: e.target.value })} /></label>}
+                              {["exceptional_passenger_count", "additional_passenger_count"].includes(editExceptional.event_type) && <>
                                 <label className="live-field"><span>Passengers</span><input required type="number" min="1" step="1" value={editExceptional.passengers_count} onChange={(e) => setEditExceptional({ ...editExceptional, passengers_count: e.target.value })} /></label>
-                                <label className="live-field"><span>Price per passenger (৳)</span><input required type="number" min="0" step="0.01" value={editExceptional.price_per_seat} onChange={(e) => setEditExceptional({ ...editExceptional, price_per_seat: e.target.value })} /></label>
-                                <label className="live-field"><span>Description</span><input required value={editExceptional.note} onChange={(e) => setEditExceptional({ ...editExceptional, note: e.target.value })} /></label>
+                                <label className="live-field"><span>Seat price (৳)</span><input required type="number" min="0" step="0.01" value={editExceptional.price_per_seat} onChange={(e) => setEditExceptional({ ...editExceptional, price_per_seat: e.target.value })} /></label>
+                                <label className="live-field"><span>Description{editExceptional.event_type === "additional_passenger_count" ? " (optional)" : ""}</span><input required={editExceptional.event_type !== "additional_passenger_count"} value={editExceptional.note} onChange={(e) => setEditExceptional({ ...editExceptional, note: e.target.value })} /></label>
                               </>}
-                              <button className="primary" type="submit">{t("save")}</button>
-                              <button className="secondary" type="button" onClick={() => setEditingLogId(null)}>{t("cancel")}</button>
+                              <button className="primary" type="submit" disabled={Boolean(busy)} aria-busy={busy === `edit:${l.id}`}>{busy === `edit:${l.id}` ? "Saving…" : t("save")}</button>
+                              <button className="secondary" type="button" disabled={Boolean(busy)} onClick={() => setEditingLogId(null)}>{t("cancel")}</button>
                             </form>
                           ) : null}
                         </div>
@@ -487,6 +601,7 @@ export default function LiveActivity() {
             )}
           </article>
         ))}
+        {historyMode && history.page_count > 1 && !historyLoading && <Pagination page={history.page} pageCount={history.page_count} onPageChange={(page) => { if (!busy) { closeEditors(); setHistoryPage(page); } }} label="historical journeys" />}
       </div>
     </div>
   );
