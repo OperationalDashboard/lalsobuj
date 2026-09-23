@@ -14,6 +14,7 @@ server/data/
 # Build output
 client/dist/
 client/build/
+client/public/checker-ocr/
 client/dist-maintenance-preview/
 
 # Logs

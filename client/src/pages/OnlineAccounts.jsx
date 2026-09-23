@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { api, getUser } from "../api.js";
 import OnlineAccountsImporter from "../components/OnlineAccountsImporter.jsx";
 import OnlineAccountsImportHistory from "../components/OnlineAccountsImportHistory.jsx";
@@ -6,6 +6,7 @@ import { ROLES, isFullAccess } from "../roles.js";
 import { canUseFeature } from "../permissions.js";
 import PdfExportButton from "../components/PdfExportButton.jsx";
 import { downloadReportPdf } from "../utils/reportPdf.js";
+const PassengerChecker = lazy(() => import("../components/PassengerChecker.jsx"));
 
 const today = () => {
   const now = new Date();
@@ -651,10 +652,12 @@ export default function OnlineAccounts() {
       <button type="button" className={view === "daily" ? "active" : ""} onClick={() => setView("daily")}>Daily entries</button>
       <button type="button" className={view === "history" ? "active" : ""} onClick={() => setView("history")}>Import history</button>
       <button type="button" className={view === "report" ? "active" : ""} onClick={() => setView("report")}>Final report</button>
+      <button type="button" className={view === "checker" ? "active" : ""} onClick={() => setView("checker")}>Passenger checker</button>
     </div>
     {error && <p className="error-text online-notice">{error}</p>}
     {message && <p className="success-text online-notice">{message}</p>}
     {!canWrite && <p className="online-read-only-note">View-only access: an Admin can enable Edit permission from Users & Permissions.</p>}
+    {view === "checker" && <Suspense fallback={<p role="status">Loading passenger checker…</p>}><PassengerChecker canWrite={canWrite} /></Suspense>}
 
     {view === "daily" && <>
       <div className="online-day-toolbar card">

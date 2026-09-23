@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.27.0 — 2026-09-23
+
+- Added Online Accounts → Passenger checker beside Final report. Read PDF/image sheets using self-hosted English/Bengali OCR, inspect the original page, and correct/confirm journey dates, bus numbers and passenger counts before comparison. Handwriting suggestions require manual verification; missed rows can be entered manually.
+- Compare reviewed rows with selected digital platforms or cash. Flag missing buses, passenger mismatches and ambiguous short numbers. Repeated bus/day rows are explicitly combined; the document heading date never replaces individual journey dates.
+- Save isolated comparison snapshots, edit/recheck with revision protection, and record Admin/Super Admin decisions with retained prior revisions. Checking or reviewing never adds, changes or removes operational sales, buses, passengers or accounts.
+- Local OCR loads only when requested and runs in the browser. An optional, disabled-by-default handwriting reader can be configured with a server-only OpenAI API key; sending pages requires explicit confirmation and may incur API charges. Original documents are not persisted in the website database.
+
 ## 1.26.0 — 2026-09-18
 
 - Added shared Super Admin bus-model templates with rename-safe aliases, archive/restore, engine layout selection, and linked maintenance anatomy.

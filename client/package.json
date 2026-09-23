@@ -1,10 +1,12 @@
 {
   "name": "lsp-client",
-  "version": "1.26.0",
+  "version": "1.27.0",
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/prepare-checker-ocr.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/prepare-checker-ocr.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -16,9 +18,12 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0",
     "read-excel-file": "^9.3.10",
+    "tesseract.js": "6.0.1",
     "three": "0.186.0"
   },
   "devDependencies": {
+    "@tesseract.js-data/ben": "1.0.0",
+    "@tesseract.js-data/eng": "1.0.0",
     "@vitejs/plugin-react": "^4.3.1",
     "vite": "^5.4.0"
   }

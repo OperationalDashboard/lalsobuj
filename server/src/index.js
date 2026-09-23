@@ -37,10 +37,12 @@ app.use((req, res, next) => {
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "same-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  res.setHeader("Content-Security-Policy", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'");
+  res.setHeader("Content-Security-Policy", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:");
   next();
 });
 app.use(cors({ origin: allowedOrigin, methods: ["GET", "POST", "PUT", "DELETE"], allowedHeaders: ["Content-Type", "Authorization"] }));
+// Larger bodies are allowed only for the authenticated, opt-in OCR endpoint.
+app.use("/api/passenger-checker-ocr", (req, res, next) => { res.setHeader("Cache-Control", "no-store, private"); next(); }, require("./routes/passengerCheckerOcr"));
 app.use(express.json({ limit: "1mb" }));
 app.use(morgan("dev"));
 app.use("/api", (req, res, next) => { res.setHeader("Cache-Control", "no-store, private"); next(); });
@@ -76,6 +78,7 @@ app.use("/api/roles", permissionsRoutes);
 app.use("/api/discount-types", discountTypesRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/online-accounts", onlineAccountsRoutes);
+app.use("/api/passenger-checks", require("./routes/passengerChecks"));
 
 app.use("/api", (req, res) => res.status(404).json({ error: "Not found" }));
 
