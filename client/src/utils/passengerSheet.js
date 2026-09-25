@@ -16,7 +16,7 @@ export function suggestPassengerRows(text, page = 1) {
   });
 }
 
-export async function readPassengerSheet(file, onProgress, signal, remoteReader) {
+export async function readPassengerSheet(file, onProgress, signal, handwritingReader) {
   if (file.size > 15 * 1024 * 1024) throw new Error("Maximum document size is 15 MB.");
   const pdfFile = /\.pdf$/i.test(file.name);
   if (!pdfFile && !/\.(png|jpe?g|webp)$/i.test(file.name)) throw new Error("Choose a PDF, JPG, PNG or WebP file.");
@@ -32,7 +32,7 @@ export async function readPassengerSheet(file, onProgress, signal, remoteReader)
   let rejectOcrError;
   const ocrError = new Promise((_, reject) => { rejectOcrError = reject; });
   ocrError.catch(() => {});
-  const deadline = setTimeout(() => rejectOcrError(new Error("Local reader timed out. Use the preview to enter rows manually.")), 120000);
+  const deadline = handwritingReader ? null : setTimeout(() => rejectOcrError(new Error("Local reader timed out. Use the preview to enter rows manually.")), 120000);
   async function recognize(image, page) {
     checkCancelled();
     if (!worker) {
@@ -73,11 +73,11 @@ export async function readPassengerSheet(file, onProgress, signal, remoteReader)
         // A scanned form may contain printed text but no readable entry rows.
         const image = canvas.toDataURL("image/jpeg", .85);
         try { if (failed) throw new Error("Reader stopped after a previous error. Enter this page’s rows manually.");
-        if (remoteReader) {
+        if (handwritingReader) {
           onProgress(`Page ${number}: reading handwriting…`);
-          const data = await Promise.race([remoteReader(image), cancelled]);
+          const data = await Promise.race([handwritingReader(image), cancelled]);
           rows.push(...data.rows.map(row => ({ ...row, date: parseImportDate(row.date, ""), source: `Page ${number}: ${row.source}` })));
-          text = data.warning || "Suggested rows from the handwriting service. Verify every row against this image.";
+          text = data.warning || "Suggested rows from the local handwriting model. Verify every row against this image.";
         } else {
           if (!suggestPassengerRows(text, number).length) text = await recognize(canvas, number);
           rows.push(...suggestPassengerRows(text, number));
@@ -91,18 +91,18 @@ export async function readPassengerSheet(file, onProgress, signal, remoteReader)
       const image = await new Promise((resolve, reject) => {
         const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file);
       });
-      // Bound uploaded pixels before remote reading; never send the original file.
+      // Bound image pixels before local inference to limit memory use.
       const bitmap = await createImageBitmap(file);
       const canvas = document.createElement("canvas");
       const scale = Math.min(1, 2200 / Math.max(bitmap.width, bitmap.height));
       canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
       canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
       let text;
-      try { if (remoteReader) {
+      try { if (handwritingReader) {
         onProgress("Page 1: reading handwriting…");
-        const data = await Promise.race([remoteReader(canvas.toDataURL("image/jpeg", .9)), cancelled]);
+        const data = await Promise.race([handwritingReader(canvas.toDataURL("image/jpeg", .9)), cancelled]);
         rows.push(...data.rows.map(row => ({ ...row, date: parseImportDate(row.date, ""), source: `Page 1: ${row.source}` })));
-        text = data.warning || "Suggested rows from the handwriting service. Verify every row against this image.";
+        text = data.warning || "Suggested rows from the local handwriting model. Verify every row against this image.";
       } else { text = await recognize(canvas, 1); rows.push(...suggestPassengerRows(text)); }
       } catch (error) { checkCancelled(); text = error.message || "Reader failed. Enter rows manually."; warnings.push(text); }
       pages.push({ image, text }); canvas.width = canvas.height = 0;

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.28.1 — 2026-09-25 (experimental review-only beta)
+
+- Integrate the smaller self-hosted Bengali cell reader into Passenger checker. Image processing and inference run on the user's device with no external OCR API. First use loads a roughly 71 MB model plus WebAssembly runtime from this website.
+- Show actual source-cell crops and raw output. Every suggested row requires manual confirmation before comparison or saving; editing it clears confirmation. Bus digits can be wrong and handwritten dates need manual correction. This is not a general-purpose or reliable handwriting engine.
+- Keep printed/PDF reading, manual entry, saved checks and administrator review. Only reviewed values enter the existing comparison API; original images and diagnostics stay in the browser. No operational accounts or passenger records are changed.
+- Add a filtered Namecheap frontend build that excludes the large Qwen research model. The frontend-only deployment does not require server restarts, database migrations or changes to environment variables. The separately prepared server OCR retirement is not required for this frontend activation.
+
+## 1.28.0 — 2026-09-23 (local prototype; NOT approved for deployment)
+
+- Added a development-only on-device Bengali handwriting prototype using self-hosted Qwen3-VL model files. No hosted inference, external OCR API, or document transfer to a third party. Requires WebGPU and a large first-use model download. The first handwritten-sheet test failed accuracy checks, so the reader is blocked in production builds.
+- Added cancellable worker inference, strict untrusted-output validation, editable suggestions, and explicit review warnings. Comparison remains read-only with respect to sales and accounts.
+- Retired the optional external OCR endpoint, including when old API environment variables exist. Existing comparison history and operational records are untouched.
+- Added pinned model setup/checksums, a local benchmark and parser regression tests. Do not deploy until actual handwritten-sheet accuracy and target-browser memory/speed pass acceptance tests.
+
 ## 1.27.0 — 2026-09-23
 
 - Added Online Accounts → Passenger checker beside Final report. Read PDF/image sheets using self-hosted English/Bengali OCR, inspect the original page, and correct/confirm journey dates, bus numbers and passenger counts before comparison. Handwriting suggestions require manual verification; missed rows can be entered manually.

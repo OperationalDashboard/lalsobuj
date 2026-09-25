@@ -19,6 +19,13 @@ function getBuildRevision() {
 
 export default defineConfig({
   plugins: [react()],
+  // Release packaging can point Vite at a filtered public tree so the
+  // development-only Qwen research model is never copied to production.
+  publicDir: process.env.LSP_PUBLIC_DIR || "public",
+  build: {
+    outDir: process.env.LSP_OUT_DIR || "dist",
+  },
+  worker: { format: "es" },
   define: {
     __APP_VERSION__: JSON.stringify(packageInfo.version),
     __APP_REVISION__: JSON.stringify(getBuildRevision()),

@@ -75,26 +75,22 @@ test("anonymous/no access rejected; viewer can compare but cannot save", async (
   assert.equal((await request("/compare","POST",input([row("5315",4)]),"viewer")).status,200);
   assert.equal((await request("","POST",input([row("5315",4)]),"viewer")).status,403);
 });
-test("optional handwriting service requires setup, edit permission and explicit consent; never trusts external URLs", async () => {
+test("external OCR is retired even with legacy environment variables; no provider requests", async () => {
   const previousEnabled = process.env.CHECKER_OCR_ENABLED, previousKey = process.env.CHECKER_OCR_API_KEY;
   let called = 0;
   try {
     process.env.CHECKER_OCR_ENABLED = "false";
-    assert.equal((await request("/../ocr/read", "POST", {consent:true,image:"data:image/png;base64,AAAA"})).status,503);
+    assert.equal((await request("/../ocr/read", "POST", {consent:true,image:"data:image/png;base64,AAAA"})).status,410);
     process.env.CHECKER_OCR_ENABLED = "true"; process.env.CHECKER_OCR_API_KEY = "test-only-not-real";
-    global.fetch = async (url, options) => {
-      called++; assert.equal(url,"https://api.openai.com/v1/responses");
-      const body = JSON.parse(options.body); assert.equal(body.store,false); assert.equal(body.text.format.strict,true);
-      return {ok:true,json:async()=>({status:"completed",output:[{content:[{type:"output_text",text:JSON.stringify({rows:[{date:"2026-09-20",bus:"5315",passengers:"4",source:"Row 1"}],warning:"Verify"})}]}]})};
-    };
+    global.fetch = async () => { called++; throw new Error('No external request is allowed'); };
     assert.equal((await request("/../ocr/read", "POST", {consent:true,image:"data:image/png;base64,AAAA"},"viewer")).status,403);
-    assert.equal((await request("/../ocr/read", "POST", {image:"data:image/png;base64,AAAA"})).status,400);
-    assert.equal((await request("/../ocr/read", "POST", {consent:true,image:"https://private-server/secret"})).status,400);
+    assert.equal((await request("/../ocr/read", "POST", {image:"data:image/png;base64,AAAA"})).status,410);
+    assert.equal((await request("/../ocr/read", "POST", {consent:true,image:"https://private-server/secret"})).status,410);
     assert.equal(called,0);
     const result = await request("/../ocr/read", "POST", {consent:true,image:"data:image/png;base64,AAAA"});
-    assert.equal(result.status,200); assert.equal(result.data.rows[0].bus,"5315"); assert.equal(called,1);
-    global.fetch = async () => ({ok:true,json:async()=>({status:"incomplete"})});
-    assert.equal((await request("/../ocr/read", "POST", {consent:true,image:"data:image/png;base64,AAAA"})).status,502);
+    assert.equal(result.status,410); assert.equal(called,0);
+    const status = await request('/../ocr/status');
+    assert.equal(status.data.localOnly, true); assert.equal(status.data.enabled, false);
     assert.equal(db.prepare("SELECT passenger_count FROM online_sales_entries WHERE id=1").get().passenger_count,4);
   } finally {
     global.fetch = realFetch;

@@ -15,7 +15,10 @@ server/data/
 client/dist/
 client/build/
 client/public/checker-ocr/
+client/public/checker-handwriting/
+client/dist-handwriting-preview/
 client/dist-maintenance-preview/
+.handwriting-evaluation/
 
 # Logs
 npm-debug.log*

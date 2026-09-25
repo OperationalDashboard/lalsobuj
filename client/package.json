@@ -1,16 +1,20 @@
 {
   "name": "lsp-client",
-  "version": "1.27.0",
+  "version": "1.28.1",
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "node scripts/prepare-checker-ocr.mjs",
+    "predev": "node scripts/prepare-checker-ocr.mjs && node scripts/prepare-handwriting-runtime.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/prepare-checker-ocr.mjs",
+    "prebuild": "node scripts/prepare-checker-ocr.mjs && node scripts/prepare-handwriting-runtime.mjs",
     "build": "vite build",
-    "preview": "vite preview"
+    "build:namecheap-beta": "node scripts/prepare-checker-ocr.mjs && node scripts/prepare-handwriting-runtime.mjs && node scripts/prepare-bengali-specialist.mjs && node scripts/build-namecheap-beta.mjs",
+    "preview": "vite preview",
+    "handwriting:prepare": "node scripts/prepare-handwriting-model.mjs",
+    "handwriting:test": "node --test test/handwriting-output.test.mjs test/local-handwriting.test.mjs test/sheet-grid.test.mjs test/bengali-specialist.test.mjs"
   },
   "dependencies": {
+    "@huggingface/transformers": "4.3.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "pdfjs-dist": "^6.3.289",
@@ -25,6 +29,7 @@
     "@tesseract.js-data/ben": "1.0.0",
     "@tesseract.js-data/eng": "1.0.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",
     "vite": "^5.4.0"
   }
 }
